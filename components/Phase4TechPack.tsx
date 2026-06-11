@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, Upload, Download, Save, CheckCircle2, ArrowLeft } from 'lucide-react'
+import { Plus, Upload, Download, Save, CheckCircle2, ArrowLeft, Trash2 } from 'lucide-react'
 import { AppState } from '@/app/page'
 
 interface Props {
@@ -9,16 +9,22 @@ interface Props {
   onBack: () => void
 }
 
-const SIZES = ['S', 'M', 'L', 'XL', '2XL']
+const SIZES = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL']
 
 const DEFAULT_MEASUREMENTS: Record<string, number[]> = {
-  'Chest (Flat)': [22, 23, 24, 25, 26],
-  'Length': [27, 28, 29, 30, 31],
-  'Sleeve Length': [24, 24.5, 25, 25.5, 26],
-  'Shoulder': [22, 23, 24, 25, 26],
-  'Bottom Opening': [18, 19, 20, 21, 22],
+  'Chest (Flat)':    [19, 20, 21, 22, 23, 24, 25],
+  'Length':          [26, 27, 28, 29, 30, 31, 32],
+  'Sleeve Length':   [23, 24, 24.5, 25, 25.5, 26, 26.5],
+  'Shoulder':        [16, 17, 18, 19, 20, 21, 22],
+  'Armhole':         [8, 8.5, 9, 9.5, 10, 10.5, 11],
+  'Bottom Opening':  [18, 19, 20, 21, 22, 23, 24],
 }
 
+const GARMENT_TYPES = ['Hoodie', 'Crewneck', 'T-Shirt', 'Long Sleeve', 'Jacket', 'Bomber', 'Jogger', 'Short', 'Other']
+const GENDERS = ['Unisex', 'Men\'s', 'Women\'s', 'Kids']
+const AGE_CATEGORIES = ['Adult', 'Youth', 'Toddler', 'Infant']
+const SIZE_RANGES = ['XS–3XL', 'S–XL', 'S–2XL', 'XS–XL', 'One Size', 'Custom']
+const SEASONS = ['SS24', 'FW24', 'SS25', 'FW25', 'SS26', 'FW26', 'Year Round']
 const SECTIONS = [
   'Style Information',
   'Fabric & Material',
@@ -29,25 +35,54 @@ const SECTIONS = [
   'Notes & Finishes',
 ]
 
+type StyleInfo = {
+  styleName: string
+  sku: string
+  revision: string
+  season: string
+  collection: string
+  brandName: string
+  clientName: string
+  dateCreated: string
+  designer: string
+  garmentType: string
+  gender: string
+  ageCategory: string
+  fitDescription: string
+  sizeRange: string
+}
+
 export default function Phase4TechPack({ state, onBack }: Props) {
-  const [styleInfo, setStyleInfo] = useState({
+  const today = new Date().toISOString().split('T')[0]
+
+  const [styleInfo, setStyleInfo] = useState<StyleInfo>({
     styleName: 'GRACE HOODIE',
     sku: 'GRH-001',
-    season: 'FW25',
-    fitDescription: 'Oversized',
-    garmentType: 'Hoodie',
     revision: 'A',
+    season: 'FW25',
+    collection: '',
+    brandName: 'GRACE',
+    clientName: '',
+    dateCreated: today,
+    designer: '',
+    garmentType: 'Hoodie',
+    gender: 'Unisex',
+    ageCategory: 'Adult',
+    fitDescription: 'Oversized',
+    sizeRange: 'XS–3XL',
   })
+
   const [measurements, setMeasurements] = useState(DEFAULT_MEASUREMENTS)
   const [pantones, setPantones] = useState([{ color: '#184D3E', name: 'PANTONE 5535 C' }])
   const [newPantone, setNewPantone] = useState('')
+  const [newPantoneColor, setNewPantoneColor] = useState('#888888')
   const [placements, setPlacements] = useState([
     { location: 'Front', description: 'Center chest logo placement' },
   ])
-  const [completedSections, setCompletedSections] = useState<Set<string>>(
-    new Set(['Style Information', 'Fabric & Material', 'Measurements', 'Pantones', 'Graphic Placement', 'Construction', 'Notes & Finishes'])
-  )
   const [uploadMsg, setUploadMsg] = useState('')
+
+  const set = (key: keyof StyleInfo, value: string) =>
+    setStyleInfo(s => ({ ...s, [key]: value }))
 
   const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -68,7 +103,7 @@ export default function Phase4TechPack({ state, onBack }: Props) {
       }
       reader.readAsText(file)
     } else {
-      setUploadMsg(`${file.name} attached (PDF/XLSX parsing coming soon)`)
+      setUploadMsg(`${file.name} attached`)
     }
     e.target.value = ''
   }
@@ -82,8 +117,9 @@ export default function Phase4TechPack({ state, onBack }: Props) {
 
   const addPantone = () => {
     if (!newPantone.trim()) return
-    setPantones(p => [...p, { color: '#888', name: newPantone.trim() }])
+    setPantones(p => [...p, { color: newPantoneColor, name: newPantone.trim() }])
     setNewPantone('')
+    setNewPantoneColor('#888888')
   }
 
   const downloadTechPack = () => {
@@ -97,8 +133,17 @@ export default function Phase4TechPack({ state, onBack }: Props) {
     URL.revokeObjectURL(url)
   }
 
+  // Auto-derive which sections have meaningful data
+  const sectionComplete = (section: string) => {
+    if (section === 'Style Information') return !!styleInfo.styleName && !!styleInfo.sku
+    if (section === 'Measurements') return true
+    if (section === 'Pantones') return pantones.length > 0
+    if (section === 'Graphic Placement') return placements.length > 0
+    return true
+  }
+
   return (
-    <div className="p-6 max-w-[1200px]">
+    <div className="p-6">
       <div className="mb-5 flex items-start justify-between">
         <div>
           <p className="phase-header">Phase 4</p>
@@ -111,74 +156,156 @@ export default function Phase4TechPack({ state, onBack }: Props) {
         </button>
       </div>
 
-      <div className="grid grid-cols-[200px_1fr_1fr_200px] gap-4">
-        {/* Col 1: Input / Upload */}
+      <div className="grid grid-cols-[180px_1fr_1fr_180px] gap-4">
+
+        {/* ── Col 1: Upload + sections ── */}
         <div className="space-y-3">
           <div className="card">
-            <p className="text-xs font-medium text-gray-400 mb-3">Input Details</p>
-            <p className="text-[11px] text-gray-600 mb-3">Fill out the spec sheet or</p>
-            <label className="btn-secondary w-full flex items-center justify-center gap-2 cursor-pointer mb-2">
+            <p className="text-xs font-medium text-gray-400 mb-2">Input Details</p>
+            <p className="text-[11px] text-gray-600 mb-2">Fill out the form or</p>
+            <label className="btn-secondary w-full flex items-center justify-center gap-2 cursor-pointer mb-1.5">
               <Upload size={13}/>
               Upload Tech Pack
               <input type="file" className="hidden" accept=".json,.pdf,.xlsx" onChange={handleUpload}/>
             </label>
-            <p className="text-[11px] text-gray-600 text-center">Supported formats: JSON, PDF, XLSX</p>
+            <p className="text-[11px] text-gray-600 text-center">JSON, PDF, XLSX</p>
             {uploadMsg && <p className="text-[11px] text-brand-green text-center mt-2">{uploadMsg}</p>}
           </div>
 
-          {/* Section completion */}
           <div className="card">
             <p className="text-xs font-medium text-gray-400 mb-2">Sections</p>
             <div className="space-y-1.5">
-              {SECTIONS.map(section => {
-                const done = completedSections.has(section)
-                return (
-                  <div key={section} className="flex items-center gap-2">
-                    <CheckCircle2 size={12} className={done ? 'text-brand-green' : 'text-gray-600'}/>
-                    <span className={`text-xs ${done ? 'text-gray-300' : 'text-gray-600'}`}>{section}</span>
-                  </div>
-                )
-              })}
+              {SECTIONS.map(s => (
+                <div key={s} className="flex items-center gap-2">
+                  <CheckCircle2 size={12} className={sectionComplete(s) ? 'text-brand-green' : 'text-gray-600'}/>
+                  <span className={`text-xs ${sectionComplete(s) ? 'text-gray-300' : 'text-gray-600'}`}>{s}</span>
+                </div>
+              ))}
             </div>
           </div>
         </div>
 
-        {/* Col 2: Style Info + Pantones */}
+        {/* ── Col 2: Style Info ── */}
         <div className="space-y-3">
           <div className="card">
-            <p className="text-xs font-medium text-gray-400 mb-3">Style Information</p>
-            <div className="space-y-2.5">
-              {[
-                { label: 'Style Name', key: 'styleName' },
-                { label: 'SKU / Style Number', key: 'sku' },
-                { label: 'Season', key: 'season' },
-                { label: 'Fit Description', key: 'fitDescription' },
-                { label: 'Garment Type', key: 'garmentType' },
-                { label: 'Revision', key: 'revision' },
-              ].map(({ label, key }) => (
+            <p className="text-xs font-semibold text-white mb-4">Style Information</p>
+
+            <div className="space-y-3">
+              {/* Text fields */}
+              {([
+                ['Style Name',       'styleName',     'text'],
+                ['SKU / Style Number','sku',           'text'],
+                ['Revision',         'revision',      'text'],
+                ['Collection',       'collection',    'text'],
+                ['Brand Name',       'brandName',     'text'],
+                ['Client Name',      'clientName',    'text'],
+                ['Designer',         'designer',      'text'],
+                ['Fit Description',  'fitDescription','text'],
+              ] as [string, keyof StyleInfo, string][]).map(([label, key, type]) => (
                 <div key={key}>
                   <label className="text-[11px] text-gray-500 mb-1 block">{label}</label>
                   <input
+                    type={type}
                     className="input-field text-xs py-2"
-                    value={styleInfo[key as keyof typeof styleInfo]}
-                    onChange={e => setStyleInfo(s => ({ ...s, [key]: e.target.value }))}
+                    value={styleInfo[key]}
+                    onChange={e => set(key, e.target.value)}
+                    placeholder={label}
                   />
                 </div>
               ))}
+
+              {/* Date */}
+              <div>
+                <label className="text-[11px] text-gray-500 mb-1 block">Date Created</label>
+                <input
+                  type="date"
+                  className="input-field text-xs py-2"
+                  value={styleInfo.dateCreated}
+                  onChange={e => set('dateCreated', e.target.value)}
+                />
+              </div>
+
+              {/* Selects */}
+              <SelectField label="Season" value={styleInfo.season} onChange={v => set('season', v)} options={SEASONS}/>
+              <SelectField label="Garment Type" value={styleInfo.garmentType} onChange={v => set('garmentType', v)} options={GARMENT_TYPES}/>
+              <SelectField label="Gender" value={styleInfo.gender} onChange={v => set('gender', v)} options={GENDERS}/>
+              <SelectField label="Age Category" value={styleInfo.ageCategory} onChange={v => set('ageCategory', v)} options={AGE_CATEGORIES}/>
+              <SelectField label="Size Range" value={styleInfo.sizeRange} onChange={v => set('sizeRange', v)} options={SIZE_RANGES}/>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Col 3: Measurements + Pantones + Placement ── */}
+        <div className="space-y-3">
+
+          {/* Measurements */}
+          <div className="card">
+            <p className="text-xs font-semibold text-white mb-3">Measurements (inches)</p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr>
+                    <th className="text-left text-gray-500 pb-2 pr-2 font-normal whitespace-nowrap">Point of Measure</th>
+                    {SIZES.map(s => (
+                      <th key={s} className="text-center text-gray-500 pb-2 px-0.5 font-normal w-9">{s}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(measurements).map(([row, vals]) => (
+                    <tr key={row} className="border-t border-dark-600">
+                      <td className="py-1.5 pr-2 text-gray-400 whitespace-nowrap">{row}</td>
+                      {vals.map((v, i) => (
+                        <td key={i} className="py-1 px-0.5">
+                          <input
+                            type="number"
+                            step="0.5"
+                            value={v}
+                            onChange={e => updateMeasurement(row, i, e.target.value)}
+                            className="w-9 bg-dark-600 border border-dark-400 rounded px-1 py-1 text-center text-gray-300 text-xs focus:outline-none focus:border-brand-green"
+                          />
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
 
+          {/* Pantones */}
           <div className="card">
-            <p className="text-xs font-medium text-gray-400 mb-3">Pantones</p>
+            <p className="text-xs font-semibold text-white mb-3">Pantones</p>
             <div className="space-y-2 mb-3">
               {pantones.map((p, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg border border-dark-400" style={{ background: p.color }}/>
-                  <span className="text-xs text-gray-300">{p.name}</span>
+                <div key={i} className="flex items-center gap-2 group">
+                  <input
+                    type="color"
+                    value={p.color}
+                    onChange={e => setPantones(ps => ps.map((x, j) => j === i ? { ...x, color: e.target.value } : x))}
+                    className="w-8 h-8 rounded-lg border border-dark-400 cursor-pointer bg-transparent p-0.5"
+                  />
+                  <input
+                    className="input-field text-xs py-1.5 flex-1"
+                    value={p.name}
+                    onChange={e => setPantones(ps => ps.map((x, j) => j === i ? { ...x, name: e.target.value } : x))}
+                  />
+                  <button
+                    onClick={() => setPantones(ps => ps.filter((_, j) => j !== i))}
+                    className="text-gray-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
+                  >
+                    <Trash2 size={12}/>
+                  </button>
                 </div>
               ))}
             </div>
             <div className="flex gap-2">
+              <input
+                type="color"
+                value={newPantoneColor}
+                onChange={e => setNewPantoneColor(e.target.value)}
+                className="w-9 h-9 rounded-lg border border-dark-400 cursor-pointer bg-transparent p-0.5 shrink-0"
+              />
               <input
                 className="input-field text-xs py-2 flex-1"
                 placeholder="PANTONE 0000 C"
@@ -191,87 +318,52 @@ export default function Phase4TechPack({ state, onBack }: Props) {
               </button>
             </div>
           </div>
-        </div>
 
-        {/* Col 3: Measurements + Placements */}
-        <div className="space-y-3">
+          {/* Graphic Placement */}
           <div className="card">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-xs font-medium text-gray-400">Measurements (inches)</p>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr>
-                    <th className="text-left text-gray-500 pb-2 pr-3 font-normal">Point</th>
-                    {SIZES.map(s => (
-                      <th key={s} className="text-center text-gray-500 pb-2 px-1 font-normal w-10">{s}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {Object.entries(measurements).map(([row, vals]) => (
-                    <tr key={row} className="border-t border-dark-600">
-                      <td className="py-2 pr-3 text-gray-400 whitespace-nowrap">{row}</td>
-                      {vals.map((v, i) => (
-                        <td key={i} className="py-1 px-1">
-                          <input
-                            type="number"
-                            step="0.5"
-                            value={v}
-                            onChange={e => updateMeasurement(row, i, e.target.value)}
-                            className="w-10 bg-dark-600 border border-dark-400 rounded px-1 py-1 text-center text-gray-300 text-xs focus:outline-none focus:border-brand-green"
-                          />
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <div className="card">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-xs font-medium text-gray-400">Graphic Placement</p>
+              <p className="text-xs font-semibold text-white">Graphic Placement</p>
               <button
-                onClick={() => setPlacements(p => [...p, { location: 'New', description: '' }])}
+                onClick={() => setPlacements(p => [...p, { location: '', description: '' }])}
                 className="text-xs text-brand-green hover:text-green-400 flex items-center gap-1"
               >
-                <Plus size={11}/> Add Placement
+                <Plus size={11}/> Add
               </button>
             </div>
             <div className="space-y-2">
               {placements.map((p, i) => (
-                <div key={i} className="bg-dark-600 rounded-lg p-2.5 space-y-2">
-                  <input
-                    className="input-field text-xs py-1.5"
-                    value={p.location}
-                    onChange={e => setPlacements(ps => ps.map((x, j) => j === i ? { ...x, location: e.target.value } : x))}
-                    placeholder="Location (e.g. Front, Back)"
-                  />
+                <div key={i} className="bg-dark-600 rounded-lg p-2.5 space-y-2 group">
+                  <div className="flex items-center gap-2">
+                    <input
+                      className="input-field text-xs py-1.5 flex-1"
+                      value={p.location}
+                      onChange={e => setPlacements(ps => ps.map((x, j) => j === i ? { ...x, location: e.target.value } : x))}
+                      placeholder="Location (Front, Back…)"
+                    />
+                    <button
+                      onClick={() => setPlacements(ps => ps.filter((_, j) => j !== i))}
+                      className="text-gray-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all shrink-0"
+                    >
+                      <Trash2 size={12}/>
+                    </button>
+                  </div>
                   <input
                     className="input-field text-xs py-1.5"
                     value={p.description}
                     onChange={e => setPlacements(ps => ps.map((x, j) => j === i ? { ...x, description: e.target.value } : x))}
-                    placeholder="Description"
+                    placeholder="Description / dimensions"
                   />
                 </div>
               ))}
             </div>
 
-            {/* Placement diagram */}
             {state.garment && (
               <div className="mt-3 grid grid-cols-4 gap-2">
                 {['Front', 'Back', 'Left Sleeve', 'Right Sleeve'].map(view => (
                   <div key={view} className="text-center">
-                    <div className="bg-dark-600 rounded-lg flex items-center justify-center" style={{ height: 64 }}>
+                    <div className="bg-dark-600 rounded-lg flex items-center justify-center" style={{ height: 60 }}>
                       {state.garment?.svg ? (
-                        <div
-                          dangerouslySetInnerHTML={{ __html: state.garment.svg }}
-                          className="h-full [&>svg]:h-full [&>svg]:w-auto opacity-60"
-                          style={{ padding: 6 }}
-                        />
+                        <div dangerouslySetInnerHTML={{ __html: state.garment.svg }} className="h-full [&>svg]:h-full [&>svg]:w-auto opacity-60" style={{ padding: 6 }}/>
                       ) : (
                         <img src={state.garment?.dataUrl} alt={view} className="h-full w-full object-contain p-2 opacity-60"/>
                       )}
@@ -284,43 +376,71 @@ export default function Phase4TechPack({ state, onBack }: Props) {
           </div>
         </div>
 
-        {/* Col 4: Summary */}
+        {/* ── Col 4: Summary + Actions ── */}
         <div className="space-y-3">
           <div className="card">
             <p className="text-xs font-medium text-gray-400 mb-3">Summary</p>
+            <div className="space-y-2 text-xs">
+              {styleInfo.styleName && <SummaryRow label="Style" value={styleInfo.styleName}/>}
+              {styleInfo.sku && <SummaryRow label="SKU" value={styleInfo.sku}/>}
+              {styleInfo.revision && <SummaryRow label="Rev." value={styleInfo.revision}/>}
+              {styleInfo.season && <SummaryRow label="Season" value={styleInfo.season}/>}
+              {styleInfo.brandName && <SummaryRow label="Brand" value={styleInfo.brandName}/>}
+              {styleInfo.garmentType && <SummaryRow label="Type" value={styleInfo.garmentType}/>}
+              {styleInfo.gender && <SummaryRow label="Gender" value={styleInfo.gender}/>}
+              {styleInfo.ageCategory && <SummaryRow label="Age" value={styleInfo.ageCategory}/>}
+              {styleInfo.sizeRange && <SummaryRow label="Sizes" value={styleInfo.sizeRange}/>}
+            </div>
+          </div>
+
+          <div className="card">
+            <p className="text-xs font-medium text-gray-400 mb-2">Sections</p>
             <div className="space-y-1.5">
-              {SECTIONS.map(section => (
-                <div key={section} className="flex items-center gap-2">
-                  <CheckCircle2 size={12} className="text-brand-green shrink-0"/>
-                  <span className="text-xs text-gray-300">{section}</span>
+              {SECTIONS.map(s => (
+                <div key={s} className="flex items-center gap-2">
+                  <CheckCircle2 size={11} className={sectionComplete(s) ? 'text-brand-green' : 'text-gray-600'}/>
+                  <span className={`text-[11px] leading-tight ${sectionComplete(s) ? 'text-gray-300' : 'text-gray-600'}`}>{s}</span>
                 </div>
               ))}
             </div>
           </div>
 
-          <button
-            onClick={downloadTechPack}
-            className="btn-primary w-full flex items-center justify-center gap-2"
-          >
-            <Save size={14}/>
-            Save Tech Pack
+          <button onClick={downloadTechPack} className="btn-primary w-full flex items-center justify-center gap-2">
+            <Save size={14}/> Save Tech Pack
           </button>
 
-          <button
-            onClick={downloadTechPack}
-            className="btn-secondary w-full flex items-center justify-center gap-2"
-          >
-            <Download size={14}/>
-            Download Tech Pack
+          <button onClick={downloadTechPack} className="btn-secondary w-full flex items-center justify-center gap-2">
+            <Download size={14}/> Download
           </button>
-
-          <div className="card text-center">
-            <div className="text-4xl mb-2">🎉</div>
-            <p className="text-xs font-medium text-white mb-1">Design Complete!</p>
-            <p className="text-[11px] text-gray-500">Your tech pack is ready to send to your manufacturer.</p>
-          </div>
         </div>
+
       </div>
+    </div>
+  )
+}
+
+function SelectField({ label, value, onChange, options }: {
+  label: string; value: string; onChange: (v: string) => void; options: string[]
+}) {
+  return (
+    <div>
+      <label className="text-[11px] text-gray-500 mb-1 block">{label}</label>
+      <select
+        className="input-field text-xs py-2"
+        value={value}
+        onChange={e => onChange(e.target.value)}
+      >
+        {options.map(o => <option key={o} value={o}>{o}</option>)}
+      </select>
+    </div>
+  )
+}
+
+function SummaryRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-between gap-2">
+      <span className="text-gray-500 shrink-0">{label}</span>
+      <span className="text-gray-300 truncate text-right">{value}</span>
     </div>
   )
 }
