@@ -253,7 +253,7 @@ export default function Phase2Garment({ state, onComplete, onBack }: Props) {
             </div>
           ) : (
             <div>
-              <div className="checkerboard rounded-xl overflow-hidden flex items-center justify-center mb-3" style={{ height: 280 }}>
+              <div className="bg-white rounded-xl overflow-hidden flex items-center justify-center mb-3 border border-slate-100" style={{ height: 280 }}>
                 {loading && (
                   <div className="flex flex-col items-center gap-3 text-gray-400">
                     <Loader2 size={32} className="animate-spin"/>
@@ -275,7 +275,7 @@ export default function Phase2Garment({ state, onComplete, onBack }: Props) {
                     <button
                       key={i}
                       onClick={() => setSelectedVariant(i)}
-                      className={`checkerboard rounded-lg flex items-center justify-center overflow-hidden transition-all ${
+                      className={`bg-white border border-slate-100 rounded-lg flex items-center justify-center overflow-hidden transition-all ${
                         selectedVariant === i ? 'ring-2 ring-brand-green' : 'hover:ring-1 hover:ring-slate-300'
                       }`}
                       style={{ height: 80 }}
@@ -293,7 +293,7 @@ export default function Phase2Garment({ state, onComplete, onBack }: Props) {
         <div className="space-y-3">
           <div className="card">
             <p className="text-xs font-medium text-gray-600 mb-3">Your Garment</p>
-            <div className="checkerboard rounded-lg flex items-center justify-center mb-3" style={{ height: 130 }}>
+            <div className="bg-white border border-slate-100 rounded-lg flex items-center justify-center mb-3" style={{ height: 130 }}>
               {(mode === 'upload' && uploadedImage) ? (
                 <img src={uploadedImage} alt="garment" className="max-h-full max-w-full object-contain p-2"/>
               ) : (mode === 'generate' && currentImage) ? (
