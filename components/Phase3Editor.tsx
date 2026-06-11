@@ -7,6 +7,7 @@ import { AppState } from '@/app/page'
 interface Props {
   state: AppState
   onComplete: (design: AppState['design']) => void
+  onSetGarment: (garment: AppState['garment']) => void
   onBack: () => void
 }
 
@@ -20,7 +21,7 @@ interface LogoLayer {
   rotation: number
 }
 
-export default function Phase3Editor({ state, onComplete, onBack }: Props) {
+export default function Phase3Editor({ state, onComplete, onSetGarment, onBack }: Props) {
   const canvasRef = useRef<HTMLDivElement>(null)
   const [zoom, setZoom] = useState(100)
   const [layers, setLayers] = useState<LogoLayer[]>([])
@@ -135,6 +136,19 @@ export default function Phase3Editor({ state, onComplete, onBack }: Props) {
 
   const handleConfirm = () => {
     onComplete({ confirmed: true, previewDataUrl: '' })
+  }
+
+  // Allow uploading a garment directly in the editor (for users who jumped
+  // straight here without generating one in Phase 2).
+  const handleUploadGarment = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = ev => {
+      onSetGarment({ svg: '', dataUrl: ev.target?.result as string, type: 'custom', color: 'custom' })
+    }
+    reader.readAsDataURL(file)
+    e.target.value = ''
   }
 
   const moveLayer = (direction: 'up' | 'down') => {
@@ -300,7 +314,7 @@ export default function Phase3Editor({ state, onComplete, onBack }: Props) {
               }}
             >
               {/* Garment background */}
-              {state.garment && (
+              {state.garment ? (
                 state.garment.svg ? (
                   <div
                     dangerouslySetInnerHTML={{ __html: state.garment.svg }}
@@ -313,6 +327,13 @@ export default function Phase3Editor({ state, onComplete, onBack }: Props) {
                     className="absolute inset-0 w-full h-full object-contain pointer-events-none"
                   />
                 )
+              ) : (
+                <label className="absolute inset-0 flex flex-col items-center justify-center gap-2 cursor-pointer text-gray-500 hover:text-gray-300 transition-colors">
+                  <Upload size={28}/>
+                  <span className="text-xs font-medium">Upload a garment</span>
+                  <span className="text-[11px] text-gray-600">or generate one in Phase 2</span>
+                  <input type="file" className="hidden" accept="image/*" onChange={handleUploadGarment}/>
+                </label>
               )}
 
               {/* Logo layers */}
@@ -495,12 +516,7 @@ export default function Phase3Editor({ state, onComplete, onBack }: Props) {
 
           <button
             onClick={handleConfirm}
-            disabled={layers.length === 0}
-            className={`w-full flex items-center justify-center gap-2 font-medium py-3 px-4 rounded-xl transition-colors text-sm ${
-              layers.length > 0
-                ? 'bg-brand-green hover:bg-brand-green-light text-white'
-                : 'bg-dark-600 text-gray-600 cursor-not-allowed'
-            }`}
+            className="w-full flex items-center justify-center gap-2 font-medium py-3 px-4 rounded-xl transition-colors text-sm bg-brand-green hover:bg-brand-green-light text-white"
           >
             Confirm Design
             <ArrowRight size={15}/>

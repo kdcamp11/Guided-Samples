@@ -22,15 +22,8 @@ const phases = [
 ]
 
 export default function Sidebar({ currentPhase, onPhaseChange, state, section, onSectionChange }: Props) {
-  const isPhaseUnlocked = (phase: number) => {
-    if (phase === 1) return true
-    // A logo is optional — users can jump straight to the garment and add
-    // (or upload) a logo later in the editor.
-    if (phase === 2) return true
-    if (phase === 3) return !!state.garment
-    if (phase === 4) return !!state.design
-    return false
-  }
+  // No barriers — every phase is freely navigable at any time.
+  const isPhaseUnlocked = (_phase: number) => true
 
   const isPhaseComplete = (phase: number) => {
     if (phase === 1) return !!state.logo

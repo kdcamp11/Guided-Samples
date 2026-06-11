@@ -80,6 +80,7 @@ export default function Home() {
             onComplete={(design) => {
               setState(s => ({ ...s, design, currentPhase: 4 }))
             }}
+            onSetGarment={(garment) => setState(s => ({ ...s, garment }))}
             onBack={() => goToPhase(2)}
           />
         )}
