@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import { RefreshCw, Download, Loader2, Sparkles, ArrowRight } from 'lucide-react'
 import { AppState } from '@/app/page'
+import { exportImage, downloadSVG } from '@/lib/export'
 
 interface Props {
   state: AppState
@@ -25,20 +26,26 @@ export default function Phase1Logo({ state, onComplete }: Props) {
   } | null>(null)
   const [selectedVariant, setSelectedVariant] = useState(0)
   const [savedLogo, setSavedLogo] = useState<AppState['logo']>(state.logo)
+  const [transparentBg, setTransparentBg] = useState(true)
+  const [exporting, setExporting] = useState<string | null>(null)
 
   const svgToDataUrl = (svg: string): string => {
     const encoded = encodeURIComponent(svg)
     return `data:image/svg+xml;charset=utf-8,${encoded}`
   }
 
-  const downloadSVG = (svg: string, name: string) => {
-    const blob = new Blob([svg], { type: 'image/svg+xml' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = name
-    a.click()
-    URL.revokeObjectURL(url)
+  const handleExport = async (fmt: 'svg' | 'png' | 'jpeg' | 'pdf') => {
+    if (!currentSvg) return
+    setExporting(fmt)
+    try {
+      const bg = transparentBg && (fmt === 'png' || fmt === 'svg') ? undefined : '#ffffff'
+      await exportImage(currentSvg, fmt, 'GRACE_logo', bg)
+    } catch (e) {
+      console.error('Export failed', e)
+      alert('Export failed — please try again.')
+    } finally {
+      setExporting(null)
+    }
   }
 
   const handleGenerate = async () => {
@@ -195,30 +202,37 @@ export default function Phase1Logo({ state, onComplete }: Props) {
 
             {currentSvg && (
               <button
-                onClick={() => downloadSVG(currentSvg, 'logo.svg')}
+                onClick={() => handleExport('png')}
+                disabled={!!exporting}
                 className="btn-primary w-full flex items-center justify-center gap-2 mb-2"
               >
-                <Download size={14}/>
-                Download
+                {exporting ? <Loader2 size={14} className="animate-spin"/> : <Download size={14}/>}
+                {exporting ? 'Exporting…' : 'Download'}
               </button>
             )}
 
             {currentSvg && (
               <div className="grid grid-cols-3 gap-1 text-xs mb-3">
-                {['PNG', 'SVG', 'PDF'].map(fmt => (
+                {(['PNG', 'SVG', 'PDF'] as const).map(fmt => (
                   <button
                     key={fmt}
-                    onClick={() => fmt === 'SVG' && currentSvg && downloadSVG(currentSvg, 'logo.svg')}
-                    className="btn-secondary py-1 text-center"
+                    onClick={() => handleExport(fmt.toLowerCase() as 'png' | 'svg' | 'pdf')}
+                    disabled={!!exporting}
+                    className="btn-secondary py-1 text-center disabled:opacity-50"
                   >
-                    {fmt}
+                    {exporting === fmt.toLowerCase() ? '…' : fmt}
                   </button>
                 ))}
               </div>
             )}
 
             <label className="flex items-center gap-2 text-xs text-gray-400 cursor-pointer">
-              <input type="checkbox" defaultChecked className="accent-brand-green"/>
+              <input
+                type="checkbox"
+                checked={transparentBg}
+                onChange={e => setTransparentBg(e.target.checked)}
+                className="accent-brand-green"
+              />
               Transparent Background
             </label>
           </div>

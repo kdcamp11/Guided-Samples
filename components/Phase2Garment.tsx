@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { Upload, Cpu, Loader2, Download, ArrowRight, ArrowLeft, ImageIcon } from 'lucide-react'
 import { AppState } from '@/app/page'
+import { exportImage } from '@/lib/export'
 
 interface Props {
   state: AppState
@@ -32,6 +33,7 @@ export default function Phase2Garment({ state, onComplete, onBack }: Props) {
   } | null>(null)
   const [selectedVariant, setSelectedVariant] = useState(0)
   const [uploadedImage, setUploadedImage] = useState<string | null>(null)
+  const [exporting, setExporting] = useState<string | null>(null)
 
   const onDrop = useCallback((files: File[]) => {
     const file = files[0]
@@ -67,14 +69,17 @@ export default function Phase2Garment({ state, onComplete, onBack }: Props) {
     }
   }
 
-  const downloadSVG = (svg: string) => {
-    const blob = new Blob([svg], { type: 'image/svg+xml' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'garment.svg'
-    a.click()
-    URL.revokeObjectURL(url)
+  const handleExport = async (fmt: 'svg' | 'png' | 'jpeg' | 'pdf') => {
+    if (!currentSvg) return
+    setExporting(fmt)
+    try {
+      await exportImage(currentSvg, fmt, 'GRACE_garment', '#ffffff')
+    } catch (e) {
+      console.error('Export failed', e)
+      alert('Export failed — please try again.')
+    } finally {
+      setExporting(null)
+    }
   }
 
   const svgToDataUrl = (svg: string) =>
@@ -294,15 +299,23 @@ export default function Phase2Garment({ state, onComplete, onBack }: Props) {
             {mode === 'generate' && currentSvg && (
               <>
                 <button
-                  onClick={() => downloadSVG(currentSvg)}
+                  onClick={() => handleExport('png')}
+                  disabled={!!exporting}
                   className="btn-primary w-full flex items-center justify-center gap-2 mb-2"
                 >
-                  <Download size={14}/>
-                  Download
+                  {exporting ? <Loader2 size={14} className="animate-spin"/> : <Download size={14}/>}
+                  {exporting ? 'Exporting…' : 'Download'}
                 </button>
                 <div className="grid grid-cols-3 gap-1 text-xs mb-3">
-                  {['PNG', 'JPG', 'PDF'].map(fmt => (
-                    <button key={fmt} className="btn-secondary py-1 text-center">{fmt}</button>
+                  {(['PNG', 'JPG', 'PDF'] as const).map(fmt => (
+                    <button
+                      key={fmt}
+                      onClick={() => handleExport(fmt === 'JPG' ? 'jpeg' : fmt.toLowerCase() as 'png' | 'pdf')}
+                      disabled={!!exporting}
+                      className="btn-secondary py-1 text-center disabled:opacity-50"
+                    >
+                      {fmt}
+                    </button>
                   ))}
                 </div>
               </>

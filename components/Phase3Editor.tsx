@@ -26,8 +26,36 @@ export default function Phase3Editor({ state, onComplete, onBack }: Props) {
   const [layers, setLayers] = useState<LogoLayer[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [dragging, setDragging] = useState<{ id: string; startX: number; startY: number; origX: number; origY: number } | null>(null)
+  const [past, setPast] = useState<LogoLayer[][]>([])
+  const [future, setFuture] = useState<LogoLayer[][]>([])
 
   const selected = layers.find(l => l.id === selectedId) ?? null
+
+  // Snapshot current layers before a mutating action so it can be undone.
+  const snapshot = () => {
+    setPast(p => [...p.slice(-49), layers])
+    setFuture([])
+  }
+
+  const undo = () => {
+    setPast(p => {
+      if (p.length === 0) return p
+      const prev = p[p.length - 1]
+      setFuture(f => [layers, ...f])
+      setLayers(prev)
+      return p.slice(0, -1)
+    })
+  }
+
+  const redo = () => {
+    setFuture(f => {
+      if (f.length === 0) return f
+      const next = f[0]
+      setPast(p => [...p, layers])
+      setLayers(next)
+      return f.slice(1)
+    })
+  }
 
   // Add the logo from Phase 1 automatically
   useEffect(() => {
@@ -48,6 +76,7 @@ export default function Phase3Editor({ state, onComplete, onBack }: Props) {
 
   const updateSelected = (updates: Partial<LogoLayer>) => {
     if (!selectedId) return
+    snapshot()
     setLayers(ls => ls.map(l => l.id === selectedId ? { ...l, ...updates } : l))
   }
 
@@ -57,6 +86,7 @@ export default function Phase3Editor({ state, onComplete, onBack }: Props) {
     setSelectedId(id)
     const layer = layers.find(l => l.id === id)
     if (!layer) return
+    snapshot()
     setDragging({ id, startX: e.clientX, startY: e.clientY, origX: layer.x, origY: layer.y })
   }
 
@@ -88,6 +118,7 @@ export default function Phase3Editor({ state, onComplete, onBack }: Props) {
     const reader = new FileReader()
     reader.onload = ev => {
       const id = crypto.randomUUID()
+      snapshot()
       setLayers(ls => [...ls, {
         id,
         dataUrl: ev.target?.result as string,
@@ -108,6 +139,7 @@ export default function Phase3Editor({ state, onComplete, onBack }: Props) {
 
   const moveLayer = (direction: 'up' | 'down') => {
     if (!selectedId) return
+    snapshot()
     setLayers(ls => {
       const idx = ls.findIndex(l => l.id === selectedId)
       if (idx === -1) return ls
@@ -128,12 +160,14 @@ export default function Phase3Editor({ state, onComplete, onBack }: Props) {
   const duplicateSelected = () => {
     if (!selected) return
     const id = crypto.randomUUID()
+    snapshot()
     setLayers(ls => [...ls, { ...selected, id, x: selected.x + 20, y: selected.y + 20 }])
     setSelectedId(id)
   }
 
   const deleteSelected = () => {
     if (!selectedId) return
+    snapshot()
     setLayers(ls => ls.filter(l => l.id !== selectedId))
     setSelectedId(null)
   }
@@ -168,6 +202,7 @@ export default function Phase3Editor({ state, onComplete, onBack }: Props) {
                 <button
                   onClick={() => {
                     const id = crypto.randomUUID()
+                    snapshot()
                     setLayers(ls => [...ls, {
                       id,
                       dataUrl: state.logo!.dataUrl,
@@ -213,10 +248,20 @@ export default function Phase3Editor({ state, onComplete, onBack }: Props) {
           {/* Toolbar */}
           <div className="flex items-center justify-between px-4 py-2.5 border-b border-dark-600">
             <div className="flex items-center gap-1">
-              <button className="p-1.5 rounded hover:bg-dark-500 text-gray-400 hover:text-white transition-colors">
+              <button
+                onClick={undo}
+                disabled={past.length === 0}
+                title="Undo"
+                className="p-1.5 rounded hover:bg-dark-500 text-gray-400 hover:text-white transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
+              >
                 <Undo2 size={14}/>
               </button>
-              <button className="p-1.5 rounded hover:bg-dark-500 text-gray-400 hover:text-white transition-colors">
+              <button
+                onClick={redo}
+                disabled={future.length === 0}
+                title="Redo"
+                className="p-1.5 rounded hover:bg-dark-500 text-gray-400 hover:text-white transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
+              >
                 <Redo2 size={14}/>
               </button>
             </div>
@@ -311,6 +356,7 @@ export default function Phase3Editor({ state, onComplete, onBack }: Props) {
                           }}
                           onMouseDown={e => {
                             e.stopPropagation()
+                            snapshot()
                             const startX = e.clientX
                             const startY = e.clientY
                             const origW = layer.width

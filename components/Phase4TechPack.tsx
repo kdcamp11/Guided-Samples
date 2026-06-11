@@ -47,6 +47,31 @@ export default function Phase4TechPack({ state, onBack }: Props) {
   const [completedSections, setCompletedSections] = useState<Set<string>>(
     new Set(['Style Information', 'Fabric & Material', 'Measurements', 'Pantones', 'Graphic Placement', 'Construction', 'Notes & Finishes'])
   )
+  const [uploadMsg, setUploadMsg] = useState('')
+
+  const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.name.endsWith('.json')) {
+      const reader = new FileReader()
+      reader.onload = ev => {
+        try {
+          const data = JSON.parse(ev.target?.result as string)
+          if (data.styleInfo) setStyleInfo(s => ({ ...s, ...data.styleInfo }))
+          if (data.measurements) setMeasurements(m => ({ ...m, ...data.measurements }))
+          if (Array.isArray(data.pantones)) setPantones(data.pantones)
+          if (Array.isArray(data.placements)) setPlacements(data.placements)
+          setUploadMsg(`Imported ${file.name}`)
+        } catch {
+          setUploadMsg('Could not parse JSON file')
+        }
+      }
+      reader.readAsText(file)
+    } else {
+      setUploadMsg(`${file.name} attached (PDF/XLSX parsing coming soon)`)
+    }
+    e.target.value = ''
+  }
 
   const updateMeasurement = (row: string, sizeIdx: number, value: string) => {
     setMeasurements(m => ({
@@ -95,9 +120,10 @@ export default function Phase4TechPack({ state, onBack }: Props) {
             <label className="btn-secondary w-full flex items-center justify-center gap-2 cursor-pointer mb-2">
               <Upload size={13}/>
               Upload Tech Pack
-              <input type="file" className="hidden" accept=".pdf,.xlsx"/>
+              <input type="file" className="hidden" accept=".json,.pdf,.xlsx" onChange={handleUpload}/>
             </label>
-            <p className="text-[11px] text-gray-600 text-center">Supported formats: PDF, XLSX</p>
+            <p className="text-[11px] text-gray-600 text-center">Supported formats: JSON, PDF, XLSX</p>
+            {uploadMsg && <p className="text-[11px] text-brand-green text-center mt-2">{uploadMsg}</p>}
           </div>
 
           {/* Section completion */}
