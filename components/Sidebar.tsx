@@ -22,7 +22,6 @@ const phases = [
 ]
 
 export default function Sidebar({ currentPhase, onPhaseChange, state, section, onSectionChange }: Props) {
-  // No barriers — every phase is freely navigable at any time.
   const isPhaseUnlocked = (_phase: number) => true
 
   const isPhaseComplete = (phase: number) => {
@@ -33,14 +32,14 @@ export default function Sidebar({ currentPhase, onPhaseChange, state, section, o
   }
 
   return (
-    <aside className="w-56 bg-dark-800 border-r border-dark-600 flex flex-col shrink-0">
+    <aside className="w-56 bg-white border-r border-slate-200 flex flex-col shrink-0">
       {/* Brand */}
-      <div className="p-4 border-b border-dark-600">
+      <div className="p-4 border-b border-slate-200">
         <div className="flex items-center gap-2 mb-0.5">
           <div className="w-7 h-7 bg-brand-green rounded-md flex items-center justify-center text-xs font-bold text-white">G</div>
           <div>
-            <div className="text-sm font-bold text-white leading-none">GRACE</div>
-            <div className="text-[10px] text-gray-500 tracking-widest">ENTERPRISE</div>
+            <div className="text-sm font-bold text-gray-900 leading-none">GRACE</div>
+            <div className="text-[10px] text-gray-400 tracking-widest">ENTERPRISE</div>
           </div>
         </div>
       </div>
@@ -57,7 +56,7 @@ export default function Sidebar({ currentPhase, onPhaseChange, state, section, o
 
         {/* Phase progress */}
         <div className="pt-4 pb-1">
-          <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-widest px-2 mb-2">Workflow</p>
+          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest px-2 mb-2">Workflow</p>
           <div className="space-y-0.5">
             {phases.map(phase => {
               const unlocked = isPhaseUnlocked(phase.id)
@@ -72,14 +71,14 @@ export default function Sidebar({ currentPhase, onPhaseChange, state, section, o
                     active
                       ? 'bg-brand-green text-white'
                       : unlocked
-                      ? 'text-gray-400 hover:bg-dark-600 hover:text-white'
-                      : 'text-gray-600 cursor-not-allowed'
+                      ? 'text-gray-500 hover:bg-slate-100 hover:text-gray-900'
+                      : 'text-gray-300 cursor-not-allowed'
                   }`}
                 >
                   <span className={`w-5 h-5 rounded-full border flex items-center justify-center text-[10px] shrink-0 ${
                     complete ? 'border-brand-green bg-brand-green text-white' :
                     active ? 'border-white text-white' :
-                    unlocked ? 'border-gray-500 text-gray-500' : 'border-gray-700 text-gray-700'
+                    unlocked ? 'border-gray-300 text-gray-500' : 'border-gray-200 text-gray-300'
                   }`}>
                     {complete ? <CheckCircle2 size={12}/> : phase.id}
                   </span>
@@ -92,11 +91,11 @@ export default function Sidebar({ currentPhase, onPhaseChange, state, section, o
       </nav>
 
       {/* User */}
-      <div className="p-3 border-t border-dark-600">
-        <button className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-dark-600 transition-colors">
+      <div className="p-3 border-t border-slate-200">
+        <button className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-slate-100 transition-colors">
           <div className="w-6 h-6 bg-brand-green rounded-full flex items-center justify-center text-[10px] font-bold text-white">GB</div>
-          <span className="text-xs text-gray-300 flex-1 text-left truncate">Grace Brand</span>
-          <ChevronRight size={12} className="text-gray-500"/>
+          <span className="text-xs text-gray-600 flex-1 text-left truncate">Grace Brand</span>
+          <ChevronRight size={12} className="text-gray-400"/>
         </button>
       </div>
     </aside>
@@ -108,7 +107,7 @@ function NavItem({ icon, label, active, onClick }: { icon: React.ReactNode; labe
     <button
       onClick={onClick}
       className={`w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-xs transition-colors ${
-        active ? 'bg-dark-600 text-white' : 'text-gray-500 hover:bg-dark-600 hover:text-gray-300'
+        active ? 'bg-slate-100 text-gray-900' : 'text-gray-500 hover:bg-slate-50 hover:text-gray-700'
       }`}
     >
       {icon}

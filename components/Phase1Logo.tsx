@@ -88,7 +88,6 @@ export default function Phase1Logo({ state, onComplete, onSkip }: Props) {
     onComplete(logo)
   }
 
-  // Let users bring their own logo instead of generating one.
   const handleUploadLogo = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -107,10 +106,10 @@ export default function Phase1Logo({ state, onComplete, onSkip }: Props) {
   }
 
   return (
-    <div className="p-6 max-w-[1200px]">
+    <div className="p-6 w-full">
       <div className="mb-5">
         <p className="phase-header">Phase 1</p>
-        <h1 className="text-xl font-bold text-white">AI Logo Generation</h1>
+        <h1 className="text-xl font-bold text-gray-900">AI Logo Generation</h1>
         <p className="text-gray-500 text-sm mt-1">Describe your logo and let AI create it for you</p>
       </div>
 
@@ -118,7 +117,7 @@ export default function Phase1Logo({ state, onComplete, onSkip }: Props) {
         {/* Left: Input */}
         <div className="space-y-3">
           <div className="card">
-            <label className="text-xs font-medium text-gray-400 mb-2 block">Describe the logo you want</label>
+            <label className="text-xs font-medium text-gray-600 mb-2 block">Describe the logo you want</label>
             <textarea
               className="textarea-field"
               rows={6}
@@ -135,13 +134,12 @@ export default function Phase1Logo({ state, onComplete, onSkip }: Props) {
               {loading ? <Loader2 size={15} className="animate-spin"/> : <Sparkles size={15}/>}
               {loading ? 'Generating…' : 'Generate Logo'}
             </button>
-            {error && <p className="text-[11px] text-red-400 mt-2">{error}</p>}
+            {error && <p className="text-[11px] text-red-500 mt-2">{error}</p>}
 
-            {/* Already have a logo? Bring your own or skip entirely. */}
             <div className="flex items-center gap-2 my-3">
-              <div className="h-px bg-dark-500 flex-1"/>
-              <span className="text-[10px] text-gray-600 uppercase tracking-wider">or</span>
-              <div className="h-px bg-dark-500 flex-1"/>
+              <div className="h-px bg-slate-200 flex-1"/>
+              <span className="text-[10px] text-gray-400 uppercase tracking-wider">or</span>
+              <div className="h-px bg-slate-200 flex-1"/>
             </div>
             <label className="btn-secondary w-full flex items-center justify-center gap-2 cursor-pointer">
               <Upload size={14}/>
@@ -150,7 +148,7 @@ export default function Phase1Logo({ state, onComplete, onSkip }: Props) {
             </label>
             <button
               onClick={onSkip}
-              className="w-full text-center text-xs text-gray-500 hover:text-gray-300 transition-colors mt-2.5"
+              className="w-full text-center text-xs text-gray-400 hover:text-gray-700 transition-colors mt-2.5"
             >
               Skip — I&apos;ll add a logo later →
             </button>
@@ -163,7 +161,7 @@ export default function Phase1Logo({ state, onComplete, onSkip }: Props) {
                 <button
                   key={ex}
                   onClick={() => setPrompt(ex)}
-                  className="w-full text-left text-xs text-gray-400 hover:text-white bg-dark-600 hover:bg-dark-500 px-3 py-2 rounded-lg transition-colors"
+                  className="w-full text-left text-xs text-gray-600 hover:text-gray-900 bg-slate-50 hover:bg-slate-100 px-3 py-2 rounded-lg transition-colors"
                 >
                   {ex}
                 </button>
@@ -175,32 +173,30 @@ export default function Phase1Logo({ state, onComplete, onSkip }: Props) {
         {/* Center: Preview */}
         <div className="card">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-medium text-gray-400">Generated Logo</span>
+            <span className="text-xs font-medium text-gray-600">Generated Logo</span>
             {result && (
-              <button onClick={handleGenerate} className="p-1.5 rounded-lg hover:bg-dark-500 text-gray-400 hover:text-white transition-colors">
+              <button onClick={handleGenerate} className="p-1.5 rounded-lg hover:bg-slate-100 text-gray-400 hover:text-gray-700 transition-colors">
                 <RefreshCw size={14}/>
               </button>
             )}
           </div>
 
-          {/* Main preview */}
           <div className="checkerboard rounded-xl overflow-hidden mb-3 flex items-center justify-center" style={{ height: 280 }}>
             {loading && (
-              <div className="flex flex-col items-center gap-3 text-gray-500">
+              <div className="flex flex-col items-center gap-3 text-gray-400">
                 <Loader2 size={32} className="animate-spin"/>
                 <span className="text-sm">Generating your logo…</span>
-                <span className="text-xs text-gray-600">This can take 10–30 seconds</span>
+                <span className="text-xs text-gray-400">This can take 10–30 seconds</span>
               </div>
             )}
             {!loading && !result && (
-              <div className="text-gray-600 text-sm">Your logo will appear here</div>
+              <div className="text-gray-400 text-sm">Your logo will appear here</div>
             )}
             {!loading && currentImage && (
               <img src={currentImage} alt="Generated logo" className="max-w-full max-h-full object-contain p-4"/>
             )}
           </div>
 
-          {/* Variants */}
           {result && result.images.length > 1 && (
             <div className="grid grid-cols-4 gap-2">
               {result.images.map((img, i) => (
@@ -208,7 +204,7 @@ export default function Phase1Logo({ state, onComplete, onSkip }: Props) {
                   key={i}
                   onClick={() => setSelectedVariant(i)}
                   className={`checkerboard rounded-lg overflow-hidden transition-all ${
-                    selectedVariant === i ? 'ring-2 ring-brand-green' : 'hover:ring-1 hover:ring-gray-500'
+                    selectedVariant === i ? 'ring-2 ring-brand-green' : 'hover:ring-1 hover:ring-slate-300'
                   }`}
                   style={{ height: 72 }}
                 >
@@ -222,12 +218,12 @@ export default function Phase1Logo({ state, onComplete, onSkip }: Props) {
         {/* Right: Actions */}
         <div className="space-y-3">
           <div className="card">
-            <p className="text-xs font-medium text-gray-400 mb-3">Your Logo</p>
+            <p className="text-xs font-medium text-gray-600 mb-3">Your Logo</p>
             <div className="checkerboard rounded-lg flex items-center justify-center mb-3" style={{ height: 120 }}>
               {savedLogo ? (
                 <img src={savedLogo.dataUrl} alt="Your logo" className="w-full h-full object-contain p-2"/>
               ) : (
-                <div className="text-gray-600 text-xs text-center px-4">Save a logo to use it</div>
+                <div className="text-gray-400 text-xs text-center px-4">Save a logo to use it</div>
               )}
             </div>
 
@@ -245,7 +241,6 @@ export default function Phase1Logo({ state, onComplete, onSkip }: Props) {
             {currentImage && (
               <div className="grid grid-cols-3 gap-1 text-xs mb-3">
                 {(['PNG', 'SVG', 'PDF'] as const).map(fmt => {
-                  // SVG export only makes sense for vector logos.
                   const disabled = !!exporting || (fmt === 'SVG' && !currentSvg)
                   return (
                     <button
@@ -262,7 +257,7 @@ export default function Phase1Logo({ state, onComplete, onSkip }: Props) {
               </div>
             )}
 
-            <label className="flex items-center gap-2 text-xs text-gray-400 cursor-pointer">
+            <label className="flex items-center gap-2 text-xs text-gray-500 cursor-pointer">
               <input
                 type="checkbox"
                 checked={transparentBg}
@@ -275,21 +270,21 @@ export default function Phase1Logo({ state, onComplete, onSkip }: Props) {
 
           {result && (
             <div className="card">
-              <p className="text-xs font-medium text-gray-400 mb-2">Logo Details</p>
+              <p className="text-xs font-medium text-gray-600 mb-2">Logo Details</p>
               <div className="space-y-1.5 text-xs">
                 <div className="flex justify-between">
                   <span className="text-gray-500">Engine</span>
-                  <span className="text-gray-300">{result.source === 'openai' ? 'OpenAI' : 'Built-in'}</span>
+                  <span className="text-gray-700">{result.source === 'openai' ? 'OpenAI' : 'Built-in'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500">Style</span>
-                  <span className="text-gray-300">{result.style}</span>
+                  <span className="text-gray-700">{result.style}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-gray-500">Color</span>
                   <div className="flex items-center gap-1.5">
                     <div className="w-3 h-3 rounded-full" style={{ background: result.color }}/>
-                    <span className="text-gray-300 font-mono">{result.color.toUpperCase()}</span>
+                    <span className="text-gray-700 font-mono">{result.color.toUpperCase()}</span>
                   </div>
                 </div>
               </div>

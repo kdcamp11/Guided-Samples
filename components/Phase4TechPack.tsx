@@ -133,7 +133,6 @@ export default function Phase4TechPack({ state, onBack }: Props) {
     URL.revokeObjectURL(url)
   }
 
-  // Auto-derive which sections have meaningful data
   const sectionComplete = (section: string) => {
     if (section === 'Style Information') return !!styleInfo.styleName && !!styleInfo.sku
     if (section === 'Measurements') return true
@@ -147,10 +146,10 @@ export default function Phase4TechPack({ state, onBack }: Props) {
       <div className="mb-5 flex items-start justify-between">
         <div>
           <p className="phase-header">Phase 4</p>
-          <h1 className="text-xl font-bold text-white">Tech Pack & Specifications</h1>
+          <h1 className="text-xl font-bold text-gray-900">Tech Pack & Specifications</h1>
           <p className="text-gray-500 text-sm mt-1">Fill in garment specifications, measurements, and placement details</p>
         </div>
-        <button onClick={onBack} className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-white transition-colors mt-1">
+        <button onClick={onBack} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-700 transition-colors mt-1">
           <ArrowLeft size={14}/>
           Back
         </button>
@@ -158,40 +157,39 @@ export default function Phase4TechPack({ state, onBack }: Props) {
 
       <div className="grid grid-cols-[180px_1fr_1fr_180px] gap-4">
 
-        {/* ── Col 1: Upload + sections ── */}
+        {/* Col 1: Upload + sections */}
         <div className="space-y-3">
           <div className="card">
-            <p className="text-xs font-medium text-gray-400 mb-2">Input Details</p>
-            <p className="text-[11px] text-gray-600 mb-2">Fill out the form or</p>
+            <p className="text-xs font-medium text-gray-600 mb-2">Input Details</p>
+            <p className="text-[11px] text-gray-400 mb-2">Fill out the form or</p>
             <label className="btn-secondary w-full flex items-center justify-center gap-2 cursor-pointer mb-1.5">
               <Upload size={13}/>
               Upload Tech Pack
               <input type="file" className="hidden" accept=".json,.pdf,.xlsx" onChange={handleUpload}/>
             </label>
-            <p className="text-[11px] text-gray-600 text-center">JSON, PDF, XLSX</p>
+            <p className="text-[11px] text-gray-400 text-center">JSON, PDF, XLSX</p>
             {uploadMsg && <p className="text-[11px] text-brand-green text-center mt-2">{uploadMsg}</p>}
           </div>
 
           <div className="card">
-            <p className="text-xs font-medium text-gray-400 mb-2">Sections</p>
+            <p className="text-xs font-medium text-gray-600 mb-2">Sections</p>
             <div className="space-y-1.5">
               {SECTIONS.map(s => (
                 <div key={s} className="flex items-center gap-2">
-                  <CheckCircle2 size={12} className={sectionComplete(s) ? 'text-brand-green' : 'text-gray-600'}/>
-                  <span className={`text-xs ${sectionComplete(s) ? 'text-gray-300' : 'text-gray-600'}`}>{s}</span>
+                  <CheckCircle2 size={12} className={sectionComplete(s) ? 'text-brand-green' : 'text-gray-300'}/>
+                  <span className={`text-xs ${sectionComplete(s) ? 'text-gray-700' : 'text-gray-400'}`}>{s}</span>
                 </div>
               ))}
             </div>
           </div>
         </div>
 
-        {/* ── Col 2: Style Info ── */}
+        {/* Col 2: Style Info */}
         <div className="space-y-3">
           <div className="card">
-            <p className="text-xs font-semibold text-white mb-4">Style Information</p>
+            <p className="text-xs font-semibold text-gray-900 mb-4">Style Information</p>
 
             <div className="space-y-3">
-              {/* Text fields */}
               {([
                 ['Style Name',       'styleName',     'text'],
                 ['SKU / Style Number','sku',           'text'],
@@ -214,7 +212,6 @@ export default function Phase4TechPack({ state, onBack }: Props) {
                 </div>
               ))}
 
-              {/* Date */}
               <div>
                 <label className="text-[11px] text-gray-500 mb-1 block">Date Created</label>
                 <input
@@ -225,7 +222,6 @@ export default function Phase4TechPack({ state, onBack }: Props) {
                 />
               </div>
 
-              {/* Selects */}
               <SelectField label="Season" value={styleInfo.season} onChange={v => set('season', v)} options={SEASONS}/>
               <SelectField label="Garment Type" value={styleInfo.garmentType} onChange={v => set('garmentType', v)} options={GARMENT_TYPES}/>
               <SelectField label="Gender" value={styleInfo.gender} onChange={v => set('gender', v)} options={GENDERS}/>
@@ -235,12 +231,11 @@ export default function Phase4TechPack({ state, onBack }: Props) {
           </div>
         </div>
 
-        {/* ── Col 3: Measurements + Pantones + Placement ── */}
+        {/* Col 3: Measurements + Pantones + Placement */}
         <div className="space-y-3">
 
-          {/* Measurements */}
           <div className="card">
-            <p className="text-xs font-semibold text-white mb-3">Measurements (inches)</p>
+            <p className="text-xs font-semibold text-gray-900 mb-3">Measurements (inches)</p>
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
@@ -253,8 +248,8 @@ export default function Phase4TechPack({ state, onBack }: Props) {
                 </thead>
                 <tbody>
                   {Object.entries(measurements).map(([row, vals]) => (
-                    <tr key={row} className="border-t border-dark-600">
-                      <td className="py-1.5 pr-2 text-gray-400 whitespace-nowrap">{row}</td>
+                    <tr key={row} className="border-t border-slate-100">
+                      <td className="py-1.5 pr-2 text-gray-600 whitespace-nowrap">{row}</td>
                       {vals.map((v, i) => (
                         <td key={i} className="py-1 px-0.5">
                           <input
@@ -262,7 +257,7 @@ export default function Phase4TechPack({ state, onBack }: Props) {
                             step="0.5"
                             value={v}
                             onChange={e => updateMeasurement(row, i, e.target.value)}
-                            className="w-9 bg-dark-600 border border-dark-400 rounded px-1 py-1 text-center text-gray-300 text-xs focus:outline-none focus:border-brand-green"
+                            className="w-9 bg-slate-50 border border-slate-200 rounded px-1 py-1 text-center text-gray-700 text-xs focus:outline-none focus:border-brand-green"
                           />
                         </td>
                       ))}
@@ -273,9 +268,8 @@ export default function Phase4TechPack({ state, onBack }: Props) {
             </div>
           </div>
 
-          {/* Pantones */}
           <div className="card">
-            <p className="text-xs font-semibold text-white mb-3">Pantones</p>
+            <p className="text-xs font-semibold text-gray-900 mb-3">Pantones</p>
             <div className="space-y-2 mb-3">
               {pantones.map((p, i) => (
                 <div key={i} className="flex items-center gap-2 group">
@@ -283,7 +277,7 @@ export default function Phase4TechPack({ state, onBack }: Props) {
                     type="color"
                     value={p.color}
                     onChange={e => setPantones(ps => ps.map((x, j) => j === i ? { ...x, color: e.target.value } : x))}
-                    className="w-8 h-8 rounded-lg border border-dark-400 cursor-pointer bg-transparent p-0.5"
+                    className="w-8 h-8 rounded-lg border border-slate-200 cursor-pointer bg-transparent p-0.5"
                   />
                   <input
                     className="input-field text-xs py-1.5 flex-1"
@@ -292,7 +286,7 @@ export default function Phase4TechPack({ state, onBack }: Props) {
                   />
                   <button
                     onClick={() => setPantones(ps => ps.filter((_, j) => j !== i))}
-                    className="text-gray-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
+                    className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
                   >
                     <Trash2 size={12}/>
                   </button>
@@ -304,7 +298,7 @@ export default function Phase4TechPack({ state, onBack }: Props) {
                 type="color"
                 value={newPantoneColor}
                 onChange={e => setNewPantoneColor(e.target.value)}
-                className="w-9 h-9 rounded-lg border border-dark-400 cursor-pointer bg-transparent p-0.5 shrink-0"
+                className="w-9 h-9 rounded-lg border border-slate-200 cursor-pointer bg-transparent p-0.5 shrink-0"
               />
               <input
                 className="input-field text-xs py-2 flex-1"
@@ -319,20 +313,19 @@ export default function Phase4TechPack({ state, onBack }: Props) {
             </div>
           </div>
 
-          {/* Graphic Placement */}
           <div className="card">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-xs font-semibold text-white">Graphic Placement</p>
+              <p className="text-xs font-semibold text-gray-900">Graphic Placement</p>
               <button
                 onClick={() => setPlacements(p => [...p, { location: '', description: '' }])}
-                className="text-xs text-brand-green hover:text-green-400 flex items-center gap-1"
+                className="text-xs text-brand-green hover:text-brand-green-light flex items-center gap-1"
               >
                 <Plus size={11}/> Add
               </button>
             </div>
             <div className="space-y-2">
               {placements.map((p, i) => (
-                <div key={i} className="bg-dark-600 rounded-lg p-2.5 space-y-2 group">
+                <div key={i} className="bg-slate-50 rounded-lg p-2.5 space-y-2 group">
                   <div className="flex items-center gap-2">
                     <input
                       className="input-field text-xs py-1.5 flex-1"
@@ -342,7 +335,7 @@ export default function Phase4TechPack({ state, onBack }: Props) {
                     />
                     <button
                       onClick={() => setPlacements(ps => ps.filter((_, j) => j !== i))}
-                      className="text-gray-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all shrink-0"
+                      className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all shrink-0"
                     >
                       <Trash2 size={12}/>
                     </button>
@@ -361,14 +354,14 @@ export default function Phase4TechPack({ state, onBack }: Props) {
               <div className="mt-3 grid grid-cols-4 gap-2">
                 {['Front', 'Back', 'Left Sleeve', 'Right Sleeve'].map(view => (
                   <div key={view} className="text-center">
-                    <div className="bg-dark-600 rounded-lg flex items-center justify-center" style={{ height: 60 }}>
+                    <div className="bg-slate-50 rounded-lg flex items-center justify-center" style={{ height: 60 }}>
                       {state.garment?.svg ? (
                         <div dangerouslySetInnerHTML={{ __html: state.garment.svg }} className="h-full [&>svg]:h-full [&>svg]:w-auto opacity-60" style={{ padding: 6 }}/>
                       ) : (
                         <img src={state.garment?.dataUrl} alt={view} className="h-full w-full object-contain p-2 opacity-60"/>
                       )}
                     </div>
-                    <p className="text-[10px] text-gray-600 mt-1">{view}</p>
+                    <p className="text-[10px] text-gray-400 mt-1">{view}</p>
                   </div>
                 ))}
               </div>
@@ -376,10 +369,10 @@ export default function Phase4TechPack({ state, onBack }: Props) {
           </div>
         </div>
 
-        {/* ── Col 4: Summary + Actions ── */}
+        {/* Col 4: Summary + Actions */}
         <div className="space-y-3">
           <div className="card">
-            <p className="text-xs font-medium text-gray-400 mb-3">Summary</p>
+            <p className="text-xs font-medium text-gray-600 mb-3">Summary</p>
             <div className="space-y-2 text-xs">
               {styleInfo.styleName && <SummaryRow label="Style" value={styleInfo.styleName}/>}
               {styleInfo.sku && <SummaryRow label="SKU" value={styleInfo.sku}/>}
@@ -394,12 +387,12 @@ export default function Phase4TechPack({ state, onBack }: Props) {
           </div>
 
           <div className="card">
-            <p className="text-xs font-medium text-gray-400 mb-2">Sections</p>
+            <p className="text-xs font-medium text-gray-600 mb-2">Sections</p>
             <div className="space-y-1.5">
               {SECTIONS.map(s => (
                 <div key={s} className="flex items-center gap-2">
-                  <CheckCircle2 size={11} className={sectionComplete(s) ? 'text-brand-green' : 'text-gray-600'}/>
-                  <span className={`text-[11px] leading-tight ${sectionComplete(s) ? 'text-gray-300' : 'text-gray-600'}`}>{s}</span>
+                  <CheckCircle2 size={11} className={sectionComplete(s) ? 'text-brand-green' : 'text-gray-300'}/>
+                  <span className={`text-[11px] leading-tight ${sectionComplete(s) ? 'text-gray-700' : 'text-gray-400'}`}>{s}</span>
                 </div>
               ))}
             </div>
@@ -440,7 +433,7 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between gap-2">
       <span className="text-gray-500 shrink-0">{label}</span>
-      <span className="text-gray-300 truncate text-right">{value}</span>
+      <span className="text-gray-700 truncate text-right">{value}</span>
     </div>
   )
 }

@@ -24,11 +24,11 @@ export default function SectionView({ section, state, onStartDesign }: Props) {
 function Header({ icon, title, subtitle }: { icon: React.ReactNode; title: string; subtitle: string }) {
   return (
     <div className="mb-6 flex items-center gap-3">
-      <div className="w-10 h-10 rounded-xl bg-brand-green/15 flex items-center justify-center text-brand-green">
+      <div className="w-10 h-10 rounded-xl bg-brand-green/10 flex items-center justify-center text-brand-green">
         {icon}
       </div>
       <div>
-        <h1 className="text-xl font-bold text-white">{title}</h1>
+        <h1 className="text-xl font-bold text-gray-900">{title}</h1>
         <p className="text-gray-500 text-sm">{subtitle}</p>
       </div>
     </div>
@@ -48,14 +48,14 @@ function Dashboard({ state, onStartDesign }: { state: AppState; onStartDesign: (
       <div className="grid grid-cols-4 gap-4 mb-6">
         {stats.map(s => (
           <div key={s.label} className="card">
-            <p className="text-3xl font-bold text-white">{s.value}</p>
+            <p className="text-3xl font-bold text-gray-900">{s.value}</p>
             <p className="text-xs text-gray-500 mt-1">{s.label}</p>
           </div>
         ))}
       </div>
       <div className="card flex items-center justify-between">
         <div>
-          <p className="text-sm font-medium text-white">Start a new design</p>
+          <p className="text-sm font-medium text-gray-900">Start a new design</p>
           <p className="text-xs text-gray-500 mt-0.5">Generate a logo, build a garment, and create a tech pack.</p>
         </div>
         <button onClick={onStartDesign} className="btn-primary flex items-center gap-2">
@@ -76,10 +76,10 @@ function Projects({ state, onStartDesign }: { state: AppState; onStartDesign: ()
           <div className="checkerboard rounded-lg w-20 h-20 flex items-center justify-center shrink-0">
             {state.logo ? (
               <img src={state.logo.dataUrl} alt="logo" className="w-full h-full object-contain p-2" />
-            ) : <Package size={24} className="text-gray-600" />}
+            ) : <Package size={24} className="text-gray-400" />}
           </div>
           <div className="flex-1">
-            <p className="text-sm font-medium text-white">GRACE Project</p>
+            <p className="text-sm font-medium text-gray-900">GRACE Project</p>
             <p className="text-xs text-gray-500 mt-0.5">
               {[state.logo && 'Logo', state.garment && 'Garment', state.design && 'Design'].filter(Boolean).join(' · ') || 'In progress'}
             </p>
@@ -105,10 +105,10 @@ function TechPacks({ state }: { state: AppState }) {
       {state.design ? (
         <div className="card flex items-center justify-between">
           <div>
-            <p className="text-sm font-medium text-white">GRACE HOODIE — GRH-001</p>
+            <p className="text-sm font-medium text-gray-900">GRACE HOODIE — GRH-001</p>
             <p className="text-xs text-gray-500 mt-0.5">FW25 · Revision A</p>
           </div>
-          <span className="text-xs px-2 py-1 rounded-full bg-brand-green/15 text-brand-green">Ready</span>
+          <span className="text-xs px-2 py-1 rounded-full bg-brand-green/10 text-brand-green">Ready</span>
         </div>
       ) : (
         <EmptyState icon={<Package size={28} />} title="No tech packs yet" subtitle="Complete a design to generate a tech pack." />
@@ -141,7 +141,7 @@ function LibraryView({ state }: { state: AppState }) {
               <div className="checkerboard rounded-lg h-28 flex items-center justify-center mb-2">
                 <img src={a.src} alt={a.label} className="w-full h-full object-contain p-2" />
               </div>
-              <p className="text-xs text-gray-400">{a.label}</p>
+              <p className="text-xs text-gray-600">{a.label}</p>
             </div>
           ))}
         </div>
@@ -164,7 +164,7 @@ function SettingsView() {
           <label className="text-xs text-gray-500 mb-1.5 block">Default Logo Color</label>
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg" style={{ background: '#184D3E' }} />
-            <span className="text-sm text-gray-300 font-mono">#184D3E</span>
+            <span className="text-sm text-gray-700 font-mono">#184D3E</span>
           </div>
         </div>
       </div>
@@ -186,9 +186,9 @@ function EmptyState({ icon, title, subtitle, action, onAction }: {
 }) {
   return (
     <div className="card flex flex-col items-center justify-center text-center py-16">
-      <div className="text-gray-600 mb-3">{icon}</div>
-      <p className="text-sm font-medium text-gray-300">{title}</p>
-      {subtitle && <p className="text-xs text-gray-600 mt-1 max-w-xs">{subtitle}</p>}
+      <div className="text-gray-300 mb-3">{icon}</div>
+      <p className="text-sm font-medium text-gray-700">{title}</p>
+      {subtitle && <p className="text-xs text-gray-400 mt-1 max-w-xs">{subtitle}</p>}
       {action && onAction && (
         <button onClick={onAction} className="btn-primary mt-4 flex items-center gap-2">
           <Plus size={14} /> {action}

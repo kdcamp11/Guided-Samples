@@ -48,14 +48,12 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack }
     }
   }
 
-  // Manual save — immediate, with brief "saving" feedback.
   const saveDesign = () => {
     setSaveStatus('saving')
     if (saveTimer.current) clearTimeout(saveTimer.current)
     setTimeout(() => writeSave(layers), 150)
   }
 
-  // Snapshot current layers before a mutating action so it can be undone.
   const snapshot = () => {
     setPast(p => [...p.slice(-49), layers])
     setFuture([])
@@ -81,9 +79,6 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack }
     })
   }
 
-  // On mount: restore a previously saved design, otherwise seed the Phase 1
-  // logo. Runs once; remounting (e.g. navigating away and back) restores from
-  // localStorage since React state is lost but the save persists.
   useEffect(() => {
     let restored = false
     try {
@@ -115,7 +110,6 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Auto-save: debounce writes whenever the design changes after hydration.
   useEffect(() => {
     if (!hydrated.current) return
     setSaveStatus('saving')
@@ -173,11 +167,7 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack }
       setLayers(ls => [...ls, {
         id,
         dataUrl: ev.target?.result as string,
-        x: 60,
-        y: 80,
-        width: 160,
-        height: 80,
-        rotation: 0,
+        x: 60, y: 80, width: 160, height: 80, rotation: 0,
       }])
       setSelectedId(id)
     }
@@ -188,8 +178,6 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack }
     onComplete({ confirmed: true, previewDataUrl: '' })
   }
 
-  // Allow uploading a garment directly in the editor (for users who jumped
-  // straight here without generating one in Phase 2).
   const handleUploadGarment = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -236,15 +224,17 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack }
     setSelectedId(null)
   }
 
+  void lastSaved
+
   return (
-    <div className="p-6 max-w-[1200px]">
+    <div className="p-6 w-full">
       <div className="mb-5 flex items-start justify-between">
         <div>
           <p className="phase-header">Phase 3</p>
-          <h1 className="text-xl font-bold text-white">Apply Logo to Garment</h1>
+          <h1 className="text-xl font-bold text-gray-900">Apply Logo to Garment</h1>
           <p className="text-gray-500 text-sm mt-1">Drag, resize, and position your logo on the garment</p>
         </div>
-        <button onClick={onBack} className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-white transition-colors mt-1">
+        <button onClick={onBack} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-700 transition-colors mt-1">
           <ArrowLeft size={14}/>
           Back
         </button>
@@ -254,7 +244,7 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack }
         {/* Left: Assets */}
         <div className="space-y-3">
           <div className="card">
-            <p className="text-xs font-medium text-gray-400 mb-3">Your Assets</p>
+            <p className="text-xs font-medium text-gray-600 mb-3">Your Assets</p>
             <label className="btn-secondary w-full flex items-center justify-center gap-2 cursor-pointer">
               <Upload size={13}/>
               Upload Logo
@@ -274,7 +264,7 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack }
                     }])
                     setSelectedId(id)
                   }}
-                  className="w-full bg-dark-600 hover:bg-dark-500 rounded-lg overflow-hidden transition-colors"
+                  className="w-full bg-slate-50 hover:bg-slate-100 rounded-lg overflow-hidden transition-colors"
                 >
                   <div className="checkerboard rounded-lg" style={{ height: 64 }}>
                     <img src={state.logo.dataUrl} alt="logo" className="w-full h-full object-contain p-2"/>
@@ -285,17 +275,16 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack }
             </div>
           </div>
 
-          {/* Layer panel */}
           {layers.length > 0 && (
             <div className="card">
-              <p className="text-xs font-medium text-gray-400 mb-2">Layers</p>
+              <p className="text-xs font-medium text-gray-600 mb-2">Layers</p>
               <div className="space-y-1">
                 {[...layers].reverse().map((layer, i) => (
                   <button
                     key={layer.id}
                     onClick={() => setSelectedId(layer.id)}
                     className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs transition-colors ${
-                      selectedId === layer.id ? 'bg-brand-green/20 text-white' : 'hover:bg-dark-600 text-gray-400'
+                      selectedId === layer.id ? 'bg-brand-green/10 text-gray-900' : 'hover:bg-slate-100 text-gray-500'
                     }`}
                   >
                     <Layers size={11}/>
@@ -310,13 +299,13 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack }
         {/* Center: Canvas */}
         <div className="card p-0 overflow-hidden">
           {/* Toolbar */}
-          <div className="flex items-center justify-between px-4 py-2.5 border-b border-dark-600">
+          <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-200">
             <div className="flex items-center gap-1">
               <button
                 onClick={undo}
                 disabled={past.length === 0}
                 title="Undo"
-                className="p-1.5 rounded hover:bg-dark-500 text-gray-400 hover:text-white transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
+                className="p-1.5 rounded hover:bg-slate-100 text-gray-400 hover:text-gray-700 transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
               >
                 <Undo2 size={14}/>
               </button>
@@ -324,23 +313,22 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack }
                 onClick={redo}
                 disabled={future.length === 0}
                 title="Redo"
-                className="p-1.5 rounded hover:bg-dark-500 text-gray-400 hover:text-white transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
+                className="p-1.5 rounded hover:bg-slate-100 text-gray-400 hover:text-gray-700 transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
               >
                 <Redo2 size={14}/>
               </button>
             </div>
-            <div className="flex items-center gap-2 text-xs text-gray-400">
-              <button onClick={() => setZoom(z => Math.max(25, z - 25))} className="p-1 rounded hover:bg-dark-500 hover:text-white transition-colors">
+            <div className="flex items-center gap-2 text-xs text-gray-500">
+              <button onClick={() => setZoom(z => Math.max(25, z - 25))} className="p-1 rounded hover:bg-slate-100 hover:text-gray-700 transition-colors">
                 <Minus size={12}/>
               </button>
               <span className="w-14 text-center">{zoom}%</span>
-              <button onClick={() => setZoom(z => Math.min(200, z + 25))} className="p-1 rounded hover:bg-dark-500 hover:text-white transition-colors">
+              <button onClick={() => setZoom(z => Math.min(200, z + 25))} className="p-1 rounded hover:bg-slate-100 hover:text-gray-700 transition-colors">
                 <Plus size={12}/>
               </button>
             </div>
             <div className="flex items-center gap-2.5">
-              {/* Auto-save status */}
-              <span className="text-[11px] text-gray-500 flex items-center gap-1 min-w-[64px] justify-end">
+              <span className="text-[11px] text-gray-400 flex items-center gap-1 min-w-[64px] justify-end">
                 {saveStatus === 'saving' && <><Loader2 size={11} className="animate-spin"/> Saving…</>}
                 {saveStatus === 'saved' && <><Check size={11} className="text-brand-green"/> Saved</>}
               </span>
@@ -366,7 +354,7 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack }
           <div
             ref={canvasRef}
             className="relative checkerboard overflow-hidden flex items-center justify-center"
-            style={{ height: 440 }}
+            style={{ height: 500 }}
             onClick={e => { if (e.target === e.currentTarget) setSelectedId(null) }}
           >
             <div
@@ -374,11 +362,10 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack }
                 transform: `scale(${zoom / 100})`,
                 transformOrigin: 'center center',
                 position: 'relative',
-                width: 340,
-                height: 400,
+                width: 380,
+                height: 460,
               }}
             >
-              {/* Garment background */}
               {state.garment ? (
                 state.garment.svg ? (
                   <div
@@ -393,15 +380,14 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack }
                   />
                 )
               ) : (
-                <label className="absolute inset-0 flex flex-col items-center justify-center gap-2 cursor-pointer text-gray-500 hover:text-gray-300 transition-colors">
+                <label className="absolute inset-0 flex flex-col items-center justify-center gap-2 cursor-pointer text-gray-400 hover:text-gray-600 transition-colors">
                   <Upload size={28}/>
                   <span className="text-xs font-medium">Upload a garment</span>
-                  <span className="text-[11px] text-gray-600">or generate one in Phase 2</span>
+                  <span className="text-[11px] text-gray-400">or generate one in Phase 2</span>
                   <input type="file" className="hidden" accept="image/*" onChange={handleUploadGarment}/>
                 </label>
               )}
 
-              {/* Logo layers */}
               {layers.map(layer => (
                 <div
                   key={layer.id}
@@ -420,7 +406,6 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack }
                   }}
                 >
                   <img src={layer.dataUrl} alt="logo" className="w-full h-full object-contain" draggable={false}/>
-                  {/* Corner handles */}
                   {selectedId === layer.id && (
                     <>
                       {[
@@ -500,7 +485,7 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack }
           {selected ? (
             <>
               <div className="card">
-                <p className="text-xs font-medium text-gray-400 mb-3">Edit</p>
+                <p className="text-xs font-medium text-gray-600 mb-3">Edit</p>
                 <div className="space-y-4">
                   <ControlRow
                     label="Scale"
@@ -511,11 +496,11 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack }
                   />
                   <div>
                     <div className="flex justify-between items-center mb-1.5">
-                      <span className="text-xs text-gray-400">Rotate</span>
+                      <span className="text-xs text-gray-500">Rotate</span>
                       <div className="flex items-center gap-1.5">
-                        <button onClick={() => updateSelected({ rotation: selected.rotation - 15 })} className="w-5 h-5 flex items-center justify-center rounded hover:bg-dark-500 text-gray-400 hover:text-white transition-colors text-xs">−</button>
-                        <span className="text-xs text-gray-300 w-10 text-center">{selected.rotation}°</span>
-                        <button onClick={() => updateSelected({ rotation: selected.rotation + 15 })} className="w-5 h-5 flex items-center justify-center rounded hover:bg-dark-500 text-gray-400 hover:text-white transition-colors text-xs">+</button>
+                        <button onClick={() => updateSelected({ rotation: selected.rotation - 15 })} className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-100 text-gray-500 hover:text-gray-900 transition-colors text-xs">−</button>
+                        <span className="text-xs text-gray-700 w-10 text-center">{selected.rotation}°</span>
+                        <button onClick={() => updateSelected({ rotation: selected.rotation + 15 })} className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-100 text-gray-500 hover:text-gray-900 transition-colors text-xs">+</button>
                       </div>
                     </div>
                     <input
@@ -528,7 +513,7 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack }
                     />
                   </div>
                   <div>
-                    <span className="text-xs text-gray-400 block mb-2">Position</span>
+                    <span className="text-xs text-gray-500 block mb-2">Position</span>
                     <div className="grid grid-cols-3 gap-1">
                       <div/>
                       <button onClick={() => updateSelected({ y: selected.y - 10 })} className="btn-secondary py-1.5 flex items-center justify-center">
@@ -538,7 +523,7 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack }
                       <button onClick={() => updateSelected({ x: selected.x - 10 })} className="btn-secondary py-1.5 flex items-center justify-center">
                         <ArrowLeft size={12}/>
                       </button>
-                      <div className="w-6 h-6 rounded-full bg-dark-500 mx-auto self-center"/>
+                      <div className="w-6 h-6 rounded-full bg-slate-200 mx-auto self-center"/>
                       <button onClick={() => updateSelected({ x: selected.x + 10 })} className="btn-secondary py-1.5 flex items-center justify-center">
                         <ArrowRight size={12}/>
                       </button>
@@ -553,7 +538,7 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack }
               </div>
 
               <div className="card">
-                <p className="text-xs font-medium text-gray-400 mb-2">Layer</p>
+                <p className="text-xs font-medium text-gray-600 mb-2">Layer</p>
                 <div className="grid grid-cols-2 gap-1.5">
                   <button onClick={() => moveLayer('up')} className="btn-secondary flex items-center justify-center gap-1 text-xs py-2">
                     <ChevronUp size={12}/> Bring Fwd
@@ -564,7 +549,7 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack }
                   <button onClick={duplicateSelected} className="btn-secondary flex items-center justify-center gap-1 text-xs py-2">
                     <Copy size={12}/> Duplicate
                   </button>
-                  <button onClick={deleteSelected} className="flex items-center justify-center gap-1 text-xs py-2 rounded-lg bg-red-900/30 hover:bg-red-900/50 text-red-400 hover:text-red-300 transition-colors border border-red-900/40">
+                  <button onClick={deleteSelected} className="flex items-center justify-center gap-1 text-xs py-2 rounded-lg bg-red-50 hover:bg-red-100 text-red-500 hover:text-red-600 transition-colors border border-red-200">
                     <Trash2 size={12}/> Delete
                   </button>
                 </div>
@@ -573,8 +558,8 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack }
           ) : (
             <div className="card">
               <div className="text-center py-8">
-                <Layers size={24} className="mx-auto text-gray-600 mb-2"/>
-                <p className="text-xs text-gray-600">Select a layer to edit</p>
+                <Layers size={24} className="mx-auto text-gray-300 mb-2"/>
+                <p className="text-xs text-gray-400">Select a layer to edit</p>
               </div>
             </div>
           )}
@@ -600,11 +585,11 @@ function ControlRow({
 }) {
   return (
     <div className="flex items-center justify-between">
-      <span className="text-xs text-gray-400">{label}</span>
+      <span className="text-xs text-gray-500">{label}</span>
       <div className="flex items-center gap-1.5">
-        <button onClick={onDecrement} className="w-5 h-5 flex items-center justify-center rounded hover:bg-dark-500 text-gray-400 hover:text-white transition-colors text-xs">−</button>
-        <span className="text-xs text-gray-300 w-12 text-center">{value}{unit}</span>
-        <button onClick={onIncrement} className="w-5 h-5 flex items-center justify-center rounded hover:bg-dark-500 text-gray-400 hover:text-white transition-colors text-xs">+</button>
+        <button onClick={onDecrement} className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-100 text-gray-500 hover:text-gray-900 transition-colors text-xs">−</button>
+        <span className="text-xs text-gray-700 w-12 text-center">{value}{unit}</span>
+        <button onClick={onIncrement} className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-100 text-gray-500 hover:text-gray-900 transition-colors text-xs">+</button>
       </div>
     </div>
   )

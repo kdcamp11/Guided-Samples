@@ -44,7 +44,7 @@ export default function Home() {
   }
 
   return (
-    <div className="flex h-screen bg-dark-900 overflow-hidden">
+    <div className="flex h-screen bg-gray-50 overflow-hidden">
       <Sidebar
         currentPhase={state.currentPhase}
         onPhaseChange={goToPhase}
