@@ -75,7 +75,7 @@ function Projects({ state, onStartDesign }: { state: AppState; onStartDesign: ()
         <div className="card flex items-center gap-4">
           <div className="checkerboard rounded-lg w-20 h-20 flex items-center justify-center shrink-0">
             {state.logo ? (
-              <div dangerouslySetInnerHTML={{ __html: state.logo.svg }} className="w-full h-full [&>svg]:w-full [&>svg]:h-full p-2" />
+              <img src={state.logo.dataUrl} alt="logo" className="w-full h-full object-contain p-2" />
             ) : <Package size={24} className="text-gray-600" />}
           </div>
           <div className="flex-1">
@@ -128,9 +128,9 @@ function Orders() {
 
 function LibraryView({ state }: { state: AppState }) {
   const assets = [
-    state.logo && { label: 'GRACE_logo', svg: state.logo.svg },
-    state.garment && state.garment.svg && { label: 'GRACE_garment', svg: state.garment.svg },
-  ].filter(Boolean) as { label: string; svg: string }[]
+    state.logo && { label: 'GRACE_logo', src: state.logo.dataUrl },
+    state.garment && { label: 'GRACE_garment', src: state.garment.dataUrl },
+  ].filter(Boolean) as { label: string; src: string }[]
   return (
     <div className="p-6 max-w-[1100px]">
       <Header icon={<Library size={20} />} title="Library" subtitle="Your reusable logos and garments" />
@@ -139,7 +139,7 @@ function LibraryView({ state }: { state: AppState }) {
           {assets.map(a => (
             <div key={a.label} className="card">
               <div className="checkerboard rounded-lg h-28 flex items-center justify-center mb-2">
-                <div dangerouslySetInnerHTML={{ __html: a.svg }} className="w-full h-full [&>svg]:w-full [&>svg]:h-full p-2" />
+                <img src={a.src} alt={a.label} className="w-full h-full object-contain p-2" />
               </div>
               <p className="text-xs text-gray-400">{a.label}</p>
             </div>

@@ -99,6 +99,53 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   })
 }
 
+// Export an already-rasterized image (e.g. an AI-generated PNG data URL).
+export async function exportRaster(
+  dataUrl: string,
+  format: 'png' | 'jpeg' | 'pdf',
+  baseName: string,
+  background?: string
+) {
+  if (format === 'png') {
+    downloadBlob(dataUrlToBlob(dataUrl), `${baseName}.png`)
+    return
+  }
+  const img = await loadImage(dataUrl)
+  const canvas = document.createElement('canvas')
+  canvas.width = img.naturalWidth
+  canvas.height = img.naturalHeight
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('Canvas not supported')
+  ctx.fillStyle = background || '#ffffff'
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
+  ctx.drawImage(img, 0, 0)
+  const jpeg = canvas.toDataURL('image/jpeg', 0.95)
+  if (format === 'jpeg') {
+    downloadBlob(dataUrlToBlob(jpeg), `${baseName}.jpg`)
+    return
+  }
+  const pdf = await buildSingleImagePdf(jpeg)
+  downloadBlob(pdf, `${baseName}.pdf`)
+}
+
+// Export an asset that may be vector (SVG) or raster (data URL), choosing the
+// best path. Falls back to the raster image when no SVG source is available.
+export async function exportAsset(
+  asset: { svg?: string | null; image: string },
+  format: 'svg' | 'png' | 'jpeg' | 'pdf',
+  baseName: string,
+  background?: string
+) {
+  if (asset.svg) {
+    await exportImage(asset.svg, format, baseName, background)
+    return
+  }
+  // No vector source — SVG export isn't possible, so emit a PNG instead.
+  const raster = format === 'svg' ? 'png' : format
+  await exportRaster(asset.image, raster, baseName, background)
+}
+
+
 // Minimal single-image PDF writer (no external deps), embedding a JPEG via DCTDecode.
 async function buildSingleImagePdf(jpegDataUrl: string): Promise<Blob> {
   const img = await loadImage(jpegDataUrl)

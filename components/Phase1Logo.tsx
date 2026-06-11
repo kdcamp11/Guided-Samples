@@ -3,11 +3,19 @@
 import { useState } from 'react'
 import { RefreshCw, Download, Loader2, Sparkles, ArrowRight } from 'lucide-react'
 import { AppState } from '@/app/page'
-import { exportImage, downloadSVG } from '@/lib/export'
+import { exportAsset } from '@/lib/export'
 
 interface Props {
   state: AppState
   onComplete: (logo: AppState['logo']) => void
+}
+
+interface LogoResult {
+  source: 'openai' | 'svg'
+  images: string[]
+  svgs: (string | null)[]
+  style: string
+  color: string
 }
 
 const EXAMPLES = [
@@ -21,25 +29,22 @@ export default function Phase1Logo({ state, onComplete }: Props) {
     state.logo ? '' : 'Create a vintage athletic logo for my brand called GRACE. Make it minimal with an arrow element. Use forest green.'
   )
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState<{
-    svg: string; variants: string[]; style: string; color: string
-  } | null>(null)
+  const [error, setError] = useState('')
+  const [result, setResult] = useState<LogoResult | null>(null)
   const [selectedVariant, setSelectedVariant] = useState(0)
   const [savedLogo, setSavedLogo] = useState<AppState['logo']>(state.logo)
   const [transparentBg, setTransparentBg] = useState(true)
   const [exporting, setExporting] = useState<string | null>(null)
 
-  const svgToDataUrl = (svg: string): string => {
-    const encoded = encodeURIComponent(svg)
-    return `data:image/svg+xml;charset=utf-8,${encoded}`
-  }
+  const currentImage = result ? result.images[selectedVariant] : null
+  const currentSvg = result ? result.svgs[selectedVariant] : null
 
   const handleExport = async (fmt: 'svg' | 'png' | 'jpeg' | 'pdf') => {
-    if (!currentSvg) return
+    if (!currentImage) return
     setExporting(fmt)
     try {
       const bg = transparentBg && (fmt === 'png' || fmt === 'svg') ? undefined : '#ffffff'
-      await exportImage(currentSvg, fmt, 'GRACE_logo', bg)
+      await exportAsset({ svg: currentSvg, image: currentImage }, fmt, 'GRACE_logo', bg)
     } catch (e) {
       console.error('Export failed', e)
       alert('Export failed — please try again.')
@@ -51,37 +56,36 @@ export default function Phase1Logo({ state, onComplete }: Props) {
   const handleGenerate = async () => {
     if (!prompt.trim()) return
     setLoading(true)
+    setError('')
     try {
       const res = await fetch('/api/generate-logo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt }),
       })
-      const data = await res.json()
+      if (!res.ok) throw new Error('Request failed')
+      const data: LogoResult = await res.json()
       setResult(data)
       setSelectedVariant(0)
     } catch (e) {
       console.error(e)
+      setError('Generation failed. Please try again.')
     } finally {
       setLoading(false)
     }
   }
 
-  const handleSaveLogo = () => {
-    if (!result) return
-    const svg = selectedVariant === 0 ? result.svg : result.variants[selectedVariant - 1]
+  const handleUse = () => {
+    if (!result || !currentImage) return
     const logo = {
-      svg,
-      dataUrl: svgToDataUrl(svg),
+      svg: currentSvg || '',
+      dataUrl: currentImage,
       style: result.style,
       color: result.color,
     }
     setSavedLogo(logo)
+    onComplete(logo)
   }
-
-  const currentSvg = result
-    ? (selectedVariant === 0 ? result.svg : result.variants[selectedVariant - 1])
-    : null
 
   return (
     <div className="p-6 max-w-[1200px]">
@@ -112,6 +116,7 @@ export default function Phase1Logo({ state, onComplete }: Props) {
               {loading ? <Loader2 size={15} className="animate-spin"/> : <Sparkles size={15}/>}
               {loading ? 'Generating…' : 'Generate Logo'}
             </button>
+            {error && <p className="text-[11px] text-red-400 mt-2">{error}</p>}
           </div>
 
           <div className="card">
@@ -142,29 +147,26 @@ export default function Phase1Logo({ state, onComplete }: Props) {
           </div>
 
           {/* Main preview */}
-          <div className="checkerboard rounded-xl overflow-hidden mb-3 flex items-center justify-center" style={{ height: 220 }}>
+          <div className="checkerboard rounded-xl overflow-hidden mb-3 flex items-center justify-center" style={{ height: 280 }}>
             {loading && (
               <div className="flex flex-col items-center gap-3 text-gray-500">
                 <Loader2 size={32} className="animate-spin"/>
                 <span className="text-sm">Generating your logo…</span>
+                <span className="text-xs text-gray-600">This can take 10–30 seconds</span>
               </div>
             )}
             {!loading && !result && (
               <div className="text-gray-600 text-sm">Your logo will appear here</div>
             )}
-            {!loading && currentSvg && (
-              <div
-                dangerouslySetInnerHTML={{ __html: currentSvg }}
-                className="w-full h-full flex items-center justify-center [&>svg]:max-w-full [&>svg]:max-h-full"
-                style={{ padding: 16 }}
-              />
+            {!loading && currentImage && (
+              <img src={currentImage} alt="Generated logo" className="max-w-full max-h-full object-contain p-4"/>
             )}
           </div>
 
           {/* Variants */}
-          {result && (
+          {result && result.images.length > 1 && (
             <div className="grid grid-cols-4 gap-2">
-              {[result.svg, ...result.variants].map((svg, i) => (
+              {result.images.map((img, i) => (
                 <button
                   key={i}
                   onClick={() => setSelectedVariant(i)}
@@ -173,11 +175,7 @@ export default function Phase1Logo({ state, onComplete }: Props) {
                   }`}
                   style={{ height: 72 }}
                 >
-                  <div
-                    dangerouslySetInnerHTML={{ __html: svg }}
-                    className="w-full h-full [&>svg]:w-full [&>svg]:h-full"
-                    style={{ padding: 6 }}
-                  />
+                  <img src={img} alt={`Variant ${i + 1}`} className="w-full h-full object-contain p-1.5"/>
                 </button>
               ))}
             </div>
@@ -190,17 +188,13 @@ export default function Phase1Logo({ state, onComplete }: Props) {
             <p className="text-xs font-medium text-gray-400 mb-3">Your Logo</p>
             <div className="checkerboard rounded-lg flex items-center justify-center mb-3" style={{ height: 120 }}>
               {savedLogo ? (
-                <div
-                  dangerouslySetInnerHTML={{ __html: savedLogo.svg }}
-                  className="w-full h-full [&>svg]:w-full [&>svg]:h-full"
-                  style={{ padding: 8 }}
-                />
+                <img src={savedLogo.dataUrl} alt="Your logo" className="w-full h-full object-contain p-2"/>
               ) : (
                 <div className="text-gray-600 text-xs text-center px-4">Save a logo to use it</div>
               )}
             </div>
 
-            {currentSvg && (
+            {currentImage && (
               <button
                 onClick={() => handleExport('png')}
                 disabled={!!exporting}
@@ -211,18 +205,23 @@ export default function Phase1Logo({ state, onComplete }: Props) {
               </button>
             )}
 
-            {currentSvg && (
+            {currentImage && (
               <div className="grid grid-cols-3 gap-1 text-xs mb-3">
-                {(['PNG', 'SVG', 'PDF'] as const).map(fmt => (
-                  <button
-                    key={fmt}
-                    onClick={() => handleExport(fmt.toLowerCase() as 'png' | 'svg' | 'pdf')}
-                    disabled={!!exporting}
-                    className="btn-secondary py-1 text-center disabled:opacity-50"
-                  >
-                    {exporting === fmt.toLowerCase() ? '…' : fmt}
-                  </button>
-                ))}
+                {(['PNG', 'SVG', 'PDF'] as const).map(fmt => {
+                  // SVG export only makes sense for vector logos.
+                  const disabled = !!exporting || (fmt === 'SVG' && !currentSvg)
+                  return (
+                    <button
+                      key={fmt}
+                      onClick={() => handleExport(fmt.toLowerCase() as 'png' | 'svg' | 'pdf')}
+                      disabled={disabled}
+                      title={fmt === 'SVG' && !currentSvg ? 'Vector export unavailable for AI images' : ''}
+                      className="btn-secondary py-1 text-center disabled:opacity-40"
+                    >
+                      {exporting === fmt.toLowerCase() ? '…' : fmt}
+                    </button>
+                  )
+                })}
               </div>
             )}
 
@@ -242,6 +241,10 @@ export default function Phase1Logo({ state, onComplete }: Props) {
               <p className="text-xs font-medium text-gray-400 mb-2">Logo Details</p>
               <div className="space-y-1.5 text-xs">
                 <div className="flex justify-between">
+                  <span className="text-gray-500">Engine</span>
+                  <span className="text-gray-300">{result.source === 'openai' ? 'OpenAI' : 'Built-in'}</span>
+                </div>
+                <div className="flex justify-between">
                   <span className="text-gray-500">Style</span>
                   <span className="text-gray-300">{result.style}</span>
                 </div>
@@ -252,26 +255,13 @@ export default function Phase1Logo({ state, onComplete }: Props) {
                     <span className="text-gray-300 font-mono">{result.color.toUpperCase()}</span>
                   </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Created</span>
-                  <span className="text-gray-300">{new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
-                </div>
               </div>
             </div>
           )}
 
-          {currentSvg && (
+          {currentImage && (
             <button
-              onClick={() => {
-                handleSaveLogo()
-                const svg = selectedVariant === 0 ? result!.svg : result!.variants[selectedVariant - 1]
-                onComplete({
-                  svg,
-                  dataUrl: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`,
-                  style: result!.style,
-                  color: result!.color,
-                })
-              }}
+              onClick={handleUse}
               className="w-full flex items-center justify-center gap-2 bg-brand-green hover:bg-brand-green-light text-white font-medium py-3 px-4 rounded-xl transition-colors text-sm"
             >
               Use This Logo

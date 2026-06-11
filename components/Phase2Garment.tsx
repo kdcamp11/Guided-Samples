@@ -4,7 +4,15 @@ import { useState, useCallback } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { Upload, Cpu, Loader2, Download, ArrowRight, ArrowLeft, ImageIcon } from 'lucide-react'
 import { AppState } from '@/app/page'
-import { exportImage } from '@/lib/export'
+import { exportAsset } from '@/lib/export'
+
+interface GarmentResult {
+  source: 'openai' | 'svg'
+  images: string[]
+  svgs: (string | null)[]
+  garmentType: string
+  color: string
+}
 
 interface Props {
   state: AppState
@@ -28,9 +36,8 @@ export default function Phase2Garment({ state, onComplete, onBack }: Props) {
   )
   const [color, setColor] = useState('Black')
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState<{
-    svg: string; variants: string[]; type: string; color: string
-  } | null>(null)
+  const [error, setError] = useState('')
+  const [result, setResult] = useState<GarmentResult | null>(null)
   const [selectedVariant, setSelectedVariant] = useState(0)
   const [uploadedImage, setUploadedImage] = useState<string | null>(null)
   const [exporting, setExporting] = useState<string | null>(null)
@@ -53,27 +60,33 @@ export default function Phase2Garment({ state, onComplete, onBack }: Props) {
 
   const handleGenerate = async () => {
     setLoading(true)
+    setError('')
     try {
       const res = await fetch('/api/generate-garment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: `${prompt} Color: ${color}` }),
       })
-      const data = await res.json()
+      if (!res.ok) throw new Error('Request failed')
+      const data: GarmentResult = await res.json()
       setResult(data)
       setSelectedVariant(0)
     } catch (e) {
       console.error(e)
+      setError('Generation failed. Please try again.')
     } finally {
       setLoading(false)
     }
   }
 
-  const handleExport = async (fmt: 'svg' | 'png' | 'jpeg' | 'pdf') => {
-    if (!currentSvg) return
+  const currentImage = result ? result.images[selectedVariant] : null
+  const currentSvg = result ? result.svgs[selectedVariant] : null
+
+  const handleExport = async (fmt: 'png' | 'jpeg' | 'pdf') => {
+    if (!currentImage) return
     setExporting(fmt)
     try {
-      await exportImage(currentSvg, fmt, 'GRACE_garment', '#ffffff')
+      await exportAsset({ svg: currentSvg, image: currentImage }, fmt, 'GRACE_garment', '#ffffff')
     } catch (e) {
       console.error('Export failed', e)
       alert('Export failed — please try again.')
@@ -81,13 +94,6 @@ export default function Phase2Garment({ state, onComplete, onBack }: Props) {
       setExporting(null)
     }
   }
-
-  const svgToDataUrl = (svg: string) =>
-    `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
-
-  const currentSvg = result
-    ? (selectedVariant === 0 ? result.svg : result.variants[selectedVariant - 1])
-    : null
 
   const handleProceed = () => {
     if (mode === 'upload' && uploadedImage) {
@@ -97,11 +103,11 @@ export default function Phase2Garment({ state, onComplete, onBack }: Props) {
         type: 'custom',
         color: 'custom',
       })
-    } else if (result && currentSvg) {
+    } else if (result && currentImage) {
       onComplete({
-        svg: currentSvg,
-        dataUrl: svgToDataUrl(currentSvg),
-        type: result.type,
+        svg: currentSvg || '',
+        dataUrl: currentImage,
+        type: result.garmentType,
         color: result.color,
       })
     }
@@ -202,6 +208,7 @@ export default function Phase2Garment({ state, onComplete, onBack }: Props) {
                 {loading ? <Loader2 size={14} className="animate-spin"/> : <Cpu size={14}/>}
                 {loading ? 'Generating…' : 'Generate Garment'}
               </button>
+              {error && <p className="text-[11px] text-red-400">{error}</p>}
             </div>
           )}
 
@@ -247,33 +254,34 @@ export default function Phase2Garment({ state, onComplete, onBack }: Props) {
             </div>
           ) : (
             <div>
-              <div className="rounded-xl overflow-hidden flex items-center justify-center bg-dark-600 mb-3" style={{ height: 240 }}>
+              <div className="checkerboard rounded-xl overflow-hidden flex items-center justify-center mb-3" style={{ height: 280 }}>
                 {loading && (
                   <div className="flex flex-col items-center gap-3 text-gray-500">
                     <Loader2 size={32} className="animate-spin"/>
                     <span className="text-sm">Generating garment…</span>
+                    <span className="text-xs text-gray-600">This can take 10–30 seconds</span>
                   </div>
                 )}
                 {!loading && !result && (
                   <div className="text-gray-600 text-sm">Generated garment will appear here</div>
                 )}
-                {!loading && currentSvg && (
-                  <div dangerouslySetInnerHTML={{ __html: currentSvg }} className="h-full [&>svg]:h-full [&>svg]:w-auto" style={{ padding: 16 }}/>
+                {!loading && currentImage && (
+                  <img src={currentImage} alt="Generated garment" className="max-h-full max-w-full object-contain p-4"/>
                 )}
               </div>
 
-              {result && (
+              {result && result.images.length > 1 && (
                 <div className="grid grid-cols-4 gap-2">
-                  {[result.svg, ...result.variants].map((svg, i) => (
+                  {result.images.map((img, i) => (
                     <button
                       key={i}
                       onClick={() => setSelectedVariant(i)}
-                      className={`bg-dark-600 rounded-lg flex items-center justify-center overflow-hidden transition-all ${
+                      className={`checkerboard rounded-lg flex items-center justify-center overflow-hidden transition-all ${
                         selectedVariant === i ? 'ring-2 ring-brand-green' : 'hover:ring-1 hover:ring-gray-500'
                       }`}
                       style={{ height: 80 }}
                     >
-                      <div dangerouslySetInnerHTML={{ __html: svg }} className="h-full [&>svg]:h-full [&>svg]:w-auto" style={{ padding: 8 }}/>
+                      <img src={img} alt={`View ${i + 1}`} className="max-h-full max-w-full object-contain p-1.5"/>
                     </button>
                   ))}
                 </div>
@@ -286,17 +294,17 @@ export default function Phase2Garment({ state, onComplete, onBack }: Props) {
         <div className="space-y-3">
           <div className="card">
             <p className="text-xs font-medium text-gray-400 mb-3">Your Garment</p>
-            <div className="bg-dark-600 rounded-lg flex items-center justify-center mb-3" style={{ height: 130 }}>
+            <div className="checkerboard rounded-lg flex items-center justify-center mb-3" style={{ height: 130 }}>
               {(mode === 'upload' && uploadedImage) ? (
-                <img src={uploadedImage} alt="garment" className="max-h-full max-w-full object-contain" style={{ padding: 8 }}/>
-              ) : (mode === 'generate' && currentSvg) ? (
-                <div dangerouslySetInnerHTML={{ __html: currentSvg }} className="h-full [&>svg]:h-full [&>svg]:w-auto" style={{ padding: 8 }}/>
+                <img src={uploadedImage} alt="garment" className="max-h-full max-w-full object-contain p-2"/>
+              ) : (mode === 'generate' && currentImage) ? (
+                <img src={currentImage} alt="garment" className="max-h-full max-w-full object-contain p-2"/>
               ) : (
                 <div className="text-gray-600 text-xs text-center px-4">Your garment will appear here</div>
               )}
             </div>
 
-            {mode === 'generate' && currentSvg && (
+            {mode === 'generate' && currentImage && (
               <>
                 <button
                   onClick={() => handleExport('png')}

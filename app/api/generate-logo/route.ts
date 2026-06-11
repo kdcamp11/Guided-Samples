@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+// Image generation can take 10-40s; allow up to 60s (Vercel Hobby max).
+export const runtime = 'nodejs'
+export const maxDuration = 60
+
 export async function POST(req: NextRequest) {
   const { prompt } = await req.json()
 
@@ -7,20 +11,77 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Prompt required' }, { status: 400 })
   }
 
-  // Build an SVG logo based on the prompt using simple pattern matching
-  const svg = generateSVGLogo(prompt)
+  const style = detectStyle(prompt)
+  const color = detectColor(prompt)
 
+  // Try OpenAI first; fall back to the built-in SVG generator on any failure.
+  if (process.env.OPENAI_API_KEY) {
+    try {
+      const images = await generateWithOpenAI(prompt)
+      return NextResponse.json({
+        source: 'openai',
+        images,
+        svgs: images.map(() => null),
+        style,
+        color,
+      })
+    } catch (err) {
+      console.error('OpenAI logo generation failed, falling back to SVG:', err)
+    }
+  }
+
+  // SVG fallback
+  const svgs = [
+    generateSVGLogo(prompt),
+    generateSVGLogo(prompt, 'variant1'),
+    generateSVGLogo(prompt, 'variant2'),
+    generateSVGLogo(prompt, 'variant3'),
+    generateSVGLogo(prompt, 'variant4'),
+  ]
   return NextResponse.json({
-    logoSvg: svg,
-    variants: [
-      generateSVGLogo(prompt, 'variant1'),
-      generateSVGLogo(prompt, 'variant2'),
-      generateSVGLogo(prompt, 'variant3'),
-      generateSVGLogo(prompt, 'variant4'),
-    ],
-    style: detectStyle(prompt),
-    color: detectColor(prompt),
+    source: 'svg',
+    images: svgs.map(svgToDataUrl),
+    svgs,
+    style,
+    color,
   })
+}
+
+async function generateWithOpenAI(userPrompt: string): Promise<string[]> {
+  const prompt = `A professional vector-style brand logo. ${userPrompt}.
+Clean, minimal, high-contrast, centered composition, flat design, no mockup, no background scene.
+The logo must sit on a fully transparent background with no drop shadow.`
+
+  const res = await fetch('https://api.openai.com/v1/images/generations', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: 'gpt-image-1',
+      prompt,
+      n: 2,
+      size: '1024x1024',
+      background: 'transparent',
+      output_format: 'png',
+      quality: 'medium',
+    }),
+  })
+
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(`OpenAI ${res.status}: ${text}`)
+  }
+
+  const data = await res.json()
+  return (data.data as { b64_json: string }[]).map(
+    d => `data:image/png;base64,${d.b64_json}`
+  )
+}
+
+function svgToDataUrl(svg: string): string {
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
 }
 
 function detectColor(prompt: string): string {
@@ -106,7 +167,6 @@ function generateSVGLogo(prompt: string, variant?: string): string {
 </svg>`
   }
 
-  // Default
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 200" width="400" height="200">
   <text x="200" y="110" text-anchor="middle" font-family="'Impact', 'Arial Black', sans-serif" font-size="80" font-weight="900" fill="${color}">${name}</text>
   ${hasArrow ? `<polygon points="60,135 180,128 60,121" fill="${color}"/><polygon points="340,135 220,128 340,121" fill="${color}"/>` : ''}
