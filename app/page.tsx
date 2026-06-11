@@ -62,6 +62,7 @@ export default function Home() {
             onComplete={(logo) => {
               setState(s => ({ ...s, logo, currentPhase: 2 }))
             }}
+            onSkip={() => setState(s => ({ ...s, currentPhase: 2 }))}
           />
         )}
         {section === 'design' && state.currentPhase === 2 && (

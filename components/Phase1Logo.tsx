@@ -1,13 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { RefreshCw, Download, Loader2, Sparkles, ArrowRight } from 'lucide-react'
+import { RefreshCw, Download, Loader2, Sparkles, ArrowRight, Upload } from 'lucide-react'
 import { AppState } from '@/app/page'
 import { exportAsset } from '@/lib/export'
 
 interface Props {
   state: AppState
   onComplete: (logo: AppState['logo']) => void
+  onSkip: () => void
 }
 
 interface LogoResult {
@@ -24,7 +25,7 @@ const EXAMPLES = [
   'Athletic crest logo',
 ]
 
-export default function Phase1Logo({ state, onComplete }: Props) {
+export default function Phase1Logo({ state, onComplete, onSkip }: Props) {
   const [prompt, setPrompt] = useState(
     state.logo ? '' : 'Create a vintage athletic logo for my brand called GRACE. Make it minimal with an arrow element. Use forest green.'
   )
@@ -87,6 +88,24 @@ export default function Phase1Logo({ state, onComplete }: Props) {
     onComplete(logo)
   }
 
+  // Let users bring their own logo instead of generating one.
+  const handleUploadLogo = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = ev => {
+      const logo = {
+        svg: '',
+        dataUrl: ev.target?.result as string,
+        style: 'Uploaded',
+        color: '#184D3E',
+      }
+      onComplete(logo)
+    }
+    reader.readAsDataURL(file)
+    e.target.value = ''
+  }
+
   return (
     <div className="p-6 max-w-[1200px]">
       <div className="mb-5">
@@ -117,6 +136,24 @@ export default function Phase1Logo({ state, onComplete }: Props) {
               {loading ? 'Generating…' : 'Generate Logo'}
             </button>
             {error && <p className="text-[11px] text-red-400 mt-2">{error}</p>}
+
+            {/* Already have a logo? Bring your own or skip entirely. */}
+            <div className="flex items-center gap-2 my-3">
+              <div className="h-px bg-dark-500 flex-1"/>
+              <span className="text-[10px] text-gray-600 uppercase tracking-wider">or</span>
+              <div className="h-px bg-dark-500 flex-1"/>
+            </div>
+            <label className="btn-secondary w-full flex items-center justify-center gap-2 cursor-pointer">
+              <Upload size={14}/>
+              Upload Your Own Logo
+              <input type="file" className="hidden" accept="image/*" onChange={handleUploadLogo}/>
+            </label>
+            <button
+              onClick={onSkip}
+              className="w-full text-center text-xs text-gray-500 hover:text-gray-300 transition-colors mt-2.5"
+            >
+              Skip — I&apos;ll add a logo later →
+            </button>
           </div>
 
           <div className="card">
