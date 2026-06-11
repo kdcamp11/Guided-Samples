@@ -382,7 +382,7 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack }
           {/* Canvas area */}
           <div
             ref={canvasRef}
-            className="relative checkerboard overflow-hidden flex items-center justify-center"
+            className="relative bg-white overflow-hidden flex items-center justify-center"
             style={{ height: 500 }}
             onClick={e => { if (e.target === e.currentTarget) setSelectedId(null) }}
           >
