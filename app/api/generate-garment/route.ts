@@ -61,7 +61,7 @@ async function generateWithOpenAI(builtPrompt: string, referenceImage?: string, 
     const blob = new Blob([buffer], { type: mime })
 
     const form = new FormData()
-    form.append('model', 'gpt-image-1')
+    form.append('model', 'gpt-image-2')
     form.append('image[]', blob, `reference.${mime.split('/')[1]}`)
     form.append('prompt', builtPrompt)
     form.append('n', '1')
@@ -90,7 +90,7 @@ async function generateWithOpenAI(builtPrompt: string, referenceImage?: string, 
       Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
     },
     body: JSON.stringify({
-      model: 'gpt-image-1',
+      model: 'gpt-image-2',
       prompt: builtPrompt,
       n: 1,
       size: '1024x1024',

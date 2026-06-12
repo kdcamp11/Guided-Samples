@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
         : `Professional apparel product photography of this garment. Studio lighting, white background, photorealistic, no model, no mannequin. Show the full garment.`
 
       const form = new FormData()
-      form.append('model', 'gpt-image-1')
+      form.append('model', 'gpt-image-2')
       form.append('prompt', prompt)
       form.append('n', '2')
       form.append('size', '1024x1024')
@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
         method: 'POST',
         headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
         body: (garmentImage || logoImage) ? form : JSON.stringify({
-          model: 'gpt-image-1', prompt, n: 2, size: '1024x1024', output_format: 'png', quality: 'medium',
+          model: 'gpt-image-2', prompt, n: 2, size: '1024x1024', output_format: 'png', quality: 'medium',
         }),
       })
 

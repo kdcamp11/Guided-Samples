@@ -320,7 +320,7 @@ export default function Phase1Logo({ state, onComplete, onSkip }: Props) {
               <div className="space-y-1.5 text-xs">
                 <div className="flex justify-between">
                   <span className="text-gray-500">Engine</span>
-                  <span className="text-gray-700">{result.source === 'openai' ? 'OpenAI gpt-image-1' : 'Built-in'}</span>
+                  <span className="text-gray-700">{result.source === 'openai' ? 'OpenAI gpt-image-2' : 'Built-in'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500">Variants</span>
