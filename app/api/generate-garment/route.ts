@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
 }
 
 async function generateWithOpenAI(builtPrompt: string, referenceImage?: string, quality: 'clean' | 'realistic' = 'clean'): Promise<string> {
-  const apiQuality = quality === 'realistic' ? 'high' : 'medium'
+  const apiQuality = 'medium'
   if (referenceImage) {
     const base64Data = referenceImage.split(',')[1]
     const mimeMatch = referenceImage.match(/^data:(image\/\w+);base64,/)
