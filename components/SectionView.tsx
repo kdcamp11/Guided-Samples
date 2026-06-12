@@ -1,9 +1,11 @@
 'use client'
 
+import { useState } from 'react'
 import {
-  LayoutDashboard, FolderOpen, Package, ShoppingCart, Library, Settings, Plus, ArrowRight
+  LayoutDashboard, FolderOpen, Package, ShoppingCart, Library, Settings, Plus, ArrowRight, Save, KeyRound, LogOut
 } from 'lucide-react'
 import { AppState } from '@/app/page'
+import { useAuth } from '@/lib/auth'
 
 interface Props {
   section: string
@@ -43,9 +45,9 @@ function Dashboard({ state, onStartDesign }: { state: AppState; onStartDesign: (
     { label: 'Previews', value: state.preview ? 1 : 0 },
   ]
   return (
-    <div className="p-6 max-w-[1100px]">
+    <div className="p-4 md:p-6 max-w-[1100px]">
       <Header icon={<LayoutDashboard size={20} />} title="Dashboard" subtitle="Overview of your design activity" />
-      <div className="grid grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
         {stats.map(s => (
           <div key={s.label} className="card">
             <p className="text-3xl font-bold text-gray-900">{s.value}</p>
@@ -53,12 +55,12 @@ function Dashboard({ state, onStartDesign }: { state: AppState; onStartDesign: (
           </div>
         ))}
       </div>
-      <div className="card flex items-center justify-between">
+      <div className="card flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <p className="text-sm font-medium text-gray-900">Start a new design</p>
           <p className="text-xs text-gray-500 mt-0.5">Generate a logo, build a garment, and create a tech pack.</p>
         </div>
-        <button onClick={onStartDesign} className="btn-primary flex items-center gap-2">
+        <button onClick={onStartDesign} className="btn-primary flex items-center gap-2 shrink-0">
           New Design <ArrowRight size={15} />
         </button>
       </div>
@@ -69,22 +71,22 @@ function Dashboard({ state, onStartDesign }: { state: AppState; onStartDesign: (
 function Projects({ state, onStartDesign }: { state: AppState; onStartDesign: () => void }) {
   const hasProject = state.logo || state.garment || state.design
   return (
-    <div className="p-6 max-w-[1100px]">
+    <div className="p-4 md:p-6 max-w-[1100px]">
       <Header icon={<FolderOpen size={20} />} title="Projects" subtitle="Your saved design projects" />
       {hasProject ? (
         <div className="card flex items-center gap-4">
-          <div className="checkerboard rounded-lg w-20 h-20 flex items-center justify-center shrink-0">
+          <div className="checkerboard rounded-lg w-16 h-16 md:w-20 md:h-20 flex items-center justify-center shrink-0">
             {state.logo ? (
               <img src={state.logo.dataUrl} alt="logo" className="w-full h-full object-contain p-2" />
             ) : <Package size={24} className="text-gray-400" />}
           </div>
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-gray-900">GRACE Project</p>
-            <p className="text-xs text-gray-500 mt-0.5">
+            <p className="text-xs text-gray-500 mt-0.5 truncate">
               {[state.logo && 'Logo', state.garment && 'Garment', state.design && 'Design'].filter(Boolean).join(' · ') || 'In progress'}
             </p>
           </div>
-          <button onClick={onStartDesign} className="btn-secondary">Open</button>
+          <button onClick={onStartDesign} className="btn-secondary shrink-0">Open</button>
         </div>
       ) : (
         <EmptyState
@@ -100,15 +102,15 @@ function Projects({ state, onStartDesign }: { state: AppState; onStartDesign: ()
 
 function TechPacks({ state }: { state: AppState }) {
   return (
-    <div className="p-6 max-w-[1100px]">
+    <div className="p-4 md:p-6 max-w-[1100px]">
       <Header icon={<Package size={20} />} title="Tech Packs" subtitle="Specification sheets for manufacturing" />
       {state.design ? (
-        <div className="card flex items-center justify-between">
+        <div className="card flex items-center justify-between gap-4">
           <div>
             <p className="text-sm font-medium text-gray-900">GRACE HOODIE — GRH-001</p>
             <p className="text-xs text-gray-500 mt-0.5">FW25 · Revision A</p>
           </div>
-          <span className="text-xs px-2 py-1 rounded-full bg-brand-green/10 text-brand-green">Ready</span>
+          <span className="text-xs px-2 py-1 rounded-full bg-brand-green/10 text-brand-green shrink-0">Ready</span>
         </div>
       ) : (
         <EmptyState icon={<Package size={28} />} title="No tech packs yet" subtitle="Complete a design to generate a tech pack." />
@@ -119,7 +121,7 @@ function TechPacks({ state }: { state: AppState }) {
 
 function Orders() {
   return (
-    <div className="p-6 max-w-[1100px]">
+    <div className="p-4 md:p-6 max-w-[1100px]">
       <Header icon={<ShoppingCart size={20} />} title="Orders" subtitle="Production and sample orders" />
       <EmptyState icon={<ShoppingCart size={28} />} title="No orders yet" subtitle="Submit a tech pack to a manufacturer to place an order." />
     </div>
@@ -132,10 +134,10 @@ function LibraryView({ state }: { state: AppState }) {
     state.garment && { label: 'GRACE_garment', src: state.garment.dataUrl },
   ].filter(Boolean) as { label: string; src: string }[]
   return (
-    <div className="p-6 max-w-[1100px]">
+    <div className="p-4 md:p-6 max-w-[1100px]">
       <Header icon={<Library size={20} />} title="Library" subtitle="Your reusable logos and garments" />
       {assets.length > 0 ? (
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {assets.map(a => (
             <div key={a.label} className="card">
               <div className="checkerboard rounded-lg h-28 flex items-center justify-center mb-2">
@@ -153,30 +155,145 @@ function LibraryView({ state }: { state: AppState }) {
 }
 
 function SettingsView() {
+  const { user, updateUser, changePassword, signOut } = useAuth()
+  const [profile, setProfile] = useState({
+    name: user?.name ?? '',
+    email: user?.email ?? '',
+    phone: user?.phone ?? '',
+    brandName: user?.brandName ?? '',
+    address: user?.address ?? '',
+    city: user?.city ?? '',
+    state: user?.state ?? '',
+    zip: user?.zip ?? '',
+    country: user?.country ?? '',
+  })
+  const [profileSaved, setProfileSaved] = useState(false)
+
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [passwordMsg, setPasswordMsg] = useState<{ text: string; ok: boolean } | null>(null)
+
+  const handleProfileSave = () => {
+    updateUser(profile)
+    setProfileSaved(true)
+    setTimeout(() => setProfileSaved(false), 2500)
+  }
+
+  const handlePasswordChange = () => {
+    setPasswordMsg(null)
+    if (newPassword !== confirmPassword) {
+      setPasswordMsg({ text: 'New passwords do not match.', ok: false })
+      return
+    }
+    const err = changePassword(currentPassword, newPassword)
+    if (err) {
+      setPasswordMsg({ text: err, ok: false })
+    } else {
+      setPasswordMsg({ text: 'Password updated successfully.', ok: true })
+      setCurrentPassword('')
+      setNewPassword('')
+      setConfirmPassword('')
+    }
+  }
+
   return (
-    <div className="p-6 max-w-[700px]">
-      <Header icon={<Settings size={20} />} title="Settings" subtitle="Workspace preferences" />
-      <div className="card space-y-4">
-        <Field label="Brand Name" value="GRACE" />
-        <Field label="Workspace" value="Keith Camp's projects" />
-        <Field label="Plan" value="Hobby" />
-        <div>
-          <label className="text-xs text-gray-500 mb-1.5 block">Default Logo Color</label>
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg" style={{ background: '#184D3E' }} />
-            <span className="text-sm text-gray-700 font-mono">#184D3E</span>
+    <div className="p-4 md:p-6 max-w-[700px]">
+      <Header icon={<Settings size={20} />} title="Settings" subtitle="Manage your account and preferences" />
+
+      {/* Profile */}
+      <div className="card mb-4">
+        <div className="flex items-center gap-3 mb-5">
+          <div className="w-12 h-12 bg-brand-green rounded-full flex items-center justify-center text-lg font-bold text-white">
+            {user?.name?.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) ?? 'GB'}
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-gray-900">{user?.name}</p>
+            <p className="text-xs text-gray-500">{user?.email}</p>
           </div>
         </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+          <Field label="Full Name" value={profile.name} onChange={v => setProfile(p => ({ ...p, name: v }))} />
+          <Field label="Email" type="email" value={profile.email} onChange={v => setProfile(p => ({ ...p, email: v }))} />
+          <Field label="Phone" type="tel" value={profile.phone} onChange={v => setProfile(p => ({ ...p, phone: v }))} placeholder="+1 (555) 000-0000" />
+          <Field label="Brand Name" value={profile.brandName} onChange={v => setProfile(p => ({ ...p, brandName: v }))} />
+        </div>
+
+        <p className="text-xs font-medium text-gray-700 mb-3">Shipping Address</p>
+        <div className="grid grid-cols-1 gap-3 mb-4">
+          <Field label="Street Address" value={profile.address} onChange={v => setProfile(p => ({ ...p, address: v }))} placeholder="123 Main St" />
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="City" value={profile.city} onChange={v => setProfile(p => ({ ...p, city: v }))} />
+            <Field label="State / Province" value={profile.state} onChange={v => setProfile(p => ({ ...p, state: v }))} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="ZIP / Postal Code" value={profile.zip} onChange={v => setProfile(p => ({ ...p, zip: v }))} />
+            <Field label="Country" value={profile.country} onChange={v => setProfile(p => ({ ...p, country: v }))} placeholder="United States" />
+          </div>
+        </div>
+
+        <button
+          onClick={handleProfileSave}
+          className="btn-primary flex items-center gap-2"
+        >
+          <Save size={14}/>
+          {profileSaved ? 'Saved!' : 'Save Changes'}
+        </button>
+      </div>
+
+      {/* Change Password */}
+      <div className="card mb-4">
+        <div className="flex items-center gap-2 mb-4">
+          <KeyRound size={15} className="text-gray-500"/>
+          <p className="text-sm font-semibold text-gray-900">Change Password</p>
+        </div>
+        <div className="space-y-3 mb-4">
+          <Field label="Current Password" type="password" value={currentPassword} onChange={setCurrentPassword} />
+          <Field label="New Password" type="password" value={newPassword} onChange={setNewPassword} placeholder="At least 6 characters" />
+          <Field label="Confirm New Password" type="password" value={confirmPassword} onChange={setConfirmPassword} />
+        </div>
+        {passwordMsg && (
+          <p className={`text-xs mb-3 px-3 py-2 rounded-lg border ${
+            passwordMsg.ok
+              ? 'text-brand-green bg-brand-green/5 border-brand-green/20'
+              : 'text-red-500 bg-red-50 border-red-100'
+          }`}>
+            {passwordMsg.text}
+          </p>
+        )}
+        <button onClick={handlePasswordChange} className="btn-secondary flex items-center gap-2">
+          <KeyRound size={14}/> Update Password
+        </button>
+      </div>
+
+      {/* Sign out */}
+      <div className="card">
+        <p className="text-sm font-semibold text-gray-900 mb-1">Sign Out</p>
+        <p className="text-xs text-gray-500 mb-4">You will be returned to the sign-in screen.</p>
+        <button onClick={signOut} className="flex items-center gap-2 text-sm text-red-500 hover:text-red-600 font-medium transition-colors">
+          <LogOut size={14}/> Sign out
+        </button>
       </div>
     </div>
   )
 }
 
-function Field({ label, value }: { label: string; value: string }) {
+function Field({
+  label, value, onChange, type = 'text', placeholder
+}: {
+  label: string; value: string; onChange: (v: string) => void; type?: string; placeholder?: string
+}) {
   return (
     <div>
       <label className="text-xs text-gray-500 mb-1.5 block">{label}</label>
-      <input className="input-field" defaultValue={value} />
+      <input
+        className="input-field"
+        type={type}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+      />
     </div>
   )
 }

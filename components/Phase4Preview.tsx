@@ -63,7 +63,7 @@ export default function Phase4Preview({ state, onComplete, onBack }: Props) {
         </button>
       </div>
 
-      <div className="grid grid-cols-[260px_1fr_220px] gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr_220px] gap-4">
 
         {/* Left: Design summary */}
         <div className="space-y-3">

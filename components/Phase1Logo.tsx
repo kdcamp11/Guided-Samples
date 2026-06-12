@@ -115,7 +115,7 @@ export default function Phase1Logo({ state, onComplete, onSkip }: Props) {
         <p className="text-gray-500 text-sm mt-1">Describe your logo and let AI create it for you</p>
       </div>
 
-      <div className="grid grid-cols-[280px_1fr_240px] gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr_240px] gap-4">
         {/* Left: Input */}
         <div className="space-y-3">
           <div className="card">

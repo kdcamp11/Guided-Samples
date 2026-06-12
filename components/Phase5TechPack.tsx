@@ -155,7 +155,7 @@ export default function Phase5TechPack({ state, onBack }: Props) {
         </button>
       </div>
 
-      <div className="grid grid-cols-[180px_1fr_1fr_180px] gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-[180px_1fr_1fr_180px] gap-4">
 
         {/* Col 1: Upload + sections */}
         <div className="space-y-3">

@@ -241,7 +241,7 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack }
         </button>
       </div>
 
-      <div className="grid grid-cols-[200px_1fr_220px] gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-[200px_1fr_220px] gap-4">
         {/* Left: Assets */}
         <div className="space-y-3">
           <div className="card">
@@ -383,7 +383,7 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack }
           <div
             ref={canvasRef}
             className="relative bg-white overflow-hidden flex items-center justify-center"
-            style={{ height: 500 }}
+            style={{ height: 'clamp(320px, 50vw, 500px)' }}
             onClick={e => { if (e.target === e.currentTarget) setSelectedId(null) }}
           >
             <div

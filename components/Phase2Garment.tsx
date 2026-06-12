@@ -131,7 +131,7 @@ export default function Phase2Garment({ state, onComplete, onBack }: Props) {
         </button>
       </div>
 
-      <div className="grid grid-cols-[240px_1fr_240px] gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr_240px] gap-4">
         {/* Left: Choose option */}
         <div className="space-y-3">
           <div className="card">
