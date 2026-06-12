@@ -27,12 +27,12 @@ export const logoPrompt = ({ userPrompt, hasReference }: LogoParams): string =>
     ? `Use the uploaded image as a visual style reference. Professional vector-style brand logo. ${userPrompt}. Clean, minimal, high-contrast, centered, flat design. Transparent background, no shadow.`
     : `Professional vector-style brand logo. ${userPrompt}. Clean, minimal, high-contrast, centered composition, flat design. Transparent background, no shadow.`
 
-export const garmentPrompt = ({ userPrompt, garmentType, color, hasReference, view = 'front' }: GarmentParams): string => {
+export const garmentPrompt = ({ userPrompt, hasReference, view = 'front' }: GarmentParams): string => {
   const viewAngle = view === 'back' ? 'back view' : view === 'side' ? 'side view' : 'front view'
-  const base = `${viewAngle}, ${color} ${garmentType}. ${userPrompt}. No model, no text, no logo, no background. Transparent background, realistic fabric texture, studio lighting.`
+  const base = `${viewAngle}. ${userPrompt}. No model, no text, no logo, no background. Transparent background, realistic fabric texture, studio lighting.`
   return hasReference
     ? `This is the same garment shown from a different angle. Keep identical color, silhouette, fabric, collar, sleeves, fit, and construction details. Show the ${viewAngle}. ${base}`
-    : `Professional product shot of a blank ${base}`
+    : `Professional product shot of a blank garment. ${base}`
 }
 
 export const previewPrompt = ({ garmentType, garmentColor, logoStyle, logoColor, placement }: PreviewParams): string =>
