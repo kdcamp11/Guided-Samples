@@ -84,8 +84,12 @@ export default function Phase5TechPack({ state, onBack, onSendToProduction }: Pr
   const [uploadMsg, setUploadMsg] = useState('')
   const [detecting, setDetecting] = useState(false)
   const [detectError, setDetectError] = useState('')
+  const [detectingMeasurements, setDetectingMeasurements] = useState(false)
+  const [measurementDetectError, setMeasurementDetectError] = useState('')
+  const [measurementDetectInfo, setMeasurementDetectInfo] = useState('')
 
-  // The composite from Phase 3 (garment with logo applied) is the analysis input
+  // The composite from Phase 3 (garment with logo applied) is the analysis input.
+  // Fall back to the plain garment image if no composite exists yet.
   const designImage = state.design?.previewDataUrl || state.garment?.dataUrl || ''
 
   const handleAutoDetect = async () => {
@@ -96,7 +100,6 @@ export default function Phase5TechPack({ state, onBack, onSendToProduction }: Pr
     setDetecting(true)
     setDetectError('')
     try {
-      // Scale reference: use size M from the measurement table
       const sizeIndex = SIZES.indexOf('M')
       const res = await fetch('/api/detect-placement', {
         method: 'POST',
@@ -117,6 +120,41 @@ export default function Phase5TechPack({ state, onBack, onSendToProduction }: Pr
       setDetectError(e instanceof Error ? e.message : 'Detection failed. Please try again.')
     } finally {
       setDetecting(false)
+    }
+  }
+
+  const handleAutoDetectMeasurements = async () => {
+    const imageForAnalysis = state.garment?.dataUrl || designImage
+    if (!imageForAnalysis) {
+      setMeasurementDetectError('No garment image found — generate a garment in Phase 2 first.')
+      return
+    }
+    setDetectingMeasurements(true)
+    setMeasurementDetectError('')
+    setMeasurementDetectInfo('')
+    try {
+      const res = await fetch('/api/detect-measurements', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: imageForAnalysis, measurements }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Detection failed')
+      setMeasurements(m => ({ ...m, ...data.measurements }))
+      if (data.garmentType) setStyleInfo(s => ({
+        ...s,
+        garmentType: s.garmentType === 'Hoodie' // only override the default
+          ? data.garmentType.charAt(0).toUpperCase() + data.garmentType.slice(1)
+          : s.garmentType
+      }))
+      setMeasurementDetectInfo(
+        `Calibrated from Length (size M) = ${data.calibrator.value}". Size M: chest ${data.sizeM.chestFlatM}", shoulder ${data.sizeM.shoulderM}".`
+      )
+    } catch (e) {
+      console.error('Measurement detection failed:', e)
+      setMeasurementDetectError(e instanceof Error ? e.message : 'Detection failed. Please try again.')
+    } finally {
+      setDetectingMeasurements(false)
     }
   }
 
@@ -274,7 +312,25 @@ export default function Phase5TechPack({ state, onBack, onSendToProduction }: Pr
         <div className="space-y-3">
 
           <div className="card">
-            <p className="text-xs font-semibold text-gray-900 mb-3">Measurements (inches)</p>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs font-semibold text-gray-900">Measurements (inches)</p>
+              <button
+                onClick={handleAutoDetectMeasurements}
+                disabled={detectingMeasurements || (!state.garment?.dataUrl && !designImage)}
+                className="flex items-center gap-1.5 text-xs text-brand-green hover:text-brand-green-light disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium"
+                title="Analyze garment image and estimate all measurements"
+              >
+                {detectingMeasurements
+                  ? <><Loader2 size={11} className="animate-spin"/> Analyzing…</>
+                  : <><Sparkles size={11}/> Auto Detect</>}
+              </button>
+            </div>
+            {measurementDetectInfo && (
+              <p className="text-[10px] text-brand-green bg-green-50 rounded-lg px-2.5 py-1.5 mb-2 leading-relaxed">{measurementDetectInfo}</p>
+            )}
+            {measurementDetectError && (
+              <p className="text-[10px] text-red-500 mb-2">{measurementDetectError}</p>
+            )}
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
