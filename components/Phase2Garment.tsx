@@ -22,15 +22,6 @@ interface Props {
   onBack: () => void
 }
 
-const COLORS = [
-  { label: 'Black', value: 'Black' },
-  { label: 'White', value: 'White' },
-  { label: 'Navy', value: 'Navy' },
-  { label: 'Grey', value: 'Grey' },
-  { label: 'Forest Green', value: 'Forest Green' },
-  { label: 'Burgundy', value: 'Burgundy' },
-]
-
 const ALL_VIEWS: View[] = ['front', 'back', 'side']
 
 export default function Phase2Garment({ state, onComplete, onBack }: Props) {
@@ -38,7 +29,6 @@ export default function Phase2Garment({ state, onComplete, onBack }: Props) {
   const [prompt, setPrompt] = useState(
     'Oversized unisex hoodie, 450gsm, french terry cotton, drop shoulder, double layered hood, ribbed cuffs and hem.'
   )
-  const [color, setColor] = useState('Black')
   const [selectedViews, setSelectedViews] = useState<View[]>(['front'])
   const [activeView, setActiveView] = useState<View>('front')
 
@@ -62,7 +52,7 @@ export default function Phase2Garment({ state, onComplete, onBack }: Props) {
   }
 
   const generateView = async (view: View, frontImage?: string) => {
-    const key = cacheKey('garment', prompt, color, view, referenceImage ?? '', frontImage ?? '')
+    const key = cacheKey('garment', prompt, view, referenceImage ?? '', frontImage ?? '')
     const cached = cacheGet<ViewResult>(key)
     if (cached) {
       setViewResults(prev => ({ ...prev, [view]: cached.image }))
@@ -76,7 +66,7 @@ export default function Phase2Garment({ state, onComplete, onBack }: Props) {
     try {
       const data = await streamGenerate<ViewResult>(
         '/api/generate-garment',
-        { prompt: `${prompt} Color: ${color}`, referenceImage, view, frontImage: frontImage ?? null },
+        { prompt, referenceImage, view, frontImage: frontImage ?? null },
         msg => setStatusMsg(msg),
       )
       cacheSet(key, data)
@@ -155,7 +145,7 @@ export default function Phase2Garment({ state, onComplete, onBack }: Props) {
       dataUrl: primary,
       views,
       type: mode === 'upload' ? 'custom' : 'generated',
-      color: mode === 'upload' ? 'custom' : color,
+      color: 'custom',
     })
   }
 
@@ -225,13 +215,6 @@ export default function Phase2Garment({ state, onComplete, onBack }: Props) {
                 <label className="text-xs font-medium text-gray-600 mb-2 block">Describe your garment</label>
                 <textarea className="textarea-field" rows={4} value={prompt} onChange={e => setPrompt(e.target.value)} placeholder="Describe the garment..."/>
               </div>
-              <div>
-                <label className="text-xs font-medium text-gray-600 mb-2 block">Color</label>
-                <select className="input-field" value={color} onChange={e => setColor(e.target.value)}>
-                  {COLORS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-                </select>
-              </div>
-
               {/* Reference image */}
               <div>
                 {referenceImage ? (
