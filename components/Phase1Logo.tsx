@@ -6,6 +6,7 @@ import { AppState } from '@/app/page'
 import { exportAsset } from '@/lib/export'
 import { streamGenerate } from '@/lib/streamGenerate'
 import { cacheGet, cacheSet, cacheKey } from '@/lib/generateCache'
+import { removeWhiteBackground } from '@/lib/removeWhiteBg'
 
 interface Props {
   state: AppState
@@ -99,11 +100,17 @@ export default function Phase1Logo({ state, onComplete, onSkip }: Props) {
     }
   }
 
-  const handleUse = () => {
+  const handleUse = async () => {
     if (!result || !currentImage) return
+    let dataUrl = currentImage
+    try {
+      dataUrl = await removeWhiteBackground(currentImage)
+    } catch (e) {
+      console.error('White background removal failed, using original', e)
+    }
     const logo = {
       svg: currentSvg || '',
-      dataUrl: currentImage,
+      dataUrl,
       style: result.style,
       color: result.color,
     }
@@ -115,10 +122,16 @@ export default function Phase1Logo({ state, onComplete, onSkip }: Props) {
     const file = e.target.files?.[0]
     if (!file) return
     const reader = new FileReader()
-    reader.onload = ev => {
+    reader.onload = async ev => {
+      let dataUrl = ev.target?.result as string
+      try {
+        dataUrl = await removeWhiteBackground(dataUrl)
+      } catch (e) {
+        console.error('White background removal failed, using original', e)
+      }
       const logo = {
         svg: '',
-        dataUrl: ev.target?.result as string,
+        dataUrl,
         style: 'Uploaded',
         color: '#184D3E',
       }

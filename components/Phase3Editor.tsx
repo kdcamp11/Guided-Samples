@@ -5,6 +5,7 @@ import { Undo2, Redo2, Minus, Plus, Upload, Layers, ArrowLeft, ArrowRight, Trash
 import { AppState } from '@/app/page'
 import { streamGenerate } from '@/lib/streamGenerate'
 import { cacheGet, cacheSet, cacheKey } from '@/lib/generateCache'
+import { removeWhiteBackground } from '@/lib/removeWhiteBg'
 
 // Fire-and-forget: warm the Phase 4 preview cache as soon as design is confirmed.
 async function prefetchPreview(state: AppState, compositeImage: string) {
@@ -190,12 +191,18 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack }
     const file = e.target.files?.[0]
     if (!file) return
     const reader = new FileReader()
-    reader.onload = ev => {
+    reader.onload = async ev => {
+      let dataUrl = ev.target?.result as string
+      try {
+        dataUrl = await removeWhiteBackground(dataUrl)
+      } catch (err) {
+        console.error('White background removal failed, using original', err)
+      }
       const id = crypto.randomUUID()
       snapshot()
       setLayers(ls => [...ls, {
         id,
-        dataUrl: ev.target?.result as string,
+        dataUrl,
         x: 60, y: 80, width: 160, height: 80, rotation: 0,
       }])
       setSelectedId(id)
