@@ -23,7 +23,7 @@ export type PreviewParams = {
 
 export const logoPrompt = ({ userPrompt, hasReference }: LogoParams): string =>
   hasReference
-    ? `Use the uploaded image as a visual style reference. Professional vector-style brand logo. ${userPrompt}. Clean, minimal, high-contrast, centered, flat design. Transparent background, no shadow.`
+    ? `You are given a reference logo image. Reproduce its exact font style, exact letter shapes, exact colors, and exact graphic elements. Do not change the typeface, stroke style, or color palette. Apply only this layout change: ${userPrompt}. Transparent background, no shadow, no new colors introduced.`
     : `Professional vector-style brand logo. ${userPrompt}. Clean, minimal, high-contrast, centered composition, flat design. Transparent background, no shadow.`
 
 export const garmentPrompt = ({ userPrompt, garmentType, color, hasReference }: GarmentParams): string =>
