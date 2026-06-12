@@ -241,22 +241,17 @@ export default function Phase5TechPack({ state, onBack, onSendToProduction }: Pr
   const set = (key: keyof StyleInfo, value: string) =>
     setStyleInfo(s => ({ ...s, [key]: value }))
 
-  // Garment type change — confirm before replacing measurements
+  // Always prompt before replacing the measurement table.
   const requestTypeChange = (newType: string) => {
-    const currentLabels = Object.keys(measurements).join()
-    const templateLabels = Object.keys(templateToMeasurements(newType)).join()
-    if (currentLabels !== templateLabels) {
-      setPendingType(newType)
-    } else {
-      applyTypeChange(newType)
-    }
+    if (newType === styleInfo.garmentType) return
+    setPendingType(newType)
   }
 
   const applyTypeChange = (newType: string) => {
-    set('garmentType', newType)
-    setMeasurements(templateToMeasurements(newType))
     setPendingType(null)
     setMeasurementDetectInfo('')
+    setStyleInfo(s => ({ ...s, garmentType: newType }))
+    setMeasurements(templateToMeasurements(newType))
   }
 
   const designImage = state.design?.previewDataUrl || state.garment?.dataUrl || ''
@@ -425,7 +420,7 @@ export default function Phase5TechPack({ state, onBack, onSendToProduction }: Pr
             </div>
             <div className="flex gap-2">
               <button onClick={() => setPendingType(null)} className="btn-secondary flex-1">Cancel</button>
-              <button onClick={() => applyTypeChange(pendingType)} className="btn-primary flex-1">Switch Template</button>
+              <button onClick={() => applyTypeChange(pendingType!)} className="btn-primary flex-1">Switch Template</button>
             </div>
           </div>
         </div>
@@ -520,8 +515,8 @@ export default function Phase5TechPack({ state, onBack, onSendToProduction }: Pr
         {/* Col 3: Measurements + Pantones + Placement */}
         <div className="space-y-3">
 
-          {/* Measurements */}
-          <div className="card">
+          {/* Measurements — key forces full remount when template changes */}
+          <div className="card" key={styleInfo.garmentType}>
             <div className="flex items-center justify-between mb-2">
               <div>
                 <p className="text-xs font-semibold text-gray-900">Measurements (inches)</p>
