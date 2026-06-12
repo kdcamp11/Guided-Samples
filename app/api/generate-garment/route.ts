@@ -5,7 +5,7 @@ export const runtime = 'nodejs'
 export const maxDuration = 120
 
 export async function POST(req: NextRequest) {
-  const { prompt, referenceImage, view, frontImage } = await req.json()
+  const { prompt, referenceImage, view, frontImage, quality = 'clean' } = await req.json()
 
   if (!prompt) {
     return new Response(`data: ${JSON.stringify({ type: 'error', message: 'Prompt required' })}\n\n`, {
@@ -13,8 +13,6 @@ export async function POST(req: NextRequest) {
     })
   }
 
-  const garmentType = detectGarmentType(prompt)
-  const color = detectColor(prompt)
   const { readable, writable } = new TransformStream()
   const writer = writable.getWriter()
   const enc = new TextEncoder()
@@ -24,20 +22,19 @@ export async function POST(req: NextRequest) {
     try {
       await send({ type: 'status', message: 'Connecting to AI...' })
       if (process.env.OPENAI_API_KEY) {
-        const viewLabel = view ?? 'front'
-        await send({ type: 'status', message: `Generating ${viewLabel} view...` })
+        const viewLabel = (view ?? 'front') as string
+        const qualityLabel = quality as 'clean' | 'realistic'
+        await send({ type: 'status', message: `Generating ${viewLabel} view (${qualityLabel})...` })
 
-        // For back/side views, use the front image as reference for consistency
         const referenceForView = (view && view !== 'front' && frontImage) ? frontImage : referenceImage
-        const built = garmentPrompt({ userPrompt: prompt, garmentType, color, hasReference: !!referenceForView, view: viewLabel })
-        const image = await generateWithOpenAI(built, referenceForView)
+        const built = garmentPrompt({ userPrompt: prompt, hasReference: !!referenceForView, view: viewLabel, quality: qualityLabel })
+        const image = await generateWithOpenAI(built, referenceForView, qualityLabel)
         await send({ type: 'status', message: 'Processing result...' })
-        await send({ type: 'complete', source: 'openai', image, view: viewLabel, garmentType, color })
+        await send({ type: 'complete', source: 'openai', image, view: viewLabel, quality: qualityLabel })
       } else {
-        await send({ type: 'status', message: 'Building garment...' })
         const viewLabel = view ?? 'front'
-        const svg = generateGarmentSVG(garmentType, color, viewLabel)
-        await send({ type: 'complete', source: 'svg', image: svgToDataUrl(svg), view: viewLabel, garmentType, color })
+        const svg = generateGarmentSVG(viewLabel)
+        await send({ type: 'complete', source: 'svg', image: svgToDataUrl(svg), view: viewLabel, quality })
       }
     } catch (err) {
       console.error('Garment generation failed:', err)
@@ -53,7 +50,8 @@ export async function POST(req: NextRequest) {
   })
 }
 
-async function generateWithOpenAI(builtPrompt: string, referenceImage?: string): Promise<string> {
+async function generateWithOpenAI(builtPrompt: string, referenceImage?: string, quality: 'clean' | 'realistic' = 'clean'): Promise<string> {
+  const apiQuality = quality === 'realistic' ? 'high' : 'medium'
   if (referenceImage) {
     const base64Data = referenceImage.split(',')[1]
     const mimeMatch = referenceImage.match(/^data:(image\/\w+);base64,/)
@@ -68,7 +66,7 @@ async function generateWithOpenAI(builtPrompt: string, referenceImage?: string):
     form.append('prompt', builtPrompt)
     form.append('n', '1')
     form.append('size', '1024x1024')
-    form.append('quality', 'medium')
+    form.append('quality', apiQuality)
 
     const res = await fetch('https://api.openai.com/v1/images/edits', {
       method: 'POST',
@@ -98,7 +96,7 @@ async function generateWithOpenAI(builtPrompt: string, referenceImage?: string):
       size: '1024x1024',
       background: 'transparent',
       output_format: 'png',
-      quality: 'medium',
+      quality: apiQuality,
     }),
   })
 
@@ -115,56 +113,13 @@ function svgToDataUrl(svg: string): string {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
 }
 
-function detectGarmentType(prompt: string): string {
-  const p = prompt.toLowerCase()
-  if (p.includes('hoodie') || p.includes('hoody')) return 'hoodie'
-  if (p.includes('t-shirt') || p.includes('tshirt') || p.includes('tee')) return 'tshirt'
-  if (p.includes('crewneck') || p.includes('sweatshirt')) return 'crewneck'
-  if (p.includes('jacket') || p.includes('bomber')) return 'jacket'
-  return 'hoodie'
-}
 
-function detectColor(prompt: string): string {
-  const p = prompt.toLowerCase()
-  if (p.includes('black')) return '#1a1a1a'
-  if (p.includes('white')) return '#f5f5f5'
-  if (p.includes('navy') || p.includes('dark blue')) return '#1a2744'
-  if (p.includes('grey') || p.includes('gray')) return '#6b6b6b'
-  if (p.includes('cream') || p.includes('off white')) return '#f0ead6'
-  if (p.includes('red') || p.includes('burgundy')) return '#5c1a1a'
-  if (p.includes('green') || p.includes('forest')) return '#184D3E'
-  return '#1a1a1a'
-}
-
-function generateGarmentSVG(type: string, color: string, view?: string): string {
-  const isDark = color === '#1a1a1a' || color === '#1a2744' || color === '#184D3E' || color === '#5c1a1a'
-  const highlight = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'
-  const shadow = isDark ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.15)'
+function generateGarmentSVG(view?: string): string {
   const label = view ? view.charAt(0).toUpperCase() + view.slice(1) : 'Front'
-
-  if (type === 'hoodie' || type === 'crewneck') {
-    const hasHood = type === 'hoodie'
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 340" width="300" height="340">
-  <defs>
-    <radialGradient id="bodyGrad" cx="50%" cy="30%" r="70%">
-      <stop offset="0%" stop-color="${highlight}"/>
-      <stop offset="100%" stop-color="${shadow}"/>
-    </radialGradient>
-  </defs>
-  ${hasHood ? `<path d="M110,80 Q100,20 150,15 Q200,20 190,80" fill="${color}" stroke="none"/>` : ''}
-  <path d="M90,${hasHood ? '80' : '70'} L60,100 L45,160 L50,280 L250,280 L255,160 L240,100 L210,${hasHood ? '80' : '70'} Q175,${hasHood ? '65' : '55'} 150,${hasHood ? '72' : '62'} Q125,${hasHood ? '65' : '55'} 90,${hasHood ? '80' : '70'} Z" fill="${color}"/>
-  <path d="M90,${hasHood ? '80' : '70'} L60,100 L45,160 L50,280 L250,280 L255,160 L240,100 L210,${hasHood ? '80' : '70'} Q175,${hasHood ? '65' : '55'} 150,${hasHood ? '72' : '62'} Q125,${hasHood ? '65' : '55'} 90,${hasHood ? '80' : '70'} Z" fill="url(#bodyGrad)"/>
-  <path d="M60,100 L20,140 L25,220 L60,225 L70,160 L90,${hasHood ? '80' : '70'}" fill="${color}"/>
-  <path d="M240,100 L280,140 L275,220 L240,225 L230,160 L210,${hasHood ? '80' : '70'}" fill="${color}"/>
-  <rect x="48" y="274" width="204" height="10" rx="4" fill="${isDark ? '#333' : '#ddd'}"/>
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 340" width="300" height="340">
+  <path d="M90,80 L60,100 L45,160 L50,280 L250,280 L255,160 L240,100 L210,80 Q175,65 150,72 Q125,65 90,80 Z" fill="#e0e0e0"/>
+  <path d="M60,100 L20,140 L25,220 L60,225 L70,160 L90,80" fill="#e0e0e0"/>
+  <path d="M240,100 L280,140 L275,220 L240,225 L230,160 L210,80" fill="#e0e0e0"/>
   <text x="150" y="318" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#888">${label}</text>
-</svg>`
-  }
-
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" width="300" height="300">
-  <path d="M95,60 L55,90 L40,150 L50,250 L250,250 L260,150 L245,90 L205,60 Q175,45 150,55 Q125,45 95,60 Z" fill="${color}"/>
-  <path d="M95,60 L55,90 L40,150 L50,250 L250,250 L260,150 L245,90 L205,60 Q175,45 150,55 Q125,45 95,60 Z" fill="${highlight}"/>
-  <rect x="38" y="244" width="224" height="10" rx="4" fill="${isDark ? '#333' : '#ddd'}"/>
-  <text x="150" y="282" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#888">${label}</text>
 </svg>`
 }

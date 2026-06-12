@@ -1,20 +1,23 @@
 'use client'
 
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback } from 'react'
 import { useDropzone } from 'react-dropzone'
-import { Upload, Cpu, Loader2, ArrowRight, ArrowLeft, ImageIcon, ImagePlus, X, CheckSquare, Square } from 'lucide-react'
+import { Upload, Cpu, Loader2, ArrowRight, ArrowLeft, ImageIcon, ImagePlus, X, CheckSquare, Square, Sparkles, Camera } from 'lucide-react'
 import { AppState } from '@/app/page'
 import { streamGenerate } from '@/lib/streamGenerate'
 import { cacheGet, cacheSet, cacheKey } from '@/lib/generateCache'
 
 type View = 'front' | 'back' | 'side'
+type Quality = 'clean' | 'realistic'
 
 interface ViewResult {
   image: string
   view: View
-  garmentType: string
-  color: string
+  quality: Quality
 }
+
+// Per-view store of both quality variants
+type ViewImages = { clean?: string; realistic?: string }
 
 interface Props {
   state: AppState
@@ -31,78 +34,77 @@ export default function Phase2Garment({ state, onComplete, onBack }: Props) {
   )
   const [selectedViews, setSelectedViews] = useState<View[]>(['front'])
   const [activeView, setActiveView] = useState<View>('front')
+  const [presentationMode, setPresentationMode] = useState<Quality>('clean')
 
-  // Generate mode state
-  const [viewResults, setViewResults] = useState<Partial<Record<View, string>>>({})
+  // Generate mode: store both quality variants per view
+  const [viewResults, setViewResults] = useState<Partial<Record<View, ViewImages>>>({})
   const [loadingView, setLoadingView] = useState<View | null>(null)
+  const [loadingQuality, setLoadingQuality] = useState<Quality | null>(null)
   const [statusMsg, setStatusMsg] = useState('')
   const [errors, setErrors] = useState<Partial<Record<View, string>>>({})
   const [referenceImage, setReferenceImage] = useState<string | null>(null)
-  const referenceInputRef = useRef<HTMLInputElement>(null)
 
-  // Upload mode state
+  // Upload mode
   const [uploadedViews, setUploadedViews] = useState<Partial<Record<View, string>>>({})
 
   const toggleView = (v: View) => {
     setSelectedViews(prev =>
       prev.includes(v)
-        ? prev.length > 1 ? prev.filter(x => x !== v) : prev // always keep at least one
+        ? prev.length > 1 ? prev.filter(x => x !== v) : prev
         : [...prev, v]
     )
   }
 
-  const generateView = async (view: View, frontImage?: string) => {
-    const key = cacheKey('garment', prompt, view, referenceImage ?? '', frontImage ?? '')
+  const generateView = async (view: View, quality: Quality, frontImage?: string): Promise<string | null> => {
+    const key = cacheKey('garment2', prompt, view, quality, referenceImage ?? '', frontImage ?? '')
     const cached = cacheGet<ViewResult>(key)
     if (cached) {
-      setViewResults(prev => ({ ...prev, [view]: cached.image }))
+      setViewResults(prev => ({ ...prev, [view]: { ...prev[view], [quality]: cached.image } }))
       return cached.image
     }
 
     setLoadingView(view)
+    setLoadingQuality(quality)
     setErrors(prev => ({ ...prev, [view]: undefined }))
-    setStatusMsg(`Generating ${view} view...`)
+    setStatusMsg(quality === 'realistic' ? `Enhancing ${view} view...` : `Generating ${view} view...`)
 
     try {
       const data = await streamGenerate<ViewResult>(
         '/api/generate-garment',
-        { prompt, referenceImage, view, frontImage: frontImage ?? null },
+        { prompt, referenceImage, view, frontImage: frontImage ?? null, quality },
         msg => setStatusMsg(msg),
       )
       cacheSet(key, data)
-      setViewResults(prev => ({ ...prev, [view]: data.image }))
+      setViewResults(prev => ({ ...prev, [view]: { ...prev[view], [quality]: data.image } }))
       return data.image
     } catch (e) {
       console.error(e)
-      const msg = e instanceof Error ? e.message : 'Generation failed. Please try again.'
-      setErrors(prev => ({ ...prev, [view]: msg }))
+      setErrors(prev => ({ ...prev, [view]: e instanceof Error ? e.message : 'Generation failed.' }))
       return null
     } finally {
       setLoadingView(null)
+      setLoadingQuality(null)
       setStatusMsg('')
     }
   }
 
-  const handleGenerateAll = async () => {
-    setViewResults({})
+  const handleGenerateAll = async (quality: Quality) => {
     setErrors({})
-
-    // Always generate front first so it can be used as reference for other views
     const orderedViews: View[] = [
-      ...( selectedViews.includes('front') ? ['front' as View] : []),
-      ...( selectedViews.includes('back')  ? ['back'  as View] : []),
-      ...( selectedViews.includes('side')  ? ['side'  as View] : []),
+      ...(selectedViews.includes('front') ? ['front' as View] : []),
+      ...(selectedViews.includes('back')  ? ['back'  as View] : []),
+      ...(selectedViews.includes('side')  ? ['side'  as View] : []),
     ]
 
     let frontImg: string | null = null
     for (const view of orderedViews) {
-      const img = await generateView(view, view !== 'front' ? (frontImg ?? undefined) : undefined)
+      const img = await generateView(view, quality, view !== 'front' ? (frontImg ?? undefined) : undefined)
       if (view === 'front' && img) frontImg = img
     }
     setActiveView(orderedViews[0])
   }
 
-  // Upload dropzones — must be declared at component level (Rules of Hooks)
+  // Dropzones — declared at component level (Rules of Hooks)
   const onDropFront = useCallback((files: File[]) => {
     const file = files[0]; if (!file) return
     const reader = new FileReader()
@@ -128,25 +130,30 @@ export default function Phase2Garment({ state, onComplete, onBack }: Props) {
   const sideDrop  = useDropzone({ onDrop: onDropSide,  accept, multiple: false })
   const dropzones: Record<View, typeof frontDrop> = { front: frontDrop, back: backDrop, side: sideDrop }
 
-  const currentResults = mode === 'generate' ? viewResults : uploadedViews
-  const activeImage = currentResults[activeView] ?? null
-  const allSelectedDone = selectedViews.every(v => !!currentResults[v])
-  const anyDone = selectedViews.some(v => !!currentResults[v])
+  // Active image: for generate mode show the selected quality variant, fallback to other
+  const getActiveImage = (view: View): string | undefined => {
+    if (mode === 'upload') return uploadedViews[view]
+    const imgs = viewResults[view]
+    return imgs?.[presentationMode] ?? imgs?.clean ?? imgs?.realistic
+  }
+
+  const activeImage = getActiveImage(activeView)
+  const anyDone = selectedViews.some(v => !!getActiveImage(v))
+  const allSelectedDone = selectedViews.every(v => !!getActiveImage(v))
+  const isLoading = !!loadingView
+
+  const currentModeHasResults = mode === 'generate'
+    ? selectedViews.some(v => !!viewResults[v]?.[presentationMode])
+    : anyDone
 
   const handleProceed = () => {
     const views: { front?: string; back?: string; side?: string } = {}
     for (const v of selectedViews) {
-      const img = currentResults[v]
+      const img = getActiveImage(v)
       if (img) views[v] = img
     }
     const primary = views.front ?? views.back ?? views.side ?? ''
-    onComplete({
-      svg: '',
-      dataUrl: primary,
-      views,
-      type: mode === 'upload' ? 'custom' : 'generated',
-      color: 'custom',
-    })
+    onComplete({ svg: '', dataUrl: primary, views, type: 'generated', color: 'custom' })
   }
 
   return (
@@ -164,14 +171,17 @@ export default function Phase2Garment({ state, onComplete, onBack }: Props) {
 
       <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr_220px] gap-4">
 
-        {/* Left: Options */}
+        {/* Left */}
         <div className="space-y-3">
 
-          {/* Mode */}
+          {/* Source toggle */}
           <div className="card">
             <p className="text-xs font-medium text-gray-600 mb-3">Source</p>
             <div className="space-y-2">
-              {([['generate', Cpu, 'Generate with AI', 'Describe the garment you want'], ['upload', Upload, 'Upload Your Own', 'Add photos for each view']] as const).map(([m, Icon, label, desc]) => (
+              {([
+                ['generate', Cpu,    'Generate with AI',  'Describe the garment you want'],
+                ['upload',   Upload, 'Upload Your Own',   'Add photos for each view'],
+              ] as const).map(([m, Icon, label, desc]) => (
                 <button key={m} onClick={() => setMode(m)}
                   className={`w-full p-3 rounded-xl border text-left transition-all ${mode === m ? 'border-brand-green bg-brand-green/5' : 'border-slate-200 hover:border-slate-300'}`}>
                   <div className="flex items-start gap-2.5">
@@ -191,17 +201,18 @@ export default function Phase2Garment({ state, onComplete, onBack }: Props) {
           {/* View selector */}
           <div className="card">
             <p className="text-xs font-medium text-gray-600 mb-3">Views needed</p>
-            <div className="space-y-2">
+            <div className="space-y-1">
               {ALL_VIEWS.map(v => {
                 const checked = selectedViews.includes(v)
+                const done = !!getActiveImage(v)
                 return (
                   <button key={v} onClick={() => toggleView(v)}
                     className="w-full flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-slate-50 transition-colors">
                     {checked
                       ? <CheckSquare size={15} className="text-brand-green shrink-0"/>
                       : <Square size={15} className="text-gray-300 shrink-0"/>}
-                    <span className={`text-xs capitalize ${checked ? 'text-gray-900 font-medium' : 'text-gray-400'}`}>{v}</span>
-                    {currentResults[v] && <span className="ml-auto text-[10px] text-brand-green font-medium">✓ Done</span>}
+                    <span className={`text-xs capitalize flex-1 text-left ${checked ? 'text-gray-900 font-medium' : 'text-gray-400'}`}>{v}</span>
+                    {done && <span className="text-[10px] text-brand-green font-medium">✓</span>}
                   </button>
                 )
               })}
@@ -213,107 +224,155 @@ export default function Phase2Garment({ state, onComplete, onBack }: Props) {
             <div className="card space-y-3">
               <div>
                 <label className="text-xs font-medium text-gray-600 mb-2 block">Describe your garment</label>
-                <textarea className="textarea-field" rows={4} value={prompt} onChange={e => setPrompt(e.target.value)} placeholder="Describe the garment..."/>
+                <textarea className="textarea-field" rows={4} value={prompt}
+                  onChange={e => setPrompt(e.target.value)} placeholder="Describe the garment in detail..."/>
               </div>
+
               {/* Reference image */}
-              <div>
-                {referenceImage ? (
-                  <div className="relative rounded-lg overflow-hidden border border-slate-200" style={{ height: 80 }}>
-                    <img src={referenceImage} alt="Reference" className="w-full h-full object-cover"/>
-                    <button onClick={() => setReferenceImage(null)}
-                      className="absolute top-1 right-1 w-5 h-5 rounded-full bg-white/90 flex items-center justify-center text-gray-600 hover:text-red-500 shadow">
-                      <X size={11}/>
-                    </button>
-                    <span className="absolute bottom-1 left-2 text-[10px] text-white bg-black/50 rounded px-1.5 py-0.5">Reference</span>
-                  </div>
-                ) : (
-                  <label className="flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-slate-300 hover:border-brand-green cursor-pointer transition-colors text-xs text-gray-400 hover:text-gray-700">
-                    <ImagePlus size={13}/>
-                    Add reference image
-                    <input ref={referenceInputRef} type="file" className="hidden" accept="image/*"
-                      onChange={e => {
-                        const file = e.target.files?.[0]; if (!file) return
-                        const reader = new FileReader()
-                        reader.onload = ev => setReferenceImage(ev.target?.result as string)
-                        reader.readAsDataURL(file); e.target.value = ''
-                      }}/>
-                  </label>
-                )}
+              {referenceImage ? (
+                <div className="relative rounded-lg overflow-hidden border border-slate-200" style={{ height: 80 }}>
+                  <img src={referenceImage} alt="Reference" className="w-full h-full object-cover"/>
+                  <button onClick={() => setReferenceImage(null)}
+                    className="absolute top-1 right-1 w-5 h-5 rounded-full bg-white/90 flex items-center justify-center text-gray-600 hover:text-red-500 shadow">
+                    <X size={11}/>
+                  </button>
+                  <span className="absolute bottom-1 left-2 text-[10px] text-white bg-black/50 rounded px-1.5 py-0.5">Reference</span>
+                </div>
+              ) : (
+                <label className="flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-slate-300 hover:border-brand-green cursor-pointer transition-colors text-xs text-gray-400 hover:text-gray-700">
+                  <ImagePlus size={13}/>
+                  Add reference image
+                  <input type="file" className="hidden" accept="image/*"
+                    onChange={e => {
+                      const file = e.target.files?.[0]; if (!file) return
+                      const reader = new FileReader()
+                      reader.onload = ev => setReferenceImage(ev.target?.result as string)
+                      reader.readAsDataURL(file); e.target.value = ''
+                    }}/>
+                </label>
+              )}
+
+              {/* Two generate buttons */}
+              <div className="space-y-2">
+                <button onClick={() => handleGenerateAll('clean')} disabled={isLoading}
+                  className="btn-secondary w-full flex items-center justify-center gap-2">
+                  {loadingQuality === 'clean' ? <Loader2 size={14} className="animate-spin"/> : <Cpu size={14}/>}
+                  {loadingQuality === 'clean' ? (statusMsg || 'Generating…') : `Clean Product View`}
+                </button>
+                <button onClick={() => handleGenerateAll('realistic')} disabled={isLoading}
+                  className="btn-primary w-full flex items-center justify-center gap-2">
+                  {loadingQuality === 'realistic' ? <Loader2 size={14} className="animate-spin"/> : <Camera size={14}/>}
+                  {loadingQuality === 'realistic' ? (statusMsg || 'Enhancing…') : `Enhanced Realism View`}
+                </button>
               </div>
 
-              <button onClick={handleGenerateAll} disabled={!!loadingView}
-                className="btn-primary w-full flex items-center justify-center gap-2">
-                {loadingView ? <Loader2 size={14} className="animate-spin"/> : <Cpu size={14}/>}
-                {loadingView ? (statusMsg || 'Generating…') : `Generate ${selectedViews.length > 1 ? `${selectedViews.length} Views` : 'Garment'}`}
-              </button>
-
-              {Object.entries(errors).filter(([,v]) => v).map(([view, msg]) => (
+              {Object.entries(errors).filter(([, v]) => v).map(([view, msg]) => (
                 <p key={view} className="text-[11px] text-red-500">{view}: {msg}</p>
               ))}
             </div>
           )}
         </div>
 
-        {/* Center: Preview */}
+        {/* Center */}
         <div className="card">
-          {/* View tabs */}
-          <div className="flex items-center gap-1 mb-4">
-            {selectedViews.map(v => (
-              <button key={v} onClick={() => setActiveView(v)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition-colors ${
-                  activeView === v ? 'bg-brand-green text-white' : 'text-gray-500 hover:bg-slate-100'
-                }`}>
-                {v}
-                {currentResults[v] && activeView !== v && <span className="ml-1 text-brand-green">●</span>}
-              </button>
-            ))}
+          <div className="flex items-center justify-between mb-4">
+            {/* View tabs */}
+            <div className="flex items-center gap-1">
+              {selectedViews.map(v => (
+                <button key={v} onClick={() => setActiveView(v)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition-colors ${
+                    activeView === v ? 'bg-brand-green text-white' : 'text-gray-500 hover:bg-slate-100'
+                  }`}>
+                  {v}
+                  {getActiveImage(v) && activeView !== v && <span className="ml-1 inline-block w-1.5 h-1.5 rounded-full bg-brand-green align-middle"/>}
+                </button>
+              ))}
+            </div>
+
+            {/* Mode toggle — only in generate mode with results */}
+            {mode === 'generate' && (viewResults[activeView]?.clean || viewResults[activeView]?.realistic) && (
+              <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-0.5">
+                {(['clean', 'realistic'] as Quality[]).map(q => (
+                  <button key={q} onClick={() => setPresentationMode(q)}
+                    disabled={!viewResults[activeView]?.[q]}
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors disabled:opacity-30 capitalize ${
+                      presentationMode === q ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                    }`}>
+                    {q === 'clean' ? '⚡ Clean' : '✦ Realistic'}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {mode === 'generate' ? (
             <div>
-              <div className="bg-white border border-slate-100 rounded-xl flex items-center justify-center" style={{ minHeight: 280 }}>
+              <div className="bg-white border border-slate-100 rounded-xl flex items-center justify-center" style={{ minHeight: 300 }}>
                 {loadingView === activeView ? (
                   <div className="flex flex-col items-center gap-3 text-gray-400 py-16">
                     <Loader2 size={32} className="animate-spin text-brand-green"/>
                     <span className="text-sm text-gray-700">{statusMsg || `Generating ${activeView} view…`}</span>
-                    <span className="text-xs text-gray-400">This can take 10–30 seconds</span>
+                    <span className="text-xs text-gray-400">This can take 15–30 seconds</span>
                   </div>
                 ) : activeImage ? (
-                  <img src={activeImage} alt={`${activeView} view`} className="max-h-full max-w-full object-contain p-4"/>
+                  <img src={activeImage} alt={`${activeView} view`} className="max-w-full object-contain p-4"/>
                 ) : (
-                  <div className="text-gray-400 text-sm py-16 text-center px-4">
-                    {loadingView ? `Generating ${loadingView} view first…` : `${activeView.charAt(0).toUpperCase() + activeView.slice(1)} view will appear here`}
+                  <div className="flex flex-col items-center gap-3 py-20 text-center px-6">
+                    <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center">
+                      <Sparkles size={22} className="text-gray-400"/>
+                    </div>
+                    <p className="text-sm text-gray-500">Choose <strong>Clean</strong> for design placement or <strong>Realistic</strong> for a premium product preview</p>
                   </div>
                 )}
               </div>
 
-              {/* Thumbnails for all selected views */}
-              {anyDone && selectedViews.length > 1 && (
-                <div className="grid gap-2 mt-3" style={{ gridTemplateColumns: `repeat(${selectedViews.length}, 1fr)` }}>
-                  {selectedViews.map(v => (
-                    <button key={v} onClick={() => setActiveView(v)}
-                      className={`bg-white border rounded-lg overflow-hidden transition-all flex flex-col items-center pb-1 ${
-                        activeView === v ? 'border-brand-green ring-1 ring-brand-green' : 'border-slate-100 hover:border-slate-300'
-                      }`} style={{ minHeight: 80 }}>
-                      {currentResults[v] ? (
-                        <img src={currentResults[v]} alt={v} className="w-full h-16 object-contain p-1"/>
-                      ) : loadingView === v ? (
-                        <div className="w-full h-16 flex items-center justify-center">
-                          <Loader2 size={16} className="animate-spin text-brand-green"/>
-                        </div>
-                      ) : (
-                        <div className="w-full h-16 flex items-center justify-center text-gray-300">
-                          <ImageIcon size={16}/>
-                        </div>
-                      )}
-                      <span className="text-[10px] text-gray-400 capitalize">{v}</span>
+              {/* Comparison strip when both modes available */}
+              {viewResults[activeView]?.clean && viewResults[activeView]?.realistic && (
+                <div className="grid grid-cols-2 gap-2 mt-3">
+                  {(['clean', 'realistic'] as Quality[]).map(q => (
+                    <button key={q} onClick={() => setPresentationMode(q)}
+                      className={`bg-white border rounded-xl overflow-hidden transition-all flex flex-col ${
+                        presentationMode === q ? 'border-brand-green ring-1 ring-brand-green' : 'border-slate-100 hover:border-slate-300'
+                      }`}>
+                      <img src={viewResults[activeView]![q]!} alt={q} className="w-full object-contain p-2" style={{ height: 100 }}/>
+                      <span className={`text-[10px] font-medium text-center py-1.5 ${presentationMode === q ? 'text-brand-green' : 'text-gray-400'}`}>
+                        {q === 'clean' ? '⚡ Clean' : '✦ Realistic'}
+                      </span>
                     </button>
                   ))}
                 </div>
               )}
+
+              {/* Multi-view thumbnails */}
+              {anyDone && selectedViews.length > 1 && (
+                <div className="grid gap-2 mt-3" style={{ gridTemplateColumns: `repeat(${selectedViews.length}, 1fr)` }}>
+                  {selectedViews.map(v => {
+                    const img = getActiveImage(v)
+                    return (
+                      <button key={v} onClick={() => setActiveView(v)}
+                        className={`bg-white border rounded-lg overflow-hidden transition-all flex flex-col items-center pb-1 ${
+                          activeView === v ? 'border-brand-green ring-1 ring-brand-green' : 'border-slate-100 hover:border-slate-300'
+                        }`} style={{ minHeight: 72 }}>
+                        {img ? (
+                          <img src={img} alt={v} className="w-full h-16 object-contain p-1"/>
+                        ) : loadingView === v ? (
+                          <div className="w-full h-16 flex items-center justify-center">
+                            <Loader2 size={14} className="animate-spin text-brand-green"/>
+                          </div>
+                        ) : (
+                          <div className="w-full h-16 flex items-center justify-center text-gray-300">
+                            <ImageIcon size={14}/>
+                          </div>
+                        )}
+                        <span className="text-[10px] text-gray-400 capitalize">{v}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           ) : (
-            /* Upload mode — slot per selected view */
+            /* Upload mode */
             <div className="space-y-4">
               {selectedViews.map(v => {
                 const dz = dropzones[v]
@@ -321,7 +380,7 @@ export default function Phase2Garment({ state, onComplete, onBack }: Props) {
                   <div key={v}>
                     <p className="text-xs font-medium text-gray-600 mb-2 capitalize">{v} view</p>
                     {uploadedViews[v] ? (
-                      <div className="relative rounded-xl overflow-hidden bg-white border border-slate-100" style={{ height: 160 }}>
+                      <div className="relative rounded-xl bg-white border border-slate-100" style={{ height: 160 }}>
                         <img src={uploadedViews[v]} alt={`${v} view`} className="w-full h-full object-contain p-2"/>
                         <button onClick={() => setUploadedViews(prev => { const n = {...prev}; delete n[v]; return n })}
                           className="absolute top-2 right-2 w-6 h-6 rounded-full bg-white/90 flex items-center justify-center text-gray-600 hover:text-red-500 shadow">
@@ -334,7 +393,7 @@ export default function Phase2Garment({ state, onComplete, onBack }: Props) {
                           dz.isDragActive ? 'border-brand-green bg-brand-green/5' : 'border-slate-200 hover:border-brand-green'
                         }`} style={{ height: 120 }}>
                         <input {...dz.getInputProps()}/>
-                        <ImageIcon size={24} className="text-gray-300 mb-2"/>
+                        <ImageIcon size={22} className="text-gray-300 mb-2"/>
                         <p className="text-xs text-gray-500">Drop {v} view here</p>
                         <p className="text-[11px] text-gray-400 mt-0.5">or click to browse</p>
                       </div>
@@ -346,29 +405,34 @@ export default function Phase2Garment({ state, onComplete, onBack }: Props) {
           )}
         </div>
 
-        {/* Right: Summary + proceed */}
+        {/* Right */}
         <div className="space-y-3">
           <div className="card">
             <p className="text-xs font-medium text-gray-600 mb-3">Views</p>
             <div className="space-y-2">
               {ALL_VIEWS.map(v => {
                 const selected = selectedViews.includes(v)
-                const done = !!currentResults[v]
+                const done = !!getActiveImage(v)
+                const hasClean = !!viewResults[v]?.clean
+                const hasRealistic = !!viewResults[v]?.realistic
                 return (
                   <div key={v} className={`flex items-center gap-2 text-xs ${selected ? '' : 'opacity-30'}`}>
-                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
-                      done ? 'bg-brand-green border-brand-green' : 'border-gray-300'
-                    }`}>
+                    <div className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${done ? 'bg-brand-green border-brand-green' : 'border-gray-300'}`}>
                       {done && <span className="text-white text-[8px]">✓</span>}
                     </div>
-                    <span className={`capitalize ${done ? 'text-gray-700' : 'text-gray-400'}`}>{v}</span>
+                    <span className={`capitalize flex-1 ${done ? 'text-gray-700' : 'text-gray-400'}`}>{v}</span>
+                    {mode === 'generate' && selected && (
+                      <div className="flex gap-0.5">
+                        {hasClean    && <span className="text-[9px] bg-slate-100 text-gray-500 rounded px-1">C</span>}
+                        {hasRealistic && <span className="text-[9px] bg-brand-green/10 text-brand-green rounded px-1">R</span>}
+                      </div>
+                    )}
                   </div>
                 )
               })}
             </div>
           </div>
 
-          {/* Preview thumbnail of active view */}
           {activeImage && (
             <div className="card">
               <p className="text-xs font-medium text-gray-600 mb-2 capitalize">{activeView} preview</p>
@@ -388,7 +452,7 @@ export default function Phase2Garment({ state, onComplete, onBack }: Props) {
 
           {anyDone && !allSelectedDone && (
             <p className="text-[11px] text-gray-400 text-center">
-              {selectedViews.filter(v => !currentResults[v]).map(v => v).join(', ')} view{selectedViews.filter(v => !currentResults[v]).length > 1 ? 's' : ''} still pending
+              {selectedViews.filter(v => !getActiveImage(v)).join(', ')} still pending
             </p>
           )}
         </div>
