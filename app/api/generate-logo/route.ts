@@ -42,12 +42,8 @@ export async function POST(req: NextRequest) {
       }
     } catch (err) {
       console.error('Logo generation failed:', err)
-      try {
-        const svgs = [generateSVGLogo(prompt), generateSVGLogo(prompt, 'variant1'), generateSVGLogo(prompt, 'variant2'), generateSVGLogo(prompt, 'variant3'), generateSVGLogo(prompt, 'variant4')]
-        await send({ type: 'complete', source: 'svg', images: svgs.map(svgToDataUrl), svgs, style, color })
-      } catch {
-        await send({ type: 'error', message: 'Generation failed. Please try again.' })
-      }
+      const msg = err instanceof Error ? err.message : 'Generation failed. Please try again.'
+      await send({ type: 'error', message: msg })
     } finally {
       await writer.close()
     }

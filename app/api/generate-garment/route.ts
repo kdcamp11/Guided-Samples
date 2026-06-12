@@ -40,12 +40,8 @@ export async function POST(req: NextRequest) {
       }
     } catch (err) {
       console.error('Garment generation failed:', err)
-      try {
-        const svgs = [generateGarmentSVG(garmentType, color), generateGarmentSVG(garmentType, color, 'front'), generateGarmentSVG(garmentType, color, 'back')]
-        await send({ type: 'complete', source: 'svg', images: svgs.map(svgToDataUrl), svgs, garmentType, color })
-      } catch {
-        await send({ type: 'error', message: 'Generation failed. Please try again.' })
-      }
+      const msg = err instanceof Error ? err.message : 'Generation failed. Please try again.'
+      await send({ type: 'error', message: msg })
     } finally {
       await writer.close()
     }
