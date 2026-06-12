@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
         method: 'POST',
         headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
         body: (garmentImage || logoImage) ? form : JSON.stringify({
-          model: 'gpt-image-2', prompt, n: 2, size: '1024x1024', output_format: 'png', quality: 'medium',
+          model: 'gpt-image-2', prompt, n: 2, size: '1024x1024', quality: 'medium',
         }),
       })
 

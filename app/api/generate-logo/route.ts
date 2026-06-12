@@ -98,7 +98,6 @@ async function generateWithOpenAI(builtPrompt: string, referenceImage?: string):
       prompt: builtPrompt,
       n: 2,
       size: '1024x1024',
-      background: 'transparent',
       output_format: 'png',
       quality: 'medium',
     }),
