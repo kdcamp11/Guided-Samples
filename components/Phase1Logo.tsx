@@ -239,7 +239,7 @@ export default function Phase1Logo({ state, onComplete, onSkip }: Props) {
             )}
           </div>
 
-          <div className="checkerboard rounded-xl overflow-hidden mb-3 flex items-center justify-center" style={{ height: 280 }}>
+          <div className="bg-white border border-slate-100 rounded-xl overflow-hidden mb-3 flex items-center justify-center" style={{ height: 280 }}>
             {loading && (
               <div className="flex flex-col items-center gap-3 text-gray-400">
                 <Loader2 size={32} className="animate-spin text-brand-green"/>
@@ -255,13 +255,31 @@ export default function Phase1Logo({ state, onComplete, onSkip }: Props) {
             )}
           </div>
 
+          {currentImage && !loading && (
+            <div className="flex items-center gap-2 mb-3">
+              <button
+                onClick={() => handleExport('png')}
+                disabled={!!exporting}
+                className="btn-primary flex items-center gap-2 flex-1 justify-center"
+              >
+                {exporting === 'png' ? <Loader2 size={13} className="animate-spin"/> : <Download size={13}/>}
+                {exporting === 'png' ? 'Exporting…' : 'Download PNG'}
+              </button>
+              <button
+                onClick={() => handleExport('pdf')}
+                disabled={!!exporting}
+                className="btn-secondary px-3 py-2 text-xs"
+              >PDF</button>
+            </div>
+          )}
+
           {result && result.images.length > 1 && (
             <div className="grid grid-cols-4 gap-2">
               {result.images.map((img, i) => (
                 <button
                   key={i}
                   onClick={() => setSelectedVariant(i)}
-                  className={`checkerboard rounded-lg overflow-hidden transition-all ${
+                  className={`bg-white border border-slate-100 rounded-lg overflow-hidden transition-all ${
                     selectedVariant === i ? 'ring-2 ring-brand-green' : 'hover:ring-1 hover:ring-slate-300'
                   }`}
                   style={{ height: 72 }}
@@ -277,43 +295,13 @@ export default function Phase1Logo({ state, onComplete, onSkip }: Props) {
         <div className="space-y-3">
           <div className="card">
             <p className="text-xs font-medium text-gray-600 mb-3">Your Logo</p>
-            <div className="checkerboard rounded-lg flex items-center justify-center mb-3" style={{ height: 120 }}>
+            <div className="bg-white border border-slate-100 rounded-lg flex items-center justify-center mb-3" style={{ height: 120 }}>
               {savedLogo ? (
                 <img src={savedLogo.dataUrl} alt="Your logo" className="w-full h-full object-contain p-2"/>
               ) : (
                 <div className="text-gray-400 text-xs text-center px-4">Save a logo to use it</div>
               )}
             </div>
-
-            {currentImage && (
-              <button
-                onClick={() => handleExport('png')}
-                disabled={!!exporting}
-                className="btn-primary w-full flex items-center justify-center gap-2 mb-2"
-              >
-                {exporting ? <Loader2 size={14} className="animate-spin"/> : <Download size={14}/>}
-                {exporting ? 'Exporting…' : 'Download'}
-              </button>
-            )}
-
-            {currentImage && (
-              <div className="grid grid-cols-3 gap-1 text-xs mb-3">
-                {(['PNG', 'SVG', 'PDF'] as const).map(fmt => {
-                  const disabled = !!exporting || (fmt === 'SVG' && !currentSvg)
-                  return (
-                    <button
-                      key={fmt}
-                      onClick={() => handleExport(fmt.toLowerCase() as 'png' | 'svg' | 'pdf')}
-                      disabled={disabled}
-                      title={fmt === 'SVG' && !currentSvg ? 'Vector export unavailable for AI images' : ''}
-                      className="btn-secondary py-1 text-center disabled:opacity-40"
-                    >
-                      {exporting === fmt.toLowerCase() ? '…' : fmt}
-                    </button>
-                  )
-                })}
-              </div>
-            )}
 
             <label className="flex items-center gap-2 text-xs text-gray-500 cursor-pointer">
               <input
@@ -322,7 +310,7 @@ export default function Phase1Logo({ state, onComplete, onSkip }: Props) {
                 onChange={e => setTransparentBg(e.target.checked)}
                 className="accent-brand-green"
               />
-              Transparent Background
+              Transparent background on export
             </label>
           </div>
 
@@ -332,18 +320,11 @@ export default function Phase1Logo({ state, onComplete, onSkip }: Props) {
               <div className="space-y-1.5 text-xs">
                 <div className="flex justify-between">
                   <span className="text-gray-500">Engine</span>
-                  <span className="text-gray-700">{result.source === 'openai' ? 'OpenAI' : 'Built-in'}</span>
+                  <span className="text-gray-700">{result.source === 'openai' ? 'OpenAI gpt-image-1' : 'Built-in'}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Style</span>
-                  <span className="text-gray-700">{result.style}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-500">Color</span>
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-3 h-3 rounded-full" style={{ background: result.color }}/>
-                    <span className="text-gray-700 font-mono">{result.color.toUpperCase()}</span>
-                  </div>
+                  <span className="text-gray-500">Variants</span>
+                  <span className="text-gray-700">{result.images.length}</span>
                 </div>
               </div>
             </div>
