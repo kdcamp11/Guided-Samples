@@ -203,7 +203,7 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack }
     if (!file) return
     const reader = new FileReader()
     reader.onload = ev => {
-      onSetGarment({ svg: '', dataUrl: ev.target?.result as string, type: 'custom', color: 'custom' })
+      onSetGarment({ svg: '', dataUrl: ev.target?.result as string, views: { front: ev.target?.result as string }, type: 'custom', color: 'custom' })
     }
     reader.readAsDataURL(file)
     e.target.value = ''
