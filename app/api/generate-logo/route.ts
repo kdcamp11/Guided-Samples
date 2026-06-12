@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 import { logoPrompt } from '@/lib/prompts'
 
 export const runtime = 'nodejs'
-export const maxDuration = 60
+export const maxDuration = 120
 
 export async function POST(req: NextRequest) {
   const { prompt, referenceImage } = await req.json()

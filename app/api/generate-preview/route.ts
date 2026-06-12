@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 
 export const runtime = 'nodejs'
-export const maxDuration = 60
+export const maxDuration = 120
 
 export async function POST(req: NextRequest) {
   const { garmentImage, logoImage, placement } = await req.json()
