@@ -261,6 +261,17 @@ export default function Phase4Preview({ state, onComplete, onBack }: Props) {
             </button>
           )}
 
+          {generated && (
+            <button
+              onClick={handleRegenerate}
+              disabled={loading}
+              className="btn-secondary w-full flex items-center justify-center gap-2"
+            >
+              {loading ? <Loader2 size={14} className="animate-spin"/> : <RefreshCw size={14}/>}
+              {loading ? (statusMsg || 'Generating…') : 'Regenerate'}
+            </button>
+          )}
+
           <button
             onClick={handleProceed}
             disabled={!generated}
