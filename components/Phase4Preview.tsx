@@ -278,24 +278,16 @@ export default function Phase4Preview({ state, onComplete, onBack }: Props) {
 
           <button
             onClick={handleProceed}
-            disabled={!generated}
-            className={`w-full flex items-center justify-center gap-2 font-medium py-3 px-4 rounded-xl transition-colors text-sm ${
-              generated
-                ? 'bg-brand-green hover:bg-brand-green-light text-white'
-                : 'bg-slate-100 text-gray-400 cursor-not-allowed'
-            }`}
+            className="w-full flex items-center justify-center gap-2 font-medium py-3 px-4 rounded-xl transition-colors text-sm bg-brand-green hover:bg-brand-green-light text-white"
           >
             Proceed to Tech Pack
             <ArrowRight size={15}/>
           </button>
 
-          {generated && (
-            <button
-              onClick={handleProceed}
-              className="w-full text-center text-xs text-gray-400 hover:text-gray-700 transition-colors"
-            >
-              Skip — proceed without preview →
-            </button>
+          {!generated && (
+            <p className="text-center text-[11px] text-gray-400">
+              Preview is optional — you can proceed directly
+            </p>
           )}
         </div>
 
