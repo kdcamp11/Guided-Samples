@@ -25,8 +25,11 @@ async function prefetchPreview(state: AppState, compositeImage: string) {
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image()
+    img.crossOrigin = 'anonymous'
     img.onload = () => resolve(img)
     img.onerror = reject
+    // Force a fresh load from the data URL, bypassing any cached tainted version
+    img.src = ''
     img.src = src
   })
 }
@@ -238,10 +241,11 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack }
     let composite = ''
     try {
       composite = await compositeDesign()
+      if (!composite) console.warn('compositeDesign returned empty — garment may be missing')
     } catch (e) {
-      console.error('Composite failed, falling back to separate images', e)
+      console.error('compositeDesign threw:', e)
     }
-    prefetchPreview(state, composite) // warm Phase 4 cache in background
+    prefetchPreview(state, composite)
     onComplete({ confirmed: true, previewDataUrl: composite })
   }
 
