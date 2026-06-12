@@ -59,6 +59,12 @@ export default function Phase1Logo({ state, onComplete, onSkip }: Props) {
     }
   }
 
+  const handleRegenerate = async () => {
+    const key = cacheKey('logo', prompt, referenceImage ?? '')
+    cacheSet(key, null, 0)
+    await handleGenerate()
+  }
+
   const handleGenerate = async () => {
     if (!prompt.trim()) return
     setLoading(true)
@@ -227,7 +233,7 @@ export default function Phase1Logo({ state, onComplete, onSkip }: Props) {
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-medium text-gray-600">Generated Logo</span>
             {result && (
-              <button onClick={handleGenerate} className="p-1.5 rounded-lg hover:bg-slate-100 text-gray-400 hover:text-gray-700 transition-colors">
+              <button onClick={handleRegenerate} className="p-1.5 rounded-lg hover:bg-slate-100 text-gray-400 hover:text-gray-700 transition-colors" title="Regenerate (new result)">
                 <RefreshCw size={14}/>
               </button>
             )}

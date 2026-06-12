@@ -63,6 +63,12 @@ export default function Phase2Garment({ state, onComplete, onBack }: Props) {
     multiple: false,
   })
 
+  const handleRegenerate = async () => {
+    const key = cacheKey('garment', prompt, color, referenceImage ?? '')
+    cacheSet(key, null, 0)
+    await handleGenerate()
+  }
+
   const handleGenerate = async () => {
     setLoading(true)
     setError('')
