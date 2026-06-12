@@ -136,7 +136,7 @@ export default function Phase5TechPack({ state, onBack, onSendToProduction }: Pr
       const res = await fetch('/api/detect-measurements', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: imageForAnalysis, measurements }),
+        body: JSON.stringify({ image: imageForAnalysis }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Detection failed')
@@ -148,7 +148,7 @@ export default function Phase5TechPack({ state, onBack, onSendToProduction }: Pr
           : s.garmentType
       }))
       setMeasurementDetectInfo(
-        `Calibrated from Length (size M) = ${data.calibrator.value}". Size M: chest ${data.sizeM.chestFlatM}", shoulder ${data.sizeM.shoulderM}".`
+        `Detected ${data.garmentType ?? 'garment'} (${data.fit ?? 'regular'} fit). Size M from image: length ${data.sizeM.lengthM}", chest ${data.sizeM.chestFlatM}", shoulder ${data.sizeM.shoulderM}". All sizes graded from these — review and adjust as needed.`
       )
     } catch (e) {
       console.error('Measurement detection failed:', e)

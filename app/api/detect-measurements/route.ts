@@ -19,14 +19,10 @@ const M_IDX = 2 // index of size M
 // Vision model returns only normalized coordinates (0–1 relative to image).
 // All inch values are computed here from those coords + one known scale anchor.
 export async function POST(req: NextRequest) {
-  const { image, measurements } = await req.json()
+  const { image } = await req.json()
 
   if (!image) return NextResponse.json({ error: 'Garment image required' }, { status: 400 })
   if (!process.env.OPENAI_API_KEY) return NextResponse.json({ error: 'No API key configured' }, { status: 500 })
-
-  // Scale calibrator: use length for size M from existing table, or fall back to 28"
-  const existingLength: number[] | undefined = measurements?.['Length']
-  const calibratorLengthIn: number = existingLength?.[M_IDX] ?? 28
 
   const visionPrompt = `Analyze this flat-lay product photo of a garment. Return ONLY a JSON object with normalized coordinates where 0,0 is the top-left of the full image and 1,1 is the bottom-right of the full image.
 
@@ -47,7 +43,9 @@ export async function POST(req: NextRequest) {
   "right_sleeve_tip_x": 0.0,
   "right_sleeve_tip_y": 0.0,
   "has_sleeves": true,
-  "garment_type_guess": "t-shirt"
+  "garment_type_guess": "t-shirt",
+  "estimated_body_length_in": 28.0,
+  "fit_guess": "regular"
 }
 
 Point definitions:
@@ -61,7 +59,9 @@ Point definitions:
 - left_sleeve_tip_x / left_sleeve_tip_y: coordinates of the outermost edge of the LEFT sleeve cuff
 - right_sleeve_tip_x / right_sleeve_tip_y: coordinates of the outermost edge of the RIGHT sleeve cuff
 - has_sleeves: false if sleeveless/vest
-- garment_type_guess: one of t-shirt, hoodie, crewneck, jacket, tank, vest, long-sleeve`
+- garment_type_guess: one of t-shirt, hoodie, crewneck, jacket, tank, vest, long-sleeve
+- estimated_body_length_in: your best estimate of the real-world body length in inches from collar seam to hem for an adult size M of this garment type and fit. Typical references: regular-fit tee 27-29", oversized/boxy tee 29-31", hoodie 27-29", crewneck 26-28", tank 26-28", cropped styles 22-24". Judge from the garment's proportions (length vs width ratio, drop shoulders, boxy vs slim cut).
+- fit_guess: one of "slim", "regular", "oversized", "boxy", "cropped"`
 
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -98,8 +98,13 @@ Point definitions:
   const hemY     = p.hem_y as number
   const normBodyH = Math.max(hemY - collarY, 0.01)
 
-  // For a square 1024×1024 image taken straight-on, x and y pixel scales are equal.
-  // inches_per_norm_unit = calibratorLengthIn / normBodyH
+  // Scale anchor: model's estimate of real-world body length for this garment
+  // type and fit (clamped to a sane apparel range). All other dimensions are
+  // derived geometrically from this single anchor.
+  const rawEstimate = typeof p.estimated_body_length_in === 'number' ? p.estimated_body_length_in : 28
+  const calibratorLengthIn = Math.min(Math.max(rawEstimate, 18), 36)
+
+  // For a square image taken straight-on, x and y pixel scales are equal.
   const scale = calibratorLengthIn / normBodyH // inches per normalized unit
 
   const r = (n: number) => Math.round(n * 4) / 4 // round to nearest 0.25"
@@ -153,7 +158,8 @@ Point definitions:
   return NextResponse.json({
     measurements: detected,
     garmentType: p.garment_type_guess as string,
-    calibrator: { label: 'Length (size M)', value: calibratorLengthIn },
+    fit: (p.fit_guess as string) ?? 'regular',
+    calibrator: { label: 'estimated body length (size M)', value: calibratorLengthIn },
     sizeM: { chestFlatM, lengthM, shoulderM, bottomOpenM, armholeM, sleeveLengthM },
   })
 }
