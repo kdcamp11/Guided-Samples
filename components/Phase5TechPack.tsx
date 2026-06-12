@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, Upload, Download, Save, CheckCircle2, ArrowLeft, Trash2, ArrowRight } from 'lucide-react'
+import { Plus, Upload, Download, Save, CheckCircle2, ArrowLeft, Trash2, ArrowRight, Sparkles, Loader2 } from 'lucide-react'
 import { AppState } from '@/app/page'
 import type { TechPackData } from '@/components/Phase6Production'
 
@@ -82,6 +82,43 @@ export default function Phase5TechPack({ state, onBack, onSendToProduction }: Pr
     { location: 'Front', description: 'Center chest logo placement' },
   ])
   const [uploadMsg, setUploadMsg] = useState('')
+  const [detecting, setDetecting] = useState(false)
+  const [detectError, setDetectError] = useState('')
+
+  // The composite from Phase 3 (garment with logo applied) is the analysis input
+  const designImage = state.design?.previewDataUrl || state.garment?.dataUrl || ''
+
+  const handleAutoDetect = async () => {
+    if (!designImage) {
+      setDetectError('No applied-design image found — confirm your design in Phase 3 first.')
+      return
+    }
+    setDetecting(true)
+    setDetectError('')
+    try {
+      // Scale reference: use size M from the measurement table
+      const sizeIndex = SIZES.indexOf('M')
+      const res = await fetch('/api/detect-placement', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: designImage, measurements, sizeIndex }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Detection failed')
+      setPlacements(ps => {
+        const entry = { location: data.location, description: data.description }
+        // Replace the first "Front" placement if present, otherwise prepend
+        const idx = ps.findIndex(p => p.location.toLowerCase() === 'front')
+        if (idx >= 0) return ps.map((p, i) => (i === idx ? entry : p))
+        return [entry, ...ps]
+      })
+    } catch (e) {
+      console.error('Placement detection failed:', e)
+      setDetectError(e instanceof Error ? e.message : 'Detection failed. Please try again.')
+    } finally {
+      setDetecting(false)
+    }
+  }
 
   const set = (key: keyof StyleInfo, value: string) =>
     setStyleInfo(s => ({ ...s, [key]: value }))
@@ -325,6 +362,17 @@ export default function Phase5TechPack({ state, onBack, onSendToProduction }: Pr
                 <Plus size={11}/> Add
               </button>
             </div>
+
+            <button
+              onClick={handleAutoDetect}
+              disabled={detecting || !designImage}
+              className="btn-primary w-full flex items-center justify-center gap-2 mb-3 disabled:opacity-50"
+              title={designImage ? 'Analyze your applied design and auto-fill placement specs' : 'Confirm a design in Phase 3 first'}
+            >
+              {detecting ? <Loader2 size={13} className="animate-spin"/> : <Sparkles size={13}/>}
+              {detecting ? 'Analyzing design…' : 'Auto Detect Placement'}
+            </button>
+            {detectError && <p className="text-[11px] text-red-500 mb-2">{detectError}</p>}
             <div className="space-y-2">
               {placements.map((p, i) => (
                 <div key={i} className="bg-slate-50 rounded-lg p-2.5 space-y-2 group">
@@ -342,8 +390,9 @@ export default function Phase5TechPack({ state, onBack, onSendToProduction }: Pr
                       <Trash2 size={12}/>
                     </button>
                   </div>
-                  <input
-                    className="input-field text-xs py-1.5"
+                  <textarea
+                    className="textarea-field text-xs py-1.5"
+                    rows={Math.max(2, p.description.split('\n').length)}
                     value={p.description}
                     onChange={e => setPlacements(ps => ps.map((x, j) => j === i ? { ...x, description: e.target.value } : x))}
                     placeholder="Description / dimensions"

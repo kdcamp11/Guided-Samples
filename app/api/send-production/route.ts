@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
     .join('')
 
   const placementList = (placements as { location: string; description: string }[])
-    .map(p => `<li><strong>${p.location}:</strong> ${p.description}</li>`)
+    .map(p => `<li><strong>${p.location}:</strong><br>${p.description.replace(/\n/g, '<br>')}</li>`)
     .join('')
 
   const measurementRows = Object.entries(measurements as Record<string, number[]>)
