@@ -2,22 +2,17 @@
 
 import { useState, useCallback } from 'react'
 import { useDropzone } from 'react-dropzone'
-import { Upload, Cpu, Loader2, ArrowRight, ArrowLeft, ImageIcon, ImagePlus, X, CheckSquare, Square, Sparkles, Camera, Download } from 'lucide-react'
+import { Upload, Cpu, Loader2, ArrowRight, ArrowLeft, ImageIcon, ImagePlus, X, CheckSquare, Square, Sparkles, Download } from 'lucide-react'
 import { AppState } from '@/app/page'
 import { streamGenerate } from '@/lib/streamGenerate'
 import { cacheGet, cacheSet, cacheKey } from '@/lib/generateCache'
 
 type View = 'front' | 'back' | 'side'
-type Quality = 'clean' | 'realistic'
 
 interface ViewResult {
   image: string
   view: View
-  quality: Quality
 }
-
-// Per-view store of both quality variants
-type ViewImages = { clean?: string; realistic?: string }
 
 interface Props {
   state: AppState
@@ -34,12 +29,10 @@ export default function Phase2Garment({ state, onComplete, onBack }: Props) {
   )
   const [selectedViews, setSelectedViews] = useState<View[]>(['front'])
   const [activeView, setActiveView] = useState<View>('front')
-  const [presentationMode, setPresentationMode] = useState<Quality>('clean')
 
-  // Generate mode: store both quality variants per view
-  const [viewResults, setViewResults] = useState<Partial<Record<View, ViewImages>>>({})
+  // Generate mode: one image per view
+  const [viewResults, setViewResults] = useState<Partial<Record<View, string>>>({})
   const [loadingView, setLoadingView] = useState<View | null>(null)
-  const [loadingQuality, setLoadingQuality] = useState<Quality | null>(null)
   const [statusMsg, setStatusMsg] = useState('')
   const [errors, setErrors] = useState<Partial<Record<View, string>>>({})
   const [referenceImage, setReferenceImage] = useState<string | null>(null)
@@ -55,27 +48,26 @@ export default function Phase2Garment({ state, onComplete, onBack }: Props) {
     )
   }
 
-  const generateView = async (view: View, quality: Quality, frontImage?: string): Promise<string | null> => {
-    const key = cacheKey('garment2', prompt, view, quality, referenceImage ?? '', frontImage ?? '')
+  const generateView = async (view: View, frontImage?: string): Promise<string | null> => {
+    const key = cacheKey('garment2', prompt, view, referenceImage ?? '', frontImage ?? '')
     const cached = cacheGet<ViewResult>(key)
     if (cached) {
-      setViewResults(prev => ({ ...prev, [view]: { ...prev[view], [quality]: cached.image } }))
+      setViewResults(prev => ({ ...prev, [view]: cached.image }))
       return cached.image
     }
 
     setLoadingView(view)
-    setLoadingQuality(quality)
     setErrors(prev => ({ ...prev, [view]: undefined }))
-    setStatusMsg(quality === 'realistic' ? `Enhancing ${view} view...` : `Generating ${view} view...`)
+    setStatusMsg(`Generating ${view} view...`)
 
     try {
       const data = await streamGenerate<ViewResult>(
         '/api/generate-garment',
-        { prompt, referenceImage, view, frontImage: frontImage ?? null, quality },
+        { prompt, referenceImage, view, frontImage: frontImage ?? null, quality: 'realistic' },
         msg => setStatusMsg(msg),
       )
       cacheSet(key, data)
-      setViewResults(prev => ({ ...prev, [view]: { ...prev[view], [quality]: data.image } }))
+      setViewResults(prev => ({ ...prev, [view]: data.image }))
       return data.image
     } catch (e) {
       console.error(e)
@@ -83,12 +75,11 @@ export default function Phase2Garment({ state, onComplete, onBack }: Props) {
       return null
     } finally {
       setLoadingView(null)
-      setLoadingQuality(null)
       setStatusMsg('')
     }
   }
 
-  const handleGenerateAll = async (quality: Quality) => {
+  const handleGenerateAll = async () => {
     setErrors({})
     const orderedViews: View[] = [
       ...(selectedViews.includes('front') ? ['front' as View] : []),
@@ -98,7 +89,7 @@ export default function Phase2Garment({ state, onComplete, onBack }: Props) {
 
     let frontImg: string | null = null
     for (const view of orderedViews) {
-      const img = await generateView(view, quality, view !== 'front' ? (frontImg ?? undefined) : undefined)
+      const img = await generateView(view, view !== 'front' ? (frontImg ?? undefined) : undefined)
       if (view === 'front' && img) frontImg = img
     }
     setActiveView(orderedViews[0])
@@ -133,8 +124,7 @@ export default function Phase2Garment({ state, onComplete, onBack }: Props) {
   // Active image: for generate mode show the selected quality variant, fallback to other
   const getActiveImage = (view: View): string | undefined => {
     if (mode === 'upload') return uploadedViews[view]
-    const imgs = viewResults[view]
-    return imgs?.[presentationMode] ?? imgs?.clean ?? imgs?.realistic
+    return viewResults[view]
   }
 
   const activeImage = getActiveImage(activeView)
@@ -142,9 +132,7 @@ export default function Phase2Garment({ state, onComplete, onBack }: Props) {
   const allSelectedDone = selectedViews.every(v => !!getActiveImage(v))
   const isLoading = !!loadingView
 
-  const currentModeHasResults = mode === 'generate'
-    ? selectedViews.some(v => !!viewResults[v]?.[presentationMode])
-    : anyDone
+  const currentModeHasResults = anyDone
 
   const handleProceed = () => {
     const views: { front?: string; back?: string; side?: string } = {}
@@ -256,19 +244,10 @@ export default function Phase2Garment({ state, onComplete, onBack }: Props) {
                 )}
               </div>
 
-              {/* Two generate buttons */}
-              <div className="space-y-2">
-                <button onClick={() => handleGenerateAll('clean')} disabled={isLoading}
-                  className="btn-secondary w-full flex items-center justify-center gap-2">
-                  {loadingQuality === 'clean' ? <Loader2 size={14} className="animate-spin"/> : <Cpu size={14}/>}
-                  {loadingQuality === 'clean' ? (statusMsg || 'Generating…') : `Clean Product View`}
-                </button>
-                <button onClick={() => handleGenerateAll('realistic')} disabled={isLoading}
-                  className="btn-primary w-full flex items-center justify-center gap-2">
-                  {loadingQuality === 'realistic' ? <Loader2 size={14} className="animate-spin"/> : <Camera size={14}/>}
-                  {loadingQuality === 'realistic' ? (statusMsg || 'Enhancing…') : `Enhanced Realism View`}
-                </button>
-              </div>
+              <button onClick={handleGenerateAll} disabled={isLoading}
+                className="btn-primary w-full flex items-center justify-center gap-2">
+                {isLoading ? <><Loader2 size={14} className="animate-spin"/> {statusMsg || 'Generating…'}</> : <><Sparkles size={14}/> Generate Garment</>}
+              </button>
 
               {Object.entries(errors).filter(([, v]) => v).map(([view, msg]) => (
                 <p key={view} className="text-[11px] text-red-500">{view}: {msg}</p>
@@ -293,20 +272,6 @@ export default function Phase2Garment({ state, onComplete, onBack }: Props) {
               ))}
             </div>
 
-            {/* Mode toggle — only in generate mode with results */}
-            {mode === 'generate' && (viewResults[activeView]?.clean || viewResults[activeView]?.realistic) && (
-              <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-0.5">
-                {(['clean', 'realistic'] as Quality[]).map(q => (
-                  <button key={q} onClick={() => setPresentationMode(q)}
-                    disabled={!viewResults[activeView]?.[q]}
-                    className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors disabled:opacity-30 capitalize ${
-                      presentationMode === q ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-                    }`}>
-                    {q === 'clean' ? '⚡ Clean' : '✦ Realistic'}
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
 
           {mode === 'generate' ? (
@@ -330,22 +295,6 @@ export default function Phase2Garment({ state, onComplete, onBack }: Props) {
                 )}
               </div>
 
-              {/* Comparison strip when both modes available */}
-              {viewResults[activeView]?.clean && viewResults[activeView]?.realistic && (
-                <div className="grid grid-cols-2 gap-2 mt-3">
-                  {(['clean', 'realistic'] as Quality[]).map(q => (
-                    <button key={q} onClick={() => setPresentationMode(q)}
-                      className={`bg-white border rounded-xl overflow-hidden transition-all flex flex-col ${
-                        presentationMode === q ? 'border-brand-green ring-1 ring-brand-green' : 'border-slate-100 hover:border-slate-300'
-                      }`}>
-                      <img src={viewResults[activeView]![q]!} alt={q} className="w-full object-contain p-2" style={{ height: 100 }}/>
-                      <span className={`text-[10px] font-medium text-center py-1.5 ${presentationMode === q ? 'text-brand-green' : 'text-gray-400'}`}>
-                        {q === 'clean' ? '⚡ Clean' : '✦ Realistic'}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
 
               {/* Multi-view thumbnails */}
               {anyDone && selectedViews.length > 1 && (
@@ -434,20 +383,12 @@ export default function Phase2Garment({ state, onComplete, onBack }: Props) {
               {ALL_VIEWS.map(v => {
                 const selected = selectedViews.includes(v)
                 const done = !!getActiveImage(v)
-                const hasClean = !!viewResults[v]?.clean
-                const hasRealistic = !!viewResults[v]?.realistic
                 return (
                   <div key={v} className={`flex items-center gap-2 text-xs ${selected ? '' : 'opacity-30'}`}>
                     <div className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${done ? 'bg-brand-green border-brand-green' : 'border-gray-300'}`}>
                       {done && <span className="text-white text-[8px]">✓</span>}
                     </div>
                     <span className={`capitalize flex-1 ${done ? 'text-gray-700' : 'text-gray-400'}`}>{v}</span>
-                    {mode === 'generate' && selected && (
-                      <div className="flex gap-0.5">
-                        {hasClean    && <span className="text-[9px] bg-slate-100 text-gray-500 rounded px-1">C</span>}
-                        {hasRealistic && <span className="text-[9px] bg-brand-green/10 text-brand-green rounded px-1">R</span>}
-                      </div>
-                    )}
                   </div>
                 )
               })}

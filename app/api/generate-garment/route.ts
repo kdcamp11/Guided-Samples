@@ -5,7 +5,7 @@ export const runtime = 'nodejs'
 export const maxDuration = 120
 
 export async function POST(req: NextRequest) {
-  const { prompt, referenceImage, view, frontImage, quality = 'clean' } = await req.json()
+  const { prompt, referenceImage, view, frontImage } = await req.json()
 
   if (!prompt) {
     return new Response(`data: ${JSON.stringify({ type: 'error', message: 'Prompt required' })}\n\n`, {
@@ -23,18 +23,17 @@ export async function POST(req: NextRequest) {
       await send({ type: 'status', message: 'Connecting to AI...' })
       if (process.env.OPENAI_API_KEY) {
         const viewLabel = (view ?? 'front') as string
-        const qualityLabel = quality as 'clean' | 'realistic'
-        await send({ type: 'status', message: `Generating ${viewLabel} view (${qualityLabel})...` })
+        await send({ type: 'status', message: `Generating ${viewLabel} view...` })
 
         const referenceForView = (view && view !== 'front' && frontImage) ? frontImage : referenceImage
-        const built = garmentPrompt({ userPrompt: prompt, hasReference: !!referenceForView, view: viewLabel, quality: qualityLabel })
-        const image = await generateWithOpenAI(built, referenceForView, qualityLabel)
+        const built = garmentPrompt({ userPrompt: prompt, hasReference: !!referenceForView, view: viewLabel })
+        const image = await generateWithOpenAI(built, referenceForView, 'medium')
         await send({ type: 'status', message: 'Processing result...' })
-        await send({ type: 'complete', source: 'openai', image, view: viewLabel, quality: qualityLabel })
+        await send({ type: 'complete', source: 'openai', image, view: viewLabel })
       } else {
         const viewLabel = view ?? 'front'
         const svg = generateGarmentSVG(viewLabel)
-        await send({ type: 'complete', source: 'svg', image: svgToDataUrl(svg), view: viewLabel, quality })
+        await send({ type: 'complete', source: 'svg', image: svgToDataUrl(svg), view: viewLabel })
       }
     } catch (err) {
       console.error('Garment generation failed:', err)
@@ -50,7 +49,7 @@ export async function POST(req: NextRequest) {
   })
 }
 
-async function generateWithOpenAI(builtPrompt: string, referenceImage?: string, quality: 'clean' | 'realistic' = 'clean'): Promise<string> {
+async function generateWithOpenAI(builtPrompt: string, referenceImage?: string, _quality = 'medium'): Promise<string> {
   const apiQuality = 'medium'
   if (referenceImage) {
     const base64Data = referenceImage.split(',')[1]
