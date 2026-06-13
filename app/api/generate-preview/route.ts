@@ -4,7 +4,7 @@ export const runtime = 'nodejs'
 export const maxDuration = 120
 
 export async function POST(req: NextRequest) {
-  const { garmentImage, logoImage, placement } = await req.json()
+  const { garmentImage, logoImage, placement, extraPrompt } = await req.json()
 
   const { readable, writable } = new TransformStream()
   const writer = writable.getWriter()
@@ -22,9 +22,10 @@ export async function POST(req: NextRequest) {
 
       await send({ type: 'status', message: 'Compositing your design...' })
 
-      const prompt = logoImage
+      const basePrompt = logoImage
         ? `Professional apparel product photography. Take this garment and realistically apply the provided logo to the ${placement || 'center chest'}. The logo should look printed or embroidered on the fabric. Studio lighting, white background, photorealistic, no model, no mannequin. Show the full garment.`
         : `Professional apparel product photography of this exact garment design. The garment image includes a printed logo/graphic — keep that logo exactly as shown, in the same position, size, and colors, making it look realistically printed or embroidered on the fabric. Studio lighting, white background, photorealistic, no model, no mannequin. Show the full garment.`
+      const prompt = extraPrompt ? `${basePrompt} Additional direction: ${extraPrompt}` : basePrompt
 
       const form = new FormData()
       form.append('model', 'gpt-image-2')
