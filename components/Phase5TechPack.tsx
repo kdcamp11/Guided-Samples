@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Upload, Download, Save, CheckCircle2, ArrowLeft, Trash2, ArrowRight, Sparkles, Loader2, AlertTriangle } from 'lucide-react'
+import { Plus, Upload, Download, Save, CheckCircle2, ArrowLeft, Trash2, ArrowRight, Sparkles, Loader2 } from 'lucide-react'
 import { AppState } from '@/app/page'
 import type { TechPackData } from '@/components/Phase6Production'
 
@@ -212,7 +212,6 @@ export default function Phase5TechPack({ state, onBack, onSendToProduction }: Pr
     () => templateToMeasurements(inferredType)
   )
   const [newRowLabel, setNewRowLabel] = useState('')
-  const [pendingType, setPendingType] = useState<string | null>(null) // awaiting confirm dialog
   const [pantones, setPantones] = useState([{ color: '#184D3E', name: 'PANTONE 5535 C' }])
   const [newPantone, setNewPantone] = useState('')
   const [newPantoneColor, setNewPantoneColor] = useState('#888888')
@@ -241,14 +240,8 @@ export default function Phase5TechPack({ state, onBack, onSendToProduction }: Pr
   const set = (key: keyof StyleInfo, value: string) =>
     setStyleInfo(s => ({ ...s, [key]: value }))
 
-  // Always prompt before replacing the measurement table.
-  const requestTypeChange = (newType: string) => {
+  const switchTemplate = (newType: string) => {
     if (newType === styleInfo.garmentType) return
-    setPendingType(newType)
-  }
-
-  const applyTypeChange = (newType: string) => {
-    setPendingType(null)
     setMeasurementDetectInfo('')
     setStyleInfo(s => ({ ...s, garmentType: newType }))
     setMeasurements(templateToMeasurements(newType))
@@ -405,26 +398,6 @@ export default function Phase5TechPack({ state, onBack, onSendToProduction }: Pr
 
   return (
     <div className="p-6">
-      {/* Confirm dialog: switching garment type will reset measurements */}
-      {pendingType && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full">
-            <div className="flex items-start gap-3 mb-4">
-              <AlertTriangle size={20} className="text-amber-500 shrink-0 mt-0.5"/>
-              <div>
-                <p className="text-sm font-semibold text-gray-900">Switch to {pendingType}?</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  This will replace the current measurement rows with the {pendingType} template. Custom values and manually added rows will be lost.
-                </p>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <button onClick={() => setPendingType(null)} className="btn-secondary flex-1">Cancel</button>
-              <button onClick={() => applyTypeChange(pendingType!)} className="btn-primary flex-1">Switch Template</button>
-            </div>
-          </div>
-        </div>
-      )}
 
       <div className="mb-5 flex items-start justify-between">
         <div>
@@ -497,13 +470,7 @@ export default function Phase5TechPack({ state, onBack, onSendToProduction }: Pr
               <SelectField label="Season" value={styleInfo.season} onChange={v => set('season', v)} options={SEASONS}/>
               <div>
                 <label className="text-[11px] text-gray-500 mb-1 block">Garment Type</label>
-                <select
-                  className="input-field text-xs py-2"
-                  value={styleInfo.garmentType}
-                  onChange={e => requestTypeChange(e.target.value)}
-                >
-                  {GARMENT_TYPE_LIST.map(o => <option key={o} value={o}>{o}</option>)}
-                </select>
+                <p className="input-field text-xs py-2 text-gray-700">{styleInfo.garmentType}</p>
               </div>
               <SelectField label="Gender"       value={styleInfo.gender}      onChange={v => set('gender', v)}      options={GENDERS}/>
               <SelectField label="Age Category" value={styleInfo.ageCategory} onChange={v => set('ageCategory', v)} options={AGE_CATEGORIES}/>
@@ -515,12 +482,36 @@ export default function Phase5TechPack({ state, onBack, onSendToProduction }: Pr
         {/* Col 3: Measurements + Pantones + Placement */}
         <div className="space-y-3">
 
-          {/* Measurements — key forces full remount when template changes */}
-          <div className="card" key={styleInfo.garmentType}>
+          {/* Measurements */}
+          <div className="card">
+            {/* Template tab bar — two rows: tops / bottoms */}
+            <div className="mb-3 space-y-1">
+              {[
+                ['T-Shirt', 'Hoodie', 'Crewneck', 'Zip Hoodie', 'Track Jacket', 'Windbreaker', 'Basketball Jersey'],
+                ['Sweatpants', 'Track Pants', 'Basketball Shorts'],
+              ].map((group, gi) => (
+                <div key={gi} className="flex flex-wrap gap-1">
+                  {group.map(t => (
+                    <button
+                      key={t}
+                      onClick={() => switchTemplate(t)}
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-medium transition-colors whitespace-nowrap ${
+                        styleInfo.garmentType === t
+                          ? 'bg-brand-green text-white'
+                          : 'bg-slate-100 text-gray-500 hover:bg-slate-200'
+                      }`}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              ))}
+            </div>
+
             <div className="flex items-center justify-between mb-2">
               <div>
                 <p className="text-xs font-semibold text-gray-900">Measurements (inches)</p>
-                <p className="text-[10px] text-gray-400 mt-0.5">{styleInfo.garmentType} template · {Object.keys(measurements).length} rows</p>
+                <p className="text-[10px] text-gray-400 mt-0.5">{styleInfo.garmentType} · {Object.keys(measurements).length} rows</p>
               </div>
               <button
                 onClick={handleAutoDetectMeasurements}
