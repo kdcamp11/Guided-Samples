@@ -12,6 +12,7 @@ import Phase5TechPack from '@/components/Phase5TechPack'
 import Phase6Production from '@/components/Phase6Production'
 import type { TechPackData } from '@/components/Phase6Production'
 import SectionView from '@/components/SectionView'
+import LandingPage from '@/components/LandingPage'
 import { Menu } from 'lucide-react'
 
 export type AppState = {
@@ -40,6 +41,7 @@ export type AppState = {
 
 function App() {
   const { user, loading } = useAuth()
+  const [showLanding, setShowLanding] = useState(true)
   const [state, setState] = useState<AppState>({
     currentPhase: 1,
     logo: null,
@@ -71,6 +73,8 @@ function App() {
     setSection(s)
     setSidebarOpen(false)
   }
+
+  if (showLanding) return <LandingPage onEnter={() => setShowLanding(false)} />
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
