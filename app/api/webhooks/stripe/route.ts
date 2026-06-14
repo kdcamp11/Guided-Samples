@@ -16,6 +16,11 @@ function createWebhookClient() {
   return createClient(url, key, { auth: { persistSession: false } })
 }
 
+// Single-supplier setup: every production order is auto-assigned to the one
+// supplier we work with. Override via DEFAULT_SUPPLIER_EMAIL / _NAME env vars.
+const DEFAULT_SUPPLIER_EMAIL = process.env.DEFAULT_SUPPLIER_EMAIL ?? 'k.campjr@gmail.com'
+const DEFAULT_SUPPLIER_NAME = process.env.DEFAULT_SUPPLIER_NAME ?? 'Production Partner'
+
 const GARMENT_PRICES: Record<string, number> = {
   'T-Shirt': 2500, 'Hoodie': 4500, 'Sweatshirt': 3500,
   'Polo': 3000, 'Tank Top': 2000, 'Jacket': 6000,
@@ -87,6 +92,8 @@ async function handleSamplePayment(
     user_id,
     production_path: 'SAMPLE',
     production_stage: 'AWAITING_FIRST_PIECE',
+    supplier_email: DEFAULT_SUPPLIER_EMAIL,
+    supplier_name: DEFAULT_SUPPLIER_NAME,
     sample_fee_cents: session.amount_total,
     sample_stripe_session_id: session.id,
     sample_paid_at: new Date().toISOString(),
@@ -132,6 +139,8 @@ async function handleDirectDeposit(
     user_id,
     production_path: 'DIRECT',
     production_stage: 'BULK_PRODUCTION',
+    supplier_email: DEFAULT_SUPPLIER_EMAIL,
+    supplier_name: DEFAULT_SUPPLIER_NAME,
     deposit_amount_cents: session.amount_total,
     deposit_stripe_session_id: session.id,
     deposit_paid_at: new Date().toISOString(),

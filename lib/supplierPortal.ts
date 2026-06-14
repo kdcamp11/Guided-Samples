@@ -140,12 +140,29 @@ export async function getOrderMedia(orderId: string): Promise<OrderMedia[]> {
 
   const { data, error } = await supabase
     .from('production_order_media')
-    .select('id, stage, media_type, public_url, file_name, notes, created_at')
+    .select('id, stage, media_type, storage_path, public_url, file_name, mime_type, notes, created_at')
     .eq('production_order_id', orderId)
     .order('created_at', { ascending: false })
 
   if (error || !data) return []
-  return data as OrderMedia[]
+
+  // The bucket is private, so the stored public_url won't load. Generate a
+  // short-lived signed URL from the storage_path for each item.
+  const rows = data as Record<string, unknown>[]
+  const signed = await Promise.all(
+    rows.map(async row => {
+      const path = row.storage_path as string | null
+      let url = row.public_url as string
+      if (path) {
+        const { data: s } = await supabase.storage
+          .from('production-media')
+          .createSignedUrl(path, 60 * 60) // 1 hour
+        if (s?.signedUrl) url = s.signedUrl
+      }
+      return { ...row, public_url: url } as OrderMedia
+    }),
+  )
+  return signed
 }
 
 // ─── Write: media upload ──────────────────────────────────────────────────────
@@ -220,9 +237,17 @@ export async function supplierTransition(
   metadata: Record<string, unknown>,
   _actorEmail: string,
 ): Promise<{ ok: true; order: ProductionOrder } | { ok: false; errors: string[] }> {
+  const supabase = createClient()
+  const token = supabase
+    ? (await supabase.auth.getSession()).data.session?.access_token
+    : null
+
   const res = await fetch('/api/supplier/transition', {
     method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: JSON.stringify({ order_id: orderId, to_stage: toStage, metadata }),
   })
 

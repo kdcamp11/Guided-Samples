@@ -17,6 +17,7 @@ export const STAGE_RESPONSIBLE: Record<ProductionStage, Responsible> = {
   DELIVERED:                    'done',
   CANCELLED:                    'cancelled',
   AWAITING_FIRST_PIECE:         'factory',
+  AWAITING_SAMPLE_SHIPMENT:     'factory',
   CLOSED_SAMPLE_ONLY:           'done',
   AWAITING_PRODUCTION_DEPOSIT:  'you',
   AWAITING_FINAL_PAYMENT:       'you',
@@ -38,6 +39,7 @@ export const CLIENT_STAGE_LABELS: Record<ProductionStage, string> = {
   DELIVERED:                    'Delivered',
   CANCELLED:                    'Order Cancelled',
   AWAITING_FIRST_PIECE:         'Sample Being Made',
+  AWAITING_SAMPLE_SHIPMENT:     'Preparing Sample Shipment',
   CLOSED_SAMPLE_ONLY:           'Project Closed',
   AWAITING_PRODUCTION_DEPOSIT:  'Production Deposit Required',
   AWAITING_FINAL_PAYMENT:       'Final Payment Required',
@@ -73,6 +75,8 @@ export const CLIENT_STAGE_MESSAGES: Record<ProductionStage, string> = {
     'This order has been cancelled.',
   AWAITING_FIRST_PIECE:
     'Our supplier is crafting your first piece. We\'ll notify you when photos are ready for review.',
+  AWAITING_SAMPLE_SHIPMENT:
+    'You approved the first piece! Your factory is preparing to ship the physical sample to you.',
   CLOSED_SAMPLE_ONLY:
     'You\'ve chosen to close this project after the sample phase. No further charges will be made.',
   AWAITING_PRODUCTION_DEPOSIT:
@@ -117,7 +121,7 @@ export const CLIENT_JOURNEY: JourneyMilestone[] = [
   {
     id:     'sample_review',
     label:  'Physical Sample Review',
-    stages: ['SAMPLE_SHIPPED', 'SAMPLE_DELIVERED', 'CLIENT_SAMPLE_EVALUATION', 'REVISION_REQUIRED'],
+    stages: ['AWAITING_SAMPLE_SHIPMENT', 'SAMPLE_SHIPPED', 'SAMPLE_DELIVERED', 'CLIENT_SAMPLE_EVALUATION', 'REVISION_REQUIRED'],
   },
   {
     id:     'deposit',

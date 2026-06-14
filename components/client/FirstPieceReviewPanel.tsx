@@ -93,7 +93,7 @@ function ApproveForm({ orderId, onTransition, onBack }: { orderId: string; onTra
     setSubmit(true); setError('')
     const res = await clientTransition({
       order_id: orderId,
-      to_stage: 'SAMPLE_SHIPPED',
+      to_stage: 'AWAITING_SAMPLE_SHIPMENT',
       metadata: { approval_notes: notes.trim() || undefined },
     })
     setSubmit(false)

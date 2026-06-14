@@ -32,6 +32,9 @@ export const SUPPLIER_CONTROLLED_TRANSITIONS: Partial<
   // Supplier completes the first sample and submits for review
   FIRST_PIECE_IN_PRODUCTION:  ['FIRST_PIECE_REVIEW'],
 
+  // Client approved the first-piece photos; supplier ships the physical sample
+  AWAITING_SAMPLE_SHIPMENT:   ['SAMPLE_SHIPPED'],
+
   // Client has requested revisions; supplier restarts with updated specs
   REVISION_REQUIRED:          ['FIRST_PIECE_IN_PRODUCTION'],
 
@@ -138,7 +141,10 @@ export const SUPPLIER_ACTIONS: Partial<Record<ProductionStage, SupplierAction[]>
     },
   ],
 
-  FIRST_PIECE_REVIEW: [
+  // After the client approves the first-piece photos, the factory ships the
+  // physical sample and enters tracking. (FIRST_PIECE_REVIEW itself is the
+  // client's decision — the supplier waits during that stage.)
+  AWAITING_SAMPLE_SHIPMENT: [
     {
       id:          'ship_sample',
       label:       'Ship Sample to Client',
@@ -150,17 +156,6 @@ export const SUPPLIER_ACTIONS: Partial<Record<ProductionStage, SupplierAction[]>
       ],
       requiresMedia: false,
       variant:       'primary',
-    },
-    {
-      id:          'rework_first_piece',
-      label:       'Send Back for Internal Rework',
-      description: 'The first piece requires corrections. Return it to production without shipping.',
-      toStage:     'FIRST_PIECE_IN_PRODUCTION',
-      requiredFields: [
-        { key: 'rework_notes', label: 'Rework Notes', type: 'textarea', placeholder: 'Describe what needs to be corrected…' },
-      ],
-      requiresMedia: false,
-      variant:       'warning',
     },
   ],
 
