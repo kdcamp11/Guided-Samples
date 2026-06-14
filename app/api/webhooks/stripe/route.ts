@@ -43,6 +43,8 @@ export async function POST(req: NextRequest) {
 
   if (payment_type === 'sample') {
     await handleSamplePayment(session, meta)
+  } else if (payment_type === 'direct_deposit') {
+    await handleDirectDeposit(session, meta)
   } else if (payment_type === 'production_deposit') {
     await handleProductionDeposit(session, meta)
   } else if (payment_type === 'final_payment') {
@@ -80,6 +82,46 @@ async function handleSamplePayment(
     sample_stripe_session_id: session.id,
     sample_paid_at: new Date().toISOString(),
     activation_fee_cents: 10000,
+    garment_price_cents: garmentPrice,
+    extra_logo_count: extraLogosCount,
+    extra_logo_fee_cents: extraLogosCount * 400,
+    garment_type,
+    style_name: style_name ?? '',
+    tech_pack_snapshot: techPack ?? null,
+    status: 'paid',
+  })
+
+  await sb
+    .from('projects')
+    .update({ locked_at: new Date().toISOString() })
+    .eq('id', design_order_id)
+}
+
+async function handleDirectDeposit(
+  session: Stripe.Checkout.Session,
+  meta: Record<string, string>,
+) {
+  const sb = createWebhookClient()
+  if (!sb) return
+
+  const { design_order_id, user_id, garment_type, style_name, extra_logos } = meta
+  const extraLogosCount = parseInt(extra_logos ?? '0', 10) || 0
+  const garmentPrice = GARMENT_PRICES[garment_type] ?? 3500
+
+  const { data: techPack } = await sb
+    .from('tech_packs')
+    .select('*')
+    .eq('project_id', design_order_id)
+    .single()
+
+  await sb.from('production_orders').insert({
+    design_order_id,
+    user_id,
+    production_path: 'DIRECT',
+    production_stage: 'BULK_PRODUCTION',
+    deposit_amount_cents: session.amount_total,
+    deposit_stripe_session_id: session.id,
+    deposit_paid_at: new Date().toISOString(),
     garment_price_cents: garmentPrice,
     extra_logo_count: extraLogosCount,
     extra_logo_fee_cents: extraLogosCount * 400,

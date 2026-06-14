@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
-import { createClient } from '@supabase/supabase-js'
+import { getRouteUser } from '@/lib/supabase-server'
 
 const GARMENT_PRICES: Record<string, number> = {
   'T-Shirt': 2500,
@@ -25,20 +25,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Stripe not configured' }, { status: 500 })
   }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  )
-
-  const authHeader = req.headers.get('authorization')
-  const token = authHeader?.replace('Bearer ', '')
-  const { data: { user }, error: authError } = token
-    ? await supabase.auth.getUser(token)
-    : await supabase.auth.getUser()
-
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const { sb, user } = await getRouteUser(req)
+  if (!sb) return NextResponse.json({ error: 'Database unavailable' }, { status: 503 })
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { design_order_id, garment_type, style_name, extra_logos, notes } = await req.json()
 
