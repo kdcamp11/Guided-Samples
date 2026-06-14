@@ -27,6 +27,11 @@ export const PRODUCTION_STAGES = [
   'SHIPPED',
   'DELIVERED',
   'CANCELLED',
+  'AWAITING_FIRST_PIECE',
+  'CLOSED_SAMPLE_ONLY',
+  'AWAITING_PRODUCTION_DEPOSIT',
+  'AWAITING_FINAL_PAYMENT',
+  'READY_TO_SHIP',
 ] as const
 
 export type ProductionStage = (typeof PRODUCTION_STAGES)[number]
@@ -34,19 +39,24 @@ export type ProductionStage = (typeof PRODUCTION_STAGES)[number]
 // ─── Human-readable labels ────────────────────────────────────────────────────
 
 export const STAGE_LABELS: Record<ProductionStage, string> = {
-  PRODUCTION_FILES_RECEIVED:  'Production Files Received',
-  FIRST_PIECE_IN_PRODUCTION:  'First Piece in Production',
-  FIRST_PIECE_REVIEW:         'First Piece Review',
-  SAMPLE_SHIPPED:             'Sample Shipped',
-  SAMPLE_DELIVERED:           'Sample Delivered',
-  CLIENT_SAMPLE_EVALUATION:   'Client Sample Evaluation',
-  REVISION_REQUIRED:          'Revision Required',
-  BULK_PRODUCTION:            'Bulk Production',
-  QUALITY_CHECK:              'Quality Check',
-  PACKING:                    'Packing',
-  SHIPPED:                    'Shipped',
-  DELIVERED:                  'Delivered',
-  CANCELLED:                  'Cancelled',
+  PRODUCTION_FILES_RECEIVED:    'Production Files Received',
+  FIRST_PIECE_IN_PRODUCTION:    'First Piece in Production',
+  FIRST_PIECE_REVIEW:           'First Piece Review',
+  SAMPLE_SHIPPED:               'Sample Shipped',
+  SAMPLE_DELIVERED:             'Sample Delivered',
+  CLIENT_SAMPLE_EVALUATION:     'Client Sample Evaluation',
+  REVISION_REQUIRED:            'Revision Required',
+  BULK_PRODUCTION:              'Bulk Production',
+  QUALITY_CHECK:                'Quality Check',
+  PACKING:                      'Packing',
+  SHIPPED:                      'Shipped',
+  DELIVERED:                    'Delivered',
+  CANCELLED:                    'Cancelled',
+  AWAITING_FIRST_PIECE:         'Awaiting First Piece',
+  CLOSED_SAMPLE_ONLY:           'Sample Only — Closed',
+  AWAITING_PRODUCTION_DEPOSIT:  'Awaiting Production Deposit',
+  AWAITING_FINAL_PAYMENT:       'Awaiting Final Payment',
+  READY_TO_SHIP:                'Ready to Ship',
 }
 
 // ─── Stage descriptions (for portal display) ──────────────────────────────────
@@ -78,14 +88,26 @@ export const STAGE_DESCRIPTIONS: Record<ProductionStage, string> = {
     'Order received and confirmed by the brand owner.',
   CANCELLED:
     'Production order has been cancelled.',
+  AWAITING_FIRST_PIECE:
+    'Waiting for the factory to produce the first piece sample.',
+  CLOSED_SAMPLE_ONLY:
+    'Client opted not to proceed to bulk production after sample review.',
+  AWAITING_PRODUCTION_DEPOSIT:
+    'Sample approved. Awaiting 50% production deposit to begin bulk run.',
+  AWAITING_FINAL_PAYMENT:
+    'Bulk production complete. Awaiting final payment before shipment.',
+  READY_TO_SHIP:
+    'Final payment received. Order is packed and ready for dispatch.',
 }
 
 // ─── Terminal and reversible stages ──────────────────────────────────────────
 
-/** No further transitions are permitted from these stages */
-export const TERMINAL_STAGES = new Set<ProductionStage>(['DELIVERED', 'CANCELLED'])
+export const TERMINAL_STAGES = new Set<ProductionStage>([
+  'DELIVERED',
+  'CANCELLED',
+  'CLOSED_SAMPLE_ONLY',
+])
 
-/** Stages that can be cancelled */
 export const CANCELLABLE_STAGES = new Set<ProductionStage>([
   'PRODUCTION_FILES_RECEIVED',
   'FIRST_PIECE_IN_PRODUCTION',
@@ -94,73 +116,30 @@ export const CANCELLABLE_STAGES = new Set<ProductionStage>([
 ])
 
 // ─── Transition graph ─────────────────────────────────────────────────────────
-//
-// Directed edges define every permitted stage hop.
-// The engine rejects any transition not listed here.
-//
-// Visual flow:
-//
-//   PRODUCTION_FILES_RECEIVED
-//     → FIRST_PIECE_IN_PRODUCTION
-//
-//   FIRST_PIECE_IN_PRODUCTION
-//     → FIRST_PIECE_REVIEW
-//
-//   FIRST_PIECE_REVIEW
-//     → SAMPLE_SHIPPED          (approved; ship to client)
-//     → FIRST_PIECE_IN_PRODUCTION (internal rework; retry)
-//
-//   SAMPLE_SHIPPED
-//     → SAMPLE_DELIVERED
-//
-//   SAMPLE_DELIVERED
-//     → CLIENT_SAMPLE_EVALUATION
-//
-//   CLIENT_SAMPLE_EVALUATION
-//     → BULK_PRODUCTION         (approved)
-//     → REVISION_REQUIRED       (changes requested)
-//
-//   REVISION_REQUIRED
-//     → FIRST_PIECE_IN_PRODUCTION (restart with new specs)
-//
-//   BULK_PRODUCTION
-//     → QUALITY_CHECK
-//
-//   QUALITY_CHECK
-//     → PACKING                 (passed)
-//     → BULK_PRODUCTION         (failed; rework)
-//
-//   PACKING
-//     → SHIPPED
-//
-//   SHIPPED
-//     → DELIVERED
-//
-//   DELIVERED  → (terminal)
-//   CANCELLED  → (terminal)
-//
-//   Any stage in CANCELLABLE_STAGES → CANCELLED
 
 export const TRANSITION_GRAPH: Record<ProductionStage, ProductionStage[]> = {
-  PRODUCTION_FILES_RECEIVED:  ['FIRST_PIECE_IN_PRODUCTION', 'CANCELLED'],
-  FIRST_PIECE_IN_PRODUCTION:  ['FIRST_PIECE_REVIEW', 'CANCELLED'],
-  FIRST_PIECE_REVIEW:         ['SAMPLE_SHIPPED', 'FIRST_PIECE_IN_PRODUCTION', 'CANCELLED'],
-  SAMPLE_SHIPPED:             ['SAMPLE_DELIVERED'],
-  SAMPLE_DELIVERED:           ['CLIENT_SAMPLE_EVALUATION'],
-  CLIENT_SAMPLE_EVALUATION:   ['BULK_PRODUCTION', 'REVISION_REQUIRED', 'CANCELLED'],
-  REVISION_REQUIRED:          ['FIRST_PIECE_IN_PRODUCTION', 'CANCELLED'],
-  BULK_PRODUCTION:            ['QUALITY_CHECK'],
-  QUALITY_CHECK:              ['PACKING', 'BULK_PRODUCTION'],
-  PACKING:                    ['SHIPPED'],
-  SHIPPED:                    ['DELIVERED'],
-  DELIVERED:                  [],
-  CANCELLED:                  [],
+  PRODUCTION_FILES_RECEIVED:    ['FIRST_PIECE_IN_PRODUCTION', 'CANCELLED'],
+  FIRST_PIECE_IN_PRODUCTION:    ['FIRST_PIECE_REVIEW', 'CANCELLED'],
+  FIRST_PIECE_REVIEW:           ['SAMPLE_SHIPPED', 'FIRST_PIECE_IN_PRODUCTION', 'CANCELLED',
+                                  'CLOSED_SAMPLE_ONLY', 'AWAITING_PRODUCTION_DEPOSIT'],
+  SAMPLE_SHIPPED:               ['SAMPLE_DELIVERED'],
+  SAMPLE_DELIVERED:             ['CLIENT_SAMPLE_EVALUATION'],
+  CLIENT_SAMPLE_EVALUATION:     ['BULK_PRODUCTION', 'REVISION_REQUIRED', 'CANCELLED'],
+  REVISION_REQUIRED:            ['FIRST_PIECE_IN_PRODUCTION', 'CANCELLED'],
+  BULK_PRODUCTION:              ['QUALITY_CHECK'],
+  QUALITY_CHECK:                ['AWAITING_FINAL_PAYMENT', 'BULK_PRODUCTION'],
+  PACKING:                      ['SHIPPED'],
+  SHIPPED:                      ['DELIVERED'],
+  DELIVERED:                    [],
+  CANCELLED:                    [],
+  AWAITING_FIRST_PIECE:         ['FIRST_PIECE_REVIEW'],
+  CLOSED_SAMPLE_ONLY:           [],
+  AWAITING_PRODUCTION_DEPOSIT:  ['BULK_PRODUCTION'],
+  AWAITING_FINAL_PAYMENT:       ['READY_TO_SHIP'],
+  READY_TO_SHIP:                ['SHIPPED'],
 }
 
 // ─── Metadata requirements per transition ─────────────────────────────────────
-//
-// Some transitions require specific metadata fields to be present.
-// The validation layer uses this map to enforce completeness before writing.
 
 export type MetadataField = {
   key:      string
@@ -196,13 +175,12 @@ export const TRANSITION_METADATA_REQUIREMENTS: Partial<
   PACKING: [
     { key: 'packing_notes', label: 'Packing Notes', required: false },
   ],
+  CLOSED_SAMPLE_ONLY: [
+    { key: 'close_reason', label: 'Close Reason', required: false },
+  ],
 }
 
 // ─── Stage ordering (for progress display) ────────────────────────────────────
-//
-// The happy-path sequence, used to compute "percent complete" or highlight
-// the current step in a progress indicator.  Revision loops collapse back;
-// CANCELLED is excluded from the happy path.
 
 export const HAPPY_PATH_SEQUENCE: ProductionStage[] = [
   'PRODUCTION_FILES_RECEIVED',
@@ -218,17 +196,10 @@ export const HAPPY_PATH_SEQUENCE: ProductionStage[] = [
   'DELIVERED',
 ]
 
-/**
- * Returns a 0–1 progress fraction based on the happy-path sequence.
- * Returns 0 for CANCELLED, 1 for DELIVERED.
- * Revision loop stages (REVISION_REQUIRED, FIRST_PIECE_IN_PRODUCTION re-entry)
- * map to the position of FIRST_PIECE_IN_PRODUCTION.
- */
 export function stageProgress(stage: ProductionStage): number {
-  if (stage === 'CANCELLED') return 0
+  if (stage === 'CANCELLED' || stage === 'CLOSED_SAMPLE_ONLY') return 0
   const idx = HAPPY_PATH_SEQUENCE.indexOf(stage)
   if (idx === -1) {
-    // REVISION_REQUIRED maps to roughly the position of FIRST_PIECE_IN_PRODUCTION
     return 1 / HAPPY_PATH_SEQUENCE.length
   }
   return (idx + 1) / HAPPY_PATH_SEQUENCE.length
@@ -249,9 +220,9 @@ export type TransitionValidationError =
 // ─── Audit event types ────────────────────────────────────────────────────────
 
 export type StageTransitionEvent = {
-  from_stage:  ProductionStage | null   // null on initial stage assignment
+  from_stage:  ProductionStage | null
   to_stage:    ProductionStage
-  actor_id?:   string                   // user or system that triggered the transition
+  actor_id?:   string
   metadata:    Record<string, unknown>
-  transitioned_at: string               // ISO timestamp
+  transitioned_at: string
 }
