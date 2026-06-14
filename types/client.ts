@@ -1,10 +1,11 @@
 /**
  * Client Portal — type definitions
  *
- * Clients make exactly three business decisions in the production workflow:
- *   1. Approve sample → bulk production
- *   2. Request revisions → factory reworks
- *   3. Cancel order
+ * Clients make exactly four business decisions in the production workflow:
+ *   1. Approve first-piece media → sample ships
+ *   2. Request revisions at first-piece → factory reworks
+ *   3. Approve physical sample → bulk production
+ *   4. Request revisions / cancel at sample evaluation
  *
  * All logistics confirmations (receipt, delivery) are handled by GRACE admins.
  * Clients never advance logistical stages — only business decision stages.
@@ -20,7 +21,9 @@ import type { ProductionOrder } from './production'
 export const CLIENT_CONTROLLED_TRANSITIONS: Partial<
   Record<ProductionStage, ProductionStage[]>
 > = {
-  CLIENT_SAMPLE_EVALUATION: ['BULK_PRODUCTION', 'REVISION_REQUIRED', 'CANCELLED'],
+  // Client reviews photos/video before the physical sample ships
+  FIRST_PIECE_REVIEW:        ['SAMPLE_SHIPPED', 'FIRST_PIECE_IN_PRODUCTION'],
+  CLIENT_SAMPLE_EVALUATION:  ['BULK_PRODUCTION', 'REVISION_REQUIRED', 'CANCELLED'],
 }
 
 /**
@@ -29,7 +32,6 @@ export const CLIENT_CONTROLLED_TRANSITIONS: Partial<
 export const CLIENT_WAITING_STAGES = new Set<ProductionStage>([
   'PRODUCTION_FILES_RECEIVED',
   'FIRST_PIECE_IN_PRODUCTION',
-  'FIRST_PIECE_REVIEW',
   'REVISION_REQUIRED',
   'BULK_PRODUCTION',
   'QUALITY_CHECK',
@@ -58,6 +60,29 @@ export type ClientActionField = {
 }
 
 export const CLIENT_ACTIONS: Partial<Record<ProductionStage, ClientAction[]>> = {
+  FIRST_PIECE_REVIEW: [
+    {
+      id:          'approve_first_piece',
+      label:       'Approve — Ship the Sample',
+      description: 'The first piece looks great. Approve it and the factory will ship the physical sample to GRACE for final review.',
+      toStage:     'SAMPLE_SHIPPED',
+      requiredFields: [
+        { key: 'approval_notes', label: 'Approval Notes (optional)', type: 'textarea', placeholder: 'Any notes for the factory…' },
+      ],
+      variant:        'primary',
+      confirmMessage: 'Approving will instruct the factory to ship the physical sample.',
+    },
+    {
+      id:          'request_first_piece_revision',
+      label:       'Request Changes',
+      description: 'Something needs to change before the sample ships. The factory will address your feedback and share updated photos.',
+      toStage:     'FIRST_PIECE_IN_PRODUCTION',
+      requiredFields: [
+        { key: 'revision_notes', label: 'What needs to change?', type: 'textarea', placeholder: 'Describe exactly what needs to be corrected…' },
+      ],
+      variant: 'secondary',
+    },
+  ],
   CLIENT_SAMPLE_EVALUATION: [
     {
       id:          'approve_sample',

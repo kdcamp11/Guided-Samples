@@ -28,9 +28,6 @@ export const SUPPLIER_CONTROLLED_TRANSITIONS: Partial<
   // Supplier completes the first sample and submits for review
   FIRST_PIECE_IN_PRODUCTION:  ['FIRST_PIECE_REVIEW'],
 
-  // After internal review: either ship the sample or loop back for rework
-  FIRST_PIECE_REVIEW:         ['SAMPLE_SHIPPED', 'FIRST_PIECE_IN_PRODUCTION'],
-
   // Client has requested revisions; supplier restarts with updated specs
   REVISION_REQUIRED:          ['FIRST_PIECE_IN_PRODUCTION'],
 
@@ -51,10 +48,11 @@ export const SUPPLIER_CONTROLLED_TRANSITIONS: Partial<
  * Used to render a "waiting" state in the portal.
  */
 export const SUPPLIER_WAITING_STAGES = new Set<ProductionStage>([
-  'SAMPLE_SHIPPED',          // waiting for delivery confirmation
-  'SAMPLE_DELIVERED',        // waiting for client to evaluate
+  'FIRST_PIECE_REVIEW',      // client reviewing photos before sample ships
+  'SAMPLE_SHIPPED',          // GRACE confirms delivery
+  'SAMPLE_DELIVERED',        // GRACE opens for client evaluation
   'CLIENT_SAMPLE_EVALUATION',// client is deciding
-  'SHIPPED',                 // waiting for client to confirm delivery
+  'SHIPPED',                 // GRACE confirms delivery
   'DELIVERED',               // terminal — complete
   'CANCELLED',               // terminal — voided
 ])

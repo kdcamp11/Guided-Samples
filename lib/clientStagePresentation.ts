@@ -17,7 +17,7 @@ export type Responsible = 'factory' | 'you' | 'transit' | 'grace' | 'done' | 'ca
 export const STAGE_RESPONSIBLE: Record<ProductionStage, Responsible> = {
   PRODUCTION_FILES_RECEIVED:  'factory',
   FIRST_PIECE_IN_PRODUCTION:  'factory',
-  FIRST_PIECE_REVIEW:         'factory',
+  FIRST_PIECE_REVIEW:         'you',
   SAMPLE_SHIPPED:             'transit',
   SAMPLE_DELIVERED:           'grace',   // GRACE confirms delivery, not client
   CLIENT_SAMPLE_EVALUATION:   'you',
@@ -35,7 +35,7 @@ export const STAGE_RESPONSIBLE: Record<ProductionStage, Responsible> = {
 export const CLIENT_STAGE_LABELS: Record<ProductionStage, string> = {
   PRODUCTION_FILES_RECEIVED:  'Order Confirmed',
   FIRST_PIECE_IN_PRODUCTION:  'Sample Being Made',
-  FIRST_PIECE_REVIEW:         'Sample Being Made',
+  FIRST_PIECE_REVIEW:         'Review First Sample',
   SAMPLE_SHIPPED:             'Sample in Transit',
   SAMPLE_DELIVERED:           'Sample Arrived',
   CLIENT_SAMPLE_EVALUATION:   'Review Your Sample',
@@ -56,7 +56,7 @@ export const CLIENT_STAGE_MESSAGES: Record<ProductionStage, string> = {
   FIRST_PIECE_IN_PRODUCTION:
     'Your factory is hand-crafting the first physical sample of your design.',
   FIRST_PIECE_REVIEW:
-    'The first sample is complete and the factory is checking it before sending.',
+    'Your factory has completed the first sample. Review the photos and video below, then approve to ship or request changes.',
   SAMPLE_SHIPPED:
     'Your sample is on its way to you. You\'ll be able to hold it soon.',
   SAMPLE_DELIVERED:
@@ -110,11 +110,16 @@ export const CLIENT_JOURNEY: JourneyMilestone[] = [
   {
     id:     'sample',
     label:  'Sample Being Made',
-    stages: ['FIRST_PIECE_IN_PRODUCTION', 'FIRST_PIECE_REVIEW'],
+    stages: ['FIRST_PIECE_IN_PRODUCTION'],
+  },
+  {
+    id:     'first_piece_review',
+    label:  'Review First Sample',
+    stages: ['FIRST_PIECE_REVIEW'],
   },
   {
     id:     'sample_review',
-    label:  'Sample Review',
+    label:  'Physical Sample Review',
     stages: ['SAMPLE_SHIPPED', 'SAMPLE_DELIVERED', 'CLIENT_SAMPLE_EVALUATION', 'REVISION_REQUIRED'],
   },
   {

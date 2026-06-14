@@ -56,8 +56,8 @@ const TRANSITION_NOTIFICATIONS: Partial<Record<ProductionStage, NotificationSpec
   FIRST_PIECE_REVIEW: {
     recipient: 'client',
     type:      'first_piece_ready',
-    title:     'Sample Being Prepared',
-    body:      () => 'Your factory has completed the first sample and is preparing to ship it to you for evaluation.',
+    title:     'Your First Sample is Ready to Review',
+    body:      () => 'Your factory has completed the first sample and shared photos for your approval. Log in to review and decide whether to ship or request changes.',
   },
   REVISION_REQUIRED: {
     recipient: 'supplier',

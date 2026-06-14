@@ -21,10 +21,11 @@ interface Props {
 }
 
 const WAITING_MESSAGES: Partial<Record<ProductionStage, string>> = {
-  SAMPLE_SHIPPED:           'The sample is in transit. Waiting for delivery confirmation.',
-  SAMPLE_DELIVERED:         'The client has received the sample and is evaluating it.',
-  CLIENT_SAMPLE_EVALUATION: 'Awaiting the client\'s decision on the sample.',
-  SHIPPED:                  'The bulk order is in transit. Waiting for the client to confirm delivery.',
+  FIRST_PIECE_REVIEW:       'The client is reviewing your photos. Once approved, ship the physical sample.',
+  SAMPLE_SHIPPED:           'The sample is in transit. GRACE will confirm delivery.',
+  SAMPLE_DELIVERED:         'GRACE has confirmed delivery. Awaiting client evaluation.',
+  CLIENT_SAMPLE_EVALUATION: 'Awaiting the client\'s decision on the physical sample.',
+  SHIPPED:                  'The bulk order is in transit. GRACE will confirm delivery.',
   DELIVERED:                'This order has been delivered. No further actions required.',
   CANCELLED:                'This production order has been cancelled.',
 }

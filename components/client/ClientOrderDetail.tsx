@@ -19,6 +19,7 @@ import type { StageTransitionEvent } from '@/types/productionStages'
 import ClientTimeline from './ClientTimeline'
 import ClientDecisionPanel from './ClientDecisionPanel'
 import SampleEvaluationPanel, { isSampleEvaluationStage } from './SampleEvaluationPanel'
+import FirstPieceReviewPanel, { isFirstPieceReviewStage } from './FirstPieceReviewPanel'
 import MediaGallery from './MediaGallery'
 
 interface Props {
@@ -285,7 +286,17 @@ export default function ClientOrderDetail({ orderId, onBack }: Props) {
           {/* Left: actions + media + collapsible details */}
           <div className="space-y-4 order-2 lg:order-1">
 
-            {/* Sample evaluation (only during those stages) */}
+            {/* First-piece media review (client approves before sample ships) */}
+            {isFirstPieceReviewStage(stage) && (
+              <FirstPieceReviewPanel
+                orderId={orderId}
+                stage={stage!}
+                media={media}
+                onTransition={load}
+              />
+            )}
+
+            {/* Physical sample evaluation */}
             {isSampleEvaluationStage(stage) && (
               <SampleEvaluationPanel
                 orderId={orderId}
@@ -295,8 +306,8 @@ export default function ClientOrderDetail({ orderId, onBack }: Props) {
               />
             )}
 
-            {/* Other client actions (non-evaluation) */}
-            {!isSampleEvaluationStage(stage) && (
+            {/* Other client actions */}
+            {!isFirstPieceReviewStage(stage) && !isSampleEvaluationStage(stage) && (
               <ClientDecisionPanel
                 orderId={orderId}
                 currentStage={stage}
