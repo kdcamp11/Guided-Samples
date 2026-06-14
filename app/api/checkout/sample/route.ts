@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
-import { createClient } from '@/lib/supabase'
+import { createRouteClient } from '@/lib/supabase'
 
 const ACTIVATION_FEE_CENTS = 10000
 const SAMPLE_FEE_CENTS = 5000
@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Stripe not configured' }, { status: 500 })
   }
 
-  const sb = createClient()
+  const sb = createRouteClient()
   if (!sb) {
     return NextResponse.json({ error: 'Database unavailable' }, { status: 503 })
   }

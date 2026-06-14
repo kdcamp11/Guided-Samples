@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase'
+import { createRouteClient } from '@/lib/supabase'
 
 // GET  /api/notifications        — list unread notifications
 // PATCH /api/notifications       — mark all as read
 
 export async function GET() {
-  const supabase = createClient()
+  const supabase = createRouteClient()
   if (!supabase) return NextResponse.json({ notifications: [] })
 
   const { data, error } = await supabase
@@ -19,7 +19,7 @@ export async function GET() {
 }
 
 export async function PATCH(_req: NextRequest) {
-  const supabase = createClient()
+  const supabase = createRouteClient()
   if (!supabase) return NextResponse.json({ ok: false }, { status: 503 })
 
   const { data: { session } } = await supabase.auth.getSession()

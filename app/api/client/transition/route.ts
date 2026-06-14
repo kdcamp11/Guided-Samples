@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase'
+import { createRouteClient } from '@/lib/supabase'
 import { transitionStage } from '@/lib/workflowEngine'
 import { isClientControlledTransition } from '@/types/client'
 import type { ProductionStage } from '@/types/productionStages'
 
 export async function POST(req: NextRequest) {
-  const supabase = createClient()
+  const supabase = createRouteClient()
   if (!supabase) {
     return NextResponse.json({ ok: false, errors: ['Service unavailable'] }, { status: 503 })
   }

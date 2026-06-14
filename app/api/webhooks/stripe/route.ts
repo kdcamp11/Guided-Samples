@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
-import { createClient } from '@/lib/supabase'
+import { createRouteClient } from '@/lib/supabase'
 import { transitionStage } from '@/lib/workflowEngine'
 
 const GARMENT_PRICES: Record<string, number> = {
@@ -51,7 +51,7 @@ async function handleSamplePayment(
   session: Stripe.Checkout.Session,
   meta: Record<string, string>,
 ) {
-  const sb = createClient()
+  const sb = createRouteClient()
   if (!sb) return
 
   const { design_order_id, user_id, garment_type, style_name, extra_logos } = meta
@@ -92,7 +92,7 @@ async function handleProductionDeposit(
   session: Stripe.Checkout.Session,
   meta: Record<string, string>,
 ) {
-  const sb = createClient()
+  const sb = createRouteClient()
   if (!sb) return
 
   const { order_id } = meta
@@ -113,7 +113,7 @@ async function handleFinalPayment(
   session: Stripe.Checkout.Session,
   meta: Record<string, string>,
 ) {
-  const sb = createClient()
+  const sb = createRouteClient()
   if (!sb) return
 
   const { order_id } = meta

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
-import { createClient } from '@/lib/supabase'
+import { createRouteClient } from '@/lib/supabase'
 
 export async function POST(req: NextRequest) {
   const secretKey = process.env.STRIPE_SECRET_KEY
@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Stripe not configured' }, { status: 500 })
   }
 
-  const sb = createClient()
+  const sb = createRouteClient()
   if (!sb) {
     return NextResponse.json({ error: 'Database unavailable' }, { status: 503 })
   }

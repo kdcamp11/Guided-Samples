@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase'
+import { createRouteClient } from '@/lib/supabase'
 import type { NotificationPreferences } from '@/lib/notifications'
 
 // GET /api/notifications/preferences
 export async function GET() {
-  const supabase = createClient()
+  const supabase = createRouteClient()
   if (!supabase) return NextResponse.json({ email_enabled: true, email_overrides: {} })
 
   const { data: { session } } = await supabase.auth.getSession()
@@ -21,7 +21,7 @@ export async function GET() {
 
 // PUT /api/notifications/preferences
 export async function PUT(req: NextRequest) {
-  const supabase = createClient()
+  const supabase = createRouteClient()
   if (!supabase) return NextResponse.json({ ok: false }, { status: 503 })
 
   const { data: { session } } = await supabase.auth.getSession()

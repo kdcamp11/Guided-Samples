@@ -13,7 +13,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase'
+import { createRouteClient } from '@/lib/supabase'
 import { transitionStage, isValidStage } from '@/lib/workflowEngine'
 import type { ProductionStage } from '@/types/productionStages'
 
@@ -22,7 +22,7 @@ function isAdmin(session: { user: { app_metadata?: Record<string, unknown> } }):
 }
 
 export async function POST(req: NextRequest) {
-  const sb = createClient()
+  const sb = createRouteClient()
   if (!sb) return NextResponse.json({ ok: false, error: 'Service unavailable' }, { status: 503 })
 
   const { data: { session } } = await sb.auth.getSession()
