@@ -140,7 +140,7 @@ function App() {
         <AuthModal
           open={authOpen}
           onClose={() => setAuthOpen(false)}
-          onSuccess={() => { setAuthOpen(false); setView('projects') }}
+          onSuccess={() => { setAuthOpen(false); setSection('dashboard'); setView('studio') }}
         />
       </>
     )
