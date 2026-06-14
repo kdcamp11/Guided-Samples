@@ -69,7 +69,7 @@ async function handleSamplePayment(
   const sb = createWebhookClient()
   if (!sb) return
 
-  const { design_order_id, user_id, garment_type, style_name, extra_logos } = meta
+  const { design_order_id, user_id, garment_type, extra_logos } = meta
   const extraLogosCount = parseInt(extra_logos ?? '0', 10) || 0
   const garmentPrice = GARMENT_PRICES[garment_type] ?? 3500
 
@@ -91,9 +91,7 @@ async function handleSamplePayment(
     garment_price_cents: garmentPrice,
     extra_logo_count: extraLogosCount,
     extra_logo_fee_cents: extraLogosCount * 400,
-    garment_type,
-    style_name: style_name ?? '',
-    tech_pack_snapshot: techPack ?? null,
+    tech_pack_snapshot: techPack ?? {},
     status: 'paid',
   })
   if (insertError) {
@@ -116,7 +114,7 @@ async function handleDirectDeposit(
   const sb = createWebhookClient()
   if (!sb) return
 
-  const { design_order_id, user_id, garment_type, style_name, extra_logos } = meta
+  const { design_order_id, user_id, garment_type, extra_logos } = meta
   const extraLogosCount = parseInt(extra_logos ?? '0', 10) || 0
   const garmentPrice = GARMENT_PRICES[garment_type] ?? 3500
 
@@ -126,7 +124,7 @@ async function handleDirectDeposit(
     .eq('project_id', design_order_id)
     .single()
 
-  await sb.from('production_orders').insert({
+  const { error: insertError } = await sb.from('production_orders').insert({
     design_order_id,
     user_id,
     production_path: 'DIRECT',
@@ -138,17 +136,21 @@ async function handleDirectDeposit(
     garment_price_cents: garmentPrice,
     extra_logo_count: extraLogosCount,
     extra_logo_fee_cents: extraLogosCount * 400,
-    garment_type,
-    style_name: style_name ?? '',
-    tech_pack_snapshot: techPack ?? null,
+    tech_pack_snapshot: techPack ?? {},
     status: 'in_production',
     paid_at: new Date().toISOString(),
   })
+  if (insertError) {
+    console.error('[stripe-webhook] direct insert failed:', insertError)
+  } else {
+    console.log('[stripe-webhook] direct order created for user', user_id)
+  }
 
-  await sb
+  const { error: lockError } = await sb
     .from('projects')
     .update({ locked_at: new Date().toISOString() })
     .eq('id', design_order_id)
+  if (lockError) console.error('[stripe-webhook] project lock failed:', lockError)
 }
 
 async function handleProductionDeposit(
