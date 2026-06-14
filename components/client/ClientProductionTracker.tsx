@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Package, ChevronRight, Loader2, AlertCircle, RefreshCw, LogOut, Settings, CheckCircle2 } from 'lucide-react'
+import { Package, ChevronRight, Loader2, AlertCircle, RefreshCw, LogOut, Settings, CheckCircle2, ArrowLeft } from 'lucide-react'
 import { clientCanAct } from '@/types/client'
 import { listClientOrders } from '@/lib/clientPortal'
 import { useRealtimeOrderList } from '@/lib/useRealtimeOrder'
@@ -185,11 +185,19 @@ export default function ClientProductionTracker({ userEmail, onSelectOrder, onSi
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="sticky top-0 z-10 bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg bg-brand-green flex items-center justify-center">
-            <Package size={13} className="text-white" />
-          </div>
-          <p className="text-sm font-bold text-gray-900">My Orders</p>
+        <div className="flex items-center gap-3">
+          <a href="/" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity" title="Back to Studio">
+            <div className="w-7 h-7 rounded-lg bg-brand-green flex items-center justify-center">
+              <Package size={13} className="text-white" />
+            </div>
+            <p className="text-sm font-bold text-gray-900">My Orders</p>
+          </a>
+          <a
+            href="/"
+            className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-700 transition-colors border-l border-slate-200 pl-3"
+          >
+            <ArrowLeft size={13} /> Studio
+          </a>
         </div>
         <div className="flex items-center gap-1.5">
           <NotificationBell userEmail={userEmail} settingsHref="/track/settings" />
