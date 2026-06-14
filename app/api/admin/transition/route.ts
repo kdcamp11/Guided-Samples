@@ -43,6 +43,7 @@ export async function POST(req: NextRequest) {
     to_stage as ProductionStage,
     { ...metadata, admin_override: true },
     session.id,
+    sb,
   )
 
   if (!result.ok) {

@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, errors: ['Transition not permitted'] }, { status: 403 })
   }
 
-  const result = await transitionStage(order_id, to_stage, metadata, session.id)
+  const result = await transitionStage(order_id, to_stage, metadata, session.id, supabase)
   if (!result.ok) {
     const messages = result.errors.map(e => e.message)
     return NextResponse.json({ ok: false, errors: messages }, { status: 422 })

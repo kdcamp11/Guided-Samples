@@ -13,6 +13,7 @@
  */
 
 import { createClient } from './supabase'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import type { ProductionOrder } from '@/types/production'
 import type {
   ProductionStage,
@@ -155,8 +156,11 @@ export async function transitionStage(
   toStage: ProductionStage,
   metadata: Record<string, unknown> = {},
   actorId?: string,
+  // Server routes (no browser) inject an authenticated client; the browser
+  // client returned by createClient() is null server-side.
+  client?: SupabaseClient,
 ): Promise<TransitionResult> {
-  const supabase = createClient()
+  const supabase = client ?? createClient()
   if (!supabase) {
     return {
       ok: false,
@@ -168,7 +172,7 @@ export async function transitionStage(
   // ── 1. Fetch current order ──────────────────────────────────────────────────
   const { data: row, error: fetchErr } = await supabase
     .from('production_orders')
-    .select('id, production_stage, user_id, design_order_id, supplier_email, user_email')
+    .select('*')
     .eq('id', orderId)
     .single()
 

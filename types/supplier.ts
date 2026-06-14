@@ -25,6 +25,10 @@ export const SUPPLIER_CONTROLLED_TRANSITIONS: Partial<
   // Supplier acknowledges receipt and starts physical production
   PRODUCTION_FILES_RECEIVED:  ['FIRST_PIECE_IN_PRODUCTION'],
 
+  // Dual-path SAMPLE flow: the order is created here after the sample payment.
+  // The factory makes the first piece and submits it for review.
+  AWAITING_FIRST_PIECE:       ['FIRST_PIECE_REVIEW'],
+
   // Supplier completes the first sample and submits for review
   FIRST_PIECE_IN_PRODUCTION:  ['FIRST_PIECE_REVIEW'],
 
@@ -102,6 +106,21 @@ export const SUPPLIER_ACTIONS: Partial<Record<ProductionStage, SupplierAction[]>
       toStage:     'FIRST_PIECE_IN_PRODUCTION',
       requiredFields: [],
       requiresMedia:  false,
+      variant:        'primary',
+    },
+  ],
+
+  // Dual-path SAMPLE flow: factory makes the first piece, then submits photos
+  // for the client to review before the sample ships.
+  AWAITING_FIRST_PIECE: [
+    {
+      id:          'submit_first_piece_review',
+      label:       'Submit First Piece for Review',
+      description: 'Upload photos of the completed first piece. It will be reviewed before shipping.',
+      toStage:     'FIRST_PIECE_REVIEW',
+      requiredFields: [],
+      requiresMedia:  true,
+      mediaType:      'first_piece_review',
       variant:        'primary',
     },
   ],

@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
   }
 
   // ── 6. Delegate to workflow engine ──────────────────────────────────────────
-  const result = await transitionStage(order_id, toStage, metadata, session.id)
+  const result = await transitionStage(order_id, toStage, metadata, session.id, supabase)
 
   if (!result.ok) {
     const messages = result.errors.map(e => e.message)
