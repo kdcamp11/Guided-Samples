@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Package, ChevronRight, Loader2, AlertCircle, RefreshCw, LogOut, Settings } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Package, ChevronRight, Loader2, AlertCircle, RefreshCw, LogOut, Settings, CheckCircle2 } from 'lucide-react'
 import { clientCanAct } from '@/types/client'
 import { listClientOrders } from '@/lib/clientPortal'
 import { useRealtimeOrderList } from '@/lib/useRealtimeOrder'
@@ -118,10 +118,26 @@ function OrderCard({ order, onSelect }: { order: ProductionOrder; onSelect: () =
 
 // ─── Main dashboard ───────────────────────────────────────────────────────────
 
+// Map the Stripe success redirect to a friendly confirmation message.
+function paidContext(): { paid: boolean; label: string } {
+  if (typeof window === 'undefined') return { paid: false, label: '' }
+  const p = new URLSearchParams(window.location.search).get('payment') ?? ''
+  switch (p) {
+    case 'sample_success':  return { paid: true, label: 'Sample order confirmed' }
+    case 'direct_success':  return { paid: true, label: 'Production order confirmed' }
+    case 'deposit_success': return { paid: true, label: 'Production deposit confirmed' }
+    case 'final_success':   return { paid: true, label: 'Final payment confirmed' }
+    default:                return { paid: false, label: '' }
+  }
+}
+
 export default function ClientProductionTracker({ userEmail, onSelectOrder, onSignOut }: Props) {
   const [orders,  setOrders]  = useState<ProductionOrder[]>([])
   const [loading, setLoading] = useState(true)
   const [error,   setError]   = useState('')
+  const [paid]                = useState(paidContext)
+  const [confirming, setConfirming] = useState(paid.paid)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const load = async () => {
     setLoading(true)
@@ -134,6 +150,26 @@ export default function ClientProductionTracker({ userEmail, onSelectOrder, onSi
 
   useEffect(() => { load() }, [])
   useRealtimeOrderList(load)
+
+  // After a Stripe redirect the webhook may take a moment to create/update the
+  // order. Poll briefly until it shows up, then stop and clean the URL.
+  useEffect(() => {
+    if (!paid.paid) return
+    let elapsed = 0
+    pollRef.current = setInterval(async () => {
+      elapsed += 2500
+      const data = await listClientOrders()
+      if (data && data.length > 0) {
+        setOrders(data)
+        setConfirming(false)
+        if (pollRef.current) clearInterval(pollRef.current)
+      } else if (elapsed >= 20000) {
+        setConfirming(false)
+        if (pollRef.current) clearInterval(pollRef.current)
+      }
+    }, 2500)
+    return () => { if (pollRef.current) clearInterval(pollRef.current) }
+  }, [paid.paid])
 
   const actionNeeded = orders.filter(o => clientCanAct(o.production_stage))
   const inProgress   = orders.filter(o =>
@@ -185,6 +221,25 @@ export default function ClientProductionTracker({ userEmail, onSelectOrder, onSi
             </p>
           )}
         </div>
+
+        {/* Payment confirmation banner */}
+        {paid.paid && (
+          <div className="mb-5 bg-green-50 border border-green-100 rounded-2xl px-4 py-3 flex items-center gap-3">
+            {confirming ? (
+              <Loader2 size={18} className="animate-spin text-brand-green shrink-0" />
+            ) : (
+              <CheckCircle2 size={18} className="text-brand-green shrink-0" />
+            )}
+            <div>
+              <p className="text-sm font-semibold text-gray-900">{paid.label}</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                {confirming
+                  ? 'Payment received — setting up your order…'
+                  : 'Your order is below. We’ll keep this page updated as it progresses.'}
+              </p>
+            </div>
+          </div>
+        )}
 
         {loading && (
           <div className="flex justify-center py-20">

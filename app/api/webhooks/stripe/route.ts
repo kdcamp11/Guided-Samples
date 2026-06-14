@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { createClient } from '@supabase/supabase-js'
-import { transitionStage } from '@/lib/workflowEngine'
 
+// The webhook runs as trusted server code with no user session. It MUST use the
+// service-role key to bypass row-level security — the anon key would be blocked
+// by the "auth.uid() = user_id" policy (auth.uid() is null here), silently
+// dropping every insert/update.
 function createWebhookClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? ''
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? ''
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? ''
   if (!url || !key) return null
   return createClient(url, key, { auth: { persistSession: false } })
 }
@@ -122,13 +125,15 @@ async function handleDirectDeposit(
     deposit_amount_cents: session.amount_total,
     deposit_stripe_session_id: session.id,
     deposit_paid_at: new Date().toISOString(),
+    activation_fee_cents: 0,
     garment_price_cents: garmentPrice,
     extra_logo_count: extraLogosCount,
     extra_logo_fee_cents: extraLogosCount * 400,
     garment_type,
     style_name: style_name ?? '',
     tech_pack_snapshot: techPack ?? null,
-    status: 'paid',
+    status: 'in_production',
+    paid_at: new Date().toISOString(),
   })
 
   await sb
@@ -152,10 +157,10 @@ async function handleProductionDeposit(
       deposit_paid_at: new Date().toISOString(),
       deposit_stripe_session_id: session.id,
       deposit_amount_cents: session.amount_total,
+      production_stage: 'BULK_PRODUCTION',
+      status: 'in_production',
     })
     .eq('id', order_id)
-
-  await transitionStage(order_id, 'BULK_PRODUCTION', { admin_override: true }, undefined)
 }
 
 async function handleFinalPayment(
@@ -173,10 +178,9 @@ async function handleFinalPayment(
       final_paid_at: new Date().toISOString(),
       final_stripe_session_id: session.id,
       final_amount_cents: session.amount_total,
+      production_stage: 'READY_TO_SHIP',
     })
     .eq('id', order_id)
-
-  await transitionStage(order_id, 'READY_TO_SHIP', { admin_override: true }, undefined)
 }
 
 async function handleLegacy(
