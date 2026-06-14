@@ -220,9 +220,17 @@ export async function supplierTransition(
   metadata: Record<string, unknown>,
   _actorEmail: string,
 ): Promise<{ ok: true; order: ProductionOrder } | { ok: false; errors: string[] }> {
+  const supabase = createClient()
+  const token = supabase
+    ? (await supabase.auth.getSession()).data.session?.access_token
+    : null
+
   const res = await fetch('/api/supplier/transition', {
     method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: JSON.stringify({ order_id: orderId, to_stage: toStage, metadata }),
   })
 
