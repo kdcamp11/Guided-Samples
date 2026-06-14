@@ -62,16 +62,17 @@ function buildPricing(garmentType: string, extraLogoCount: number): ProductionOr
 
 function rowToProductionOrder(row: Record<string, unknown>): ProductionOrder {
   return {
-    id:                    row.id as string,
-    design_order_id:       row.design_order_id as string,
-    user_id:               row.user_id as string,
-    status:                row.status as ProductionOrderStatus,
+    id:                    row.id                    as string,
+    design_order_id:       row.design_order_id       as string,
+    user_id:               row.user_id               as string,
+    status:                row.status                as ProductionOrderStatus,
+    production_stage:      (row.production_stage     as import('@/types/productionStages').ProductionStage | null) ?? null,
     pricing: {
       activation_fee_cents: row.activation_fee_cents as number,
       garment_price_cents:  row.garment_price_cents  as number,
       extra_logo_count:     row.extra_logo_count     as number,
       extra_logo_fee_cents: row.extra_logo_fee_cents as number,
-      total_cents:          row.total_cents           as number,
+      total_cents:          row.total_cents          as number,
     },
     tech_pack_snapshot:    row.tech_pack_snapshot    as TechPackSnapshot,
     stripe_session_id:     row.stripe_session_id     as string | null,
@@ -81,9 +82,13 @@ function rowToProductionOrder(row: Record<string, unknown>): ProductionOrder {
     supplier_notes:        row.supplier_notes        as string | null,
     tracking_number:       row.tracking_number       as string | null,
     carrier:               row.carrier               as string | null,
+    revision_notes:        row.revision_notes        as string | null,
     created_at:            row.created_at            as string,
     updated_at:            row.updated_at            as string,
     paid_at:               row.paid_at               as string | null,
+    production_started_at: row.production_started_at as string | null,
+    sample_shipped_at:     row.sample_shipped_at     as string | null,
+    sample_delivered_at:   row.sample_delivered_at   as string | null,
     shipped_at:            row.shipped_at            as string | null,
     delivered_at:          row.delivered_at          as string | null,
   }

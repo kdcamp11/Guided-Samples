@@ -84,7 +84,19 @@ export type ProductionOrder = {
   id:                    string
   design_order_id:       string           // FK → public.projects.id  (immutable after creation)
   user_id:               string           // FK → auth.users.id
+
+  /**
+   * Payment lifecycle status — coarse-grained, managed by productionOrders.ts.
+   * Do not use this for factory/portal display; use production_stage instead.
+   */
   status:                ProductionOrderStatus
+
+  /**
+   * Canonical single-field factory stage — managed exclusively by workflowEngine.ts.
+   * Null until payment is confirmed and enterProductionWorkflow() is called.
+   * All portals derive their displayed status from this field.
+   */
+  production_stage:      import('./productionStages').ProductionStage | null
 
   /** Snapshot of pricing at checkout time */
   pricing:               ProductionOrderPricing
@@ -103,12 +115,18 @@ export type ProductionOrder = {
   tracking_number:       string | null
   carrier:               string | null
 
+  /** Revision feedback from client sample evaluation */
+  revision_notes:        string | null
+
   /** Timestamps */
-  created_at:  string
-  updated_at:  string
-  paid_at:     string | null
-  shipped_at:  string | null
-  delivered_at: string | null
+  created_at:            string
+  updated_at:            string
+  paid_at:               string | null
+  production_started_at: string | null
+  sample_shipped_at:     string | null
+  sample_delivered_at:   string | null
+  shipped_at:            string | null
+  delivered_at:          string | null
 }
 
 // ─── Production Order Event (audit log) ──────────────────────────────────────
