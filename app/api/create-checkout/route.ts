@@ -23,37 +23,57 @@ export async function POST(req: NextRequest) {
   }
 
   const stripe = new Stripe(secretKey)
-  const { garmentType, styleName, supplierEmail, supplierName, notes } = await req.json()
+  const { garmentType, styleName, extraLogos, notes } = await req.json()
 
   const garmentPrice = GARMENT_PRICES[garmentType] ?? 3500
   const garmentLabel = garmentType || 'Custom Garment'
   const origin = req.headers.get('origin') ?? 'http://localhost:3000'
 
+  const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [
+    {
+      price_data: {
+        currency: 'usd',
+        product_data: {
+          name: 'GRACE Order Activation Fee',
+          description: 'One-time activation per production order',
+        },
+        unit_amount: ACTIVATION_FEE,
+      },
+      quantity: 1,
+    },
+    {
+      price_data: {
+        currency: 'usd',
+        product_data: {
+          name: `${garmentLabel} Sample`,
+          description: styleName ? `Style: ${styleName}` : 'Single sample production',
+        },
+        unit_amount: garmentPrice,
+      },
+      quantity: 1,
+    },
+  ]
+
+  if (extraLogos > 0) {
+    lineItems.push({
+      price_data: {
+        currency: 'usd',
+        product_data: {
+          name: 'Additional Logo Placement',
+          description: `${extraLogos} additional logo location${extraLogos > 1 ? 's' : ''} at $4 each`,
+        },
+        unit_amount: 400,
+      },
+      quantity: extraLogos,
+    })
+  }
+
   const session = await stripe.checkout.sessions.create({
     mode: 'payment',
-    line_items: [
-      {
-        price_data: {
-          currency: 'usd',
-          product_data: { name: 'GRACE Order Activation Fee', description: 'One-time activation per production order' },
-          unit_amount: ACTIVATION_FEE,
-        },
-        quantity: 1,
-      },
-      {
-        price_data: {
-          currency: 'usd',
-          product_data: { name: `${garmentLabel} Sample`, description: styleName ? `Style: ${styleName}` : 'Single sample production' },
-          unit_amount: garmentPrice,
-        },
-        quantity: 1,
-      },
-    ],
+    line_items: lineItems,
     metadata: {
       garmentType: garmentLabel,
       styleName: styleName ?? '',
-      supplierEmail: supplierEmail ?? '',
-      supplierName: supplierName ?? '',
       notes: notes ?? '',
     },
     success_url: `${origin}?payment=success&session_id={CHECKOUT_SESSION_ID}`,
