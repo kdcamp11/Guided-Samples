@@ -68,7 +68,7 @@ export default function Sidebar({ currentPhase, onPhaseChange, state, section, o
         <NavItem icon={<FolderOpen size={15}/>} label="Projects" active={section === 'projects'} onClick={() => onSectionChange('projects')} />
         <NavItem icon={<Palette size={15}/>} label="Logo & Design" active={section === 'design'} onClick={() => onSectionChange('design')} />
         <NavItem icon={<Package size={15}/>} label="Tech Packs" active={section === 'techpacks'} onClick={() => onSectionChange('techpacks')} />
-        <NavItem icon={<ShoppingCart size={15}/>} label="Orders" active={section === 'orders'} onClick={() => onSectionChange('orders')} />
+        <NavItem icon={<ShoppingCart size={15}/>} label="Orders" active={section === 'orders'} href="/track" />
         <NavItem icon={<Library size={15}/>} label="Library" active={section === 'library'} onClick={() => onSectionChange('library')} />
         <NavItem icon={<Settings size={15}/>} label="Settings" active={section === 'settings'} onClick={() => onSectionChange('settings')} />
 
@@ -125,14 +125,22 @@ export default function Sidebar({ currentPhase, onPhaseChange, state, section, o
   )
 }
 
-function NavItem({ icon, label, active, onClick }: { icon: React.ReactNode; label: string; active: boolean; onClick?: () => void }) {
+function NavItem({ icon, label, active, onClick, href }: {
+  icon: React.ReactNode; label: string; active: boolean; onClick?: () => void; href?: string
+}) {
+  const cls = `w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-xs transition-colors ${
+    active ? 'bg-slate-100 text-gray-900' : 'text-gray-500 hover:bg-slate-50 hover:text-gray-700'
+  }`
+  if (href) {
+    return (
+      <a href={href} className={cls}>
+        {icon}
+        <span>{label}</span>
+      </a>
+    )
+  }
   return (
-    <button
-      onClick={onClick}
-      className={`w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-xs transition-colors ${
-        active ? 'bg-slate-100 text-gray-900' : 'text-gray-500 hover:bg-slate-50 hover:text-gray-700'
-      }`}
-    >
+    <button onClick={onClick} className={cls}>
       {icon}
       <span>{label}</span>
     </button>
