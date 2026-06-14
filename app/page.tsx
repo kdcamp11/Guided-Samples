@@ -53,9 +53,15 @@ const EMPTY_STATE: AppState = {
 
 function App() {
   const { user, loading } = useAuth()
-  const [view, setView] = useState<'landing' | 'projects' | 'studio'>('landing')
+  // Allow deep-linking straight to the studio dashboard (e.g. the "home" link
+  // from the /track orders page) via /?view=studio.
+  const initialView = typeof window !== 'undefined'
+    && new URLSearchParams(window.location.search).get('view') === 'studio'
+      ? 'studio' as const
+      : 'landing' as const
+  const [view, setView] = useState<'landing' | 'projects' | 'studio'>(initialView)
   const [state, setState] = useState<AppState>(EMPTY_STATE)
-  const [section, setSection] = useState('design')
+  const [section, setSection] = useState(initialView === 'studio' ? 'dashboard' : 'design')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [techPack, setTechPack] = useState<TechPackData | null>(null)
   const [authOpen, setAuthOpen] = useState(false)

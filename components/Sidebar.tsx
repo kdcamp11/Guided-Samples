@@ -50,13 +50,17 @@ export default function Sidebar({ currentPhase, onPhaseChange, state, section, o
     `}>
       {/* Brand */}
       <div className="p-4 border-b border-slate-200 flex items-center justify-between">
-        <div className="flex items-center gap-2">
+        <button
+          onClick={() => onSectionChange('dashboard')}
+          className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+          title="Go to Dashboard"
+        >
           <div className="w-7 h-7 bg-brand-green rounded-md flex items-center justify-center text-xs font-bold text-white">G</div>
-          <div>
+          <div className="text-left">
             <div className="text-sm font-bold text-gray-900 leading-none">GRACE</div>
             <div className="text-[10px] text-gray-400 tracking-widest">ENTERPRISE</div>
           </div>
-        </div>
+        </button>
         <button onClick={onMobileClose} className="lg:hidden p-1 rounded-lg hover:bg-slate-100 text-gray-400">
           <X size={16}/>
         </button>
