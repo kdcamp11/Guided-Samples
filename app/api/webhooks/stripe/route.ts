@@ -106,7 +106,7 @@ async function handleProductionDeposit(
     })
     .eq('id', order_id)
 
-  await transitionStage(order_id, 'BULK_PRODUCTION', { admin_override: true }, null)
+  await transitionStage(order_id, 'BULK_PRODUCTION', { admin_override: true }, undefined)
 }
 
 async function handleFinalPayment(
@@ -127,7 +127,7 @@ async function handleFinalPayment(
     })
     .eq('id', order_id)
 
-  await transitionStage(order_id, 'READY_TO_SHIP', { admin_override: true }, null)
+  await transitionStage(order_id, 'READY_TO_SHIP', { admin_override: true }, undefined)
 }
 
 async function handleLegacy(

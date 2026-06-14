@@ -1,34 +1,13 @@
-/**
- * Client Portal — type definitions
- *
- * Clients make exactly four business decisions in the production workflow:
- *   1. Approve first-piece media → sample ships
- *   2. Request revisions at first-piece → factory reworks
- *   3. Approve physical sample → bulk production
- *   4. Request revisions / cancel at sample evaluation
- *
- * All logistics confirmations (receipt, delivery) are handled by GRACE admins.
- * Clients never advance logistical stages — only business decision stages.
- */
-
 import type { ProductionStage } from './productionStages'
 import type { ProductionOrder } from './production'
 
-/**
- * The only stage transitions a client is authorised to trigger.
- * All other transitions are supplier- or admin-controlled.
- */
 export const CLIENT_CONTROLLED_TRANSITIONS: Partial<
   Record<ProductionStage, ProductionStage[]>
 > = {
-  // Client reviews photos/video before the physical sample ships
-  FIRST_PIECE_REVIEW:        ['SAMPLE_SHIPPED', 'FIRST_PIECE_IN_PRODUCTION'],
+  FIRST_PIECE_REVIEW:        ['CLOSED_SAMPLE_ONLY', 'AWAITING_PRODUCTION_DEPOSIT'],
   CLIENT_SAMPLE_EVALUATION:  ['BULK_PRODUCTION', 'REVISION_REQUIRED', 'CANCELLED'],
 }
 
-/**
- * Stages where the client has no pending action — GRACE or the factory is working.
- */
 export const CLIENT_WAITING_STAGES = new Set<ProductionStage>([
   'PRODUCTION_FILES_RECEIVED',
   'FIRST_PIECE_IN_PRODUCTION',
@@ -36,10 +15,11 @@ export const CLIENT_WAITING_STAGES = new Set<ProductionStage>([
   'BULK_PRODUCTION',
   'QUALITY_CHECK',
   'PACKING',
-  // Logistics stages advanced by admin, not client
   'SAMPLE_SHIPPED',
   'SAMPLE_DELIVERED',
   'SHIPPED',
+  'AWAITING_FIRST_PIECE',
+  'READY_TO_SHIP',
 ])
 
 export type ClientAction = {
@@ -63,24 +43,25 @@ export const CLIENT_ACTIONS: Partial<Record<ProductionStage, ClientAction[]>> = 
   FIRST_PIECE_REVIEW: [
     {
       id:          'approve_first_piece',
-      label:       'Approve — Ship the Sample',
-      description: 'The first piece looks great. Approve it and the factory will ship the physical sample to GRACE for final review.',
-      toStage:     'SAMPLE_SHIPPED',
+      label:       'Approve — Move to Production',
+      description: 'The first piece looks great. Pay the production deposit to begin bulk manufacturing.',
+      toStage:     'AWAITING_PRODUCTION_DEPOSIT',
       requiredFields: [
         { key: 'approval_notes', label: 'Approval Notes (optional)', type: 'textarea', placeholder: 'Any notes for the factory…' },
       ],
       variant:        'primary',
-      confirmMessage: 'Approving will instruct the factory to ship the physical sample.',
+      confirmMessage: 'Approving will move this order to the production deposit step.',
     },
     {
-      id:          'request_first_piece_revision',
-      label:       'Request Changes',
-      description: 'Something needs to change before the sample ships. The factory will address your feedback and share updated photos.',
-      toStage:     'FIRST_PIECE_IN_PRODUCTION',
+      id:          'close_sample_only',
+      label:       'Close Project',
+      description: 'Stop after the sample — no bulk production will be ordered.',
+      toStage:     'CLOSED_SAMPLE_ONLY',
       requiredFields: [
-        { key: 'revision_notes', label: 'What needs to change?', type: 'textarea', placeholder: 'Describe exactly what needs to be corrected…' },
+        { key: 'close_reason', label: 'Reason (optional)', type: 'textarea', placeholder: 'Why are you closing the project?' },
       ],
-      variant: 'secondary',
+      variant:        'danger',
+      confirmMessage: 'Closing the project is permanent. No further charges will be made.',
     },
   ],
   CLIENT_SAMPLE_EVALUATION: [

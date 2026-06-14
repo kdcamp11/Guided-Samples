@@ -215,6 +215,7 @@ function App() {
               state={state}
               techPack={techPack}
               onBack={() => goToPhase(5)}
+              projectId={projectIdRef.current ?? null}
             />
           )}
         </main>

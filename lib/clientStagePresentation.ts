@@ -1,54 +1,48 @@
-/**
- * Client-facing stage presentation layer
- *
- * Translates internal ProductionStage values into language and structure
- * appropriate for a brand owner tracking their order — not a factory operator.
- *
- * The underlying workflow logic and ProductionStage enum are unchanged.
- * This file is the only place manufacturing terminology should be hidden.
- */
-
 import type { ProductionStage } from '@/types/productionStages'
-
-// ─── Who is responsible right now ─────────────────────────────────────────────
 
 export type Responsible = 'factory' | 'you' | 'transit' | 'grace' | 'done' | 'cancelled'
 
 export const STAGE_RESPONSIBLE: Record<ProductionStage, Responsible> = {
-  PRODUCTION_FILES_RECEIVED:  'factory',
-  FIRST_PIECE_IN_PRODUCTION:  'factory',
-  FIRST_PIECE_REVIEW:         'you',
-  SAMPLE_SHIPPED:             'transit',
-  SAMPLE_DELIVERED:           'grace',   // GRACE confirms delivery, not client
-  CLIENT_SAMPLE_EVALUATION:   'you',
-  REVISION_REQUIRED:          'factory',
-  BULK_PRODUCTION:            'factory',
-  QUALITY_CHECK:              'factory',
-  PACKING:                    'factory',
-  SHIPPED:                    'transit',
-  DELIVERED:                  'done',
-  CANCELLED:                  'cancelled',
+  PRODUCTION_FILES_RECEIVED:    'factory',
+  FIRST_PIECE_IN_PRODUCTION:    'factory',
+  FIRST_PIECE_REVIEW:           'you',
+  SAMPLE_SHIPPED:               'transit',
+  SAMPLE_DELIVERED:             'grace',
+  CLIENT_SAMPLE_EVALUATION:     'you',
+  REVISION_REQUIRED:            'factory',
+  BULK_PRODUCTION:              'factory',
+  QUALITY_CHECK:                'factory',
+  PACKING:                      'factory',
+  SHIPPED:                      'transit',
+  DELIVERED:                    'done',
+  CANCELLED:                    'cancelled',
+  AWAITING_FIRST_PIECE:         'factory',
+  CLOSED_SAMPLE_ONLY:           'done',
+  AWAITING_PRODUCTION_DEPOSIT:  'you',
+  AWAITING_FINAL_PAYMENT:       'you',
+  READY_TO_SHIP:                'factory',
 }
-
-// ─── Customer-friendly labels ─────────────────────────────────────────────────
 
 export const CLIENT_STAGE_LABELS: Record<ProductionStage, string> = {
-  PRODUCTION_FILES_RECEIVED:  'Order Confirmed',
-  FIRST_PIECE_IN_PRODUCTION:  'Sample Being Made',
-  FIRST_PIECE_REVIEW:         'Review First Sample',
-  SAMPLE_SHIPPED:             'Sample in Transit',
-  SAMPLE_DELIVERED:           'Sample Arrived',
-  CLIENT_SAMPLE_EVALUATION:   'Review Your Sample',
-  REVISION_REQUIRED:          'Changes in Progress',
-  BULK_PRODUCTION:            'Your Order Being Made',
-  QUALITY_CHECK:              'Your Order Being Made',
-  PACKING:                    'Packing Your Order',
-  SHIPPED:                    'Order in Transit',
-  DELIVERED:                  'Delivered',
-  CANCELLED:                  'Order Cancelled',
+  PRODUCTION_FILES_RECEIVED:    'Order Confirmed',
+  FIRST_PIECE_IN_PRODUCTION:    'Sample Being Made',
+  FIRST_PIECE_REVIEW:           'Review First Sample',
+  SAMPLE_SHIPPED:               'Sample in Transit',
+  SAMPLE_DELIVERED:             'Sample Arrived',
+  CLIENT_SAMPLE_EVALUATION:     'Review Your Sample',
+  REVISION_REQUIRED:            'Changes in Progress',
+  BULK_PRODUCTION:              'Your Order Being Made',
+  QUALITY_CHECK:                'Your Order Being Made',
+  PACKING:                      'Packing Your Order',
+  SHIPPED:                      'Order in Transit',
+  DELIVERED:                    'Delivered',
+  CANCELLED:                    'Order Cancelled',
+  AWAITING_FIRST_PIECE:         'Sample Being Made',
+  CLOSED_SAMPLE_ONLY:           'Project Closed',
+  AWAITING_PRODUCTION_DEPOSIT:  'Production Deposit Required',
+  AWAITING_FINAL_PAYMENT:       'Final Payment Required',
+  READY_TO_SHIP:                'Ready to Ship',
 }
-
-// ─── Customer-friendly status messages ────────────────────────────────────────
 
 export const CLIENT_STAGE_MESSAGES: Record<ProductionStage, string> = {
   PRODUCTION_FILES_RECEIVED:
@@ -74,31 +68,34 @@ export const CLIENT_STAGE_MESSAGES: Record<ProductionStage, string> = {
   SHIPPED:
     'Your order is on its way! Check the tracking details below.',
   DELIVERED:
-    'Your order has been delivered. Enjoy! 🎉',
+    'Your order has been delivered. Enjoy!',
   CANCELLED:
     'This order has been cancelled.',
+  AWAITING_FIRST_PIECE:
+    'Our supplier is crafting your first piece. We\'ll notify you when photos are ready for review.',
+  CLOSED_SAMPLE_ONLY:
+    'You\'ve chosen to close this project after the sample phase. No further charges will be made.',
+  AWAITING_PRODUCTION_DEPOSIT:
+    'You approved the sample. Pay the 50% production deposit to begin bulk manufacturing.',
+  AWAITING_FINAL_PAYMENT:
+    'Your order has passed quality check. Pay the remaining balance to authorize shipment.',
+  READY_TO_SHIP:
+    'Payment confirmed. Your supplier has been authorized to ship your order.',
 }
-
-// ─── Responsible party label ──────────────────────────────────────────────────
 
 export const RESPONSIBLE_LABELS: Record<Responsible, { label: string; color: string; dot: string }> = {
-  factory:   { label: 'Factory is working on this',  color: 'text-brand-green',  dot: 'bg-brand-green animate-pulse' },
-  you:       { label: 'Your decision needed',         color: 'text-amber-600',    dot: 'bg-amber-500 animate-pulse' },
-  transit:   { label: 'In transit',                  color: 'text-blue-500',     dot: 'bg-blue-400' },
-  grace:     { label: 'GRACE is confirming delivery', color: 'text-brand-green',  dot: 'bg-brand-green' },
-  done:      { label: 'Complete',                    color: 'text-green-600',    dot: 'bg-green-500' },
-  cancelled: { label: 'Cancelled',                   color: 'text-red-500',      dot: 'bg-red-400' },
+  factory:   { label: 'Factory is working on this',   color: 'text-brand-green',  dot: 'bg-brand-green animate-pulse' },
+  you:       { label: 'Your decision needed',          color: 'text-amber-600',    dot: 'bg-amber-500 animate-pulse' },
+  transit:   { label: 'In transit',                   color: 'text-blue-500',     dot: 'bg-blue-400' },
+  grace:     { label: 'GRACE is confirming delivery',  color: 'text-brand-green',  dot: 'bg-brand-green' },
+  done:      { label: 'Complete',                     color: 'text-green-600',    dot: 'bg-green-500' },
+  cancelled: { label: 'Cancelled',                    color: 'text-red-500',      dot: 'bg-red-400' },
 }
-
-// ─── Simplified journey milestones (client-visible checkpoints) ───────────────
-//
-// Collapses internal factory stages into the 7 milestones a customer cares about.
-// Multiple ProductionStages can map to the same milestone index.
 
 export type JourneyMilestone = {
   id:     string
   label:  string
-  stages: ProductionStage[]  // which stages count as "at or past" this milestone
+  stages: ProductionStage[]
 }
 
 export const CLIENT_JOURNEY: JourneyMilestone[] = [
@@ -108,9 +105,9 @@ export const CLIENT_JOURNEY: JourneyMilestone[] = [
     stages: ['PRODUCTION_FILES_RECEIVED'],
   },
   {
-    id:     'sample',
+    id:     'sample_making',
     label:  'Sample Being Made',
-    stages: ['FIRST_PIECE_IN_PRODUCTION'],
+    stages: ['FIRST_PIECE_IN_PRODUCTION', 'AWAITING_FIRST_PIECE'],
   },
   {
     id:     'first_piece_review',
@@ -123,14 +120,24 @@ export const CLIENT_JOURNEY: JourneyMilestone[] = [
     stages: ['SAMPLE_SHIPPED', 'SAMPLE_DELIVERED', 'CLIENT_SAMPLE_EVALUATION', 'REVISION_REQUIRED'],
   },
   {
+    id:     'deposit',
+    label:  'Production Deposit',
+    stages: ['AWAITING_PRODUCTION_DEPOSIT'],
+  },
+  {
     id:     'production',
     label:  'Full Production',
     stages: ['BULK_PRODUCTION', 'QUALITY_CHECK', 'PACKING'],
   },
   {
+    id:     'final_payment',
+    label:  'Final Payment',
+    stages: ['AWAITING_FINAL_PAYMENT'],
+  },
+  {
     id:     'shipped',
     label:  'Shipped',
-    stages: ['SHIPPED'],
+    stages: ['SHIPPED', 'READY_TO_SHIP'],
   },
   {
     id:     'delivered',
@@ -139,18 +146,16 @@ export const CLIENT_JOURNEY: JourneyMilestone[] = [
   },
 ]
 
-/** Returns the index (0-based) of the milestone the current stage maps to. -1 if cancelled. */
 export function journeyMilestoneIndex(stage: ProductionStage | null): number {
-  if (!stage || stage === 'CANCELLED') return -1
+  if (!stage || stage === 'CANCELLED' || stage === 'CLOSED_SAMPLE_ONLY') return -1
   for (let i = 0; i < CLIENT_JOURNEY.length; i++) {
     if (CLIENT_JOURNEY[i].stages.includes(stage)) return i
   }
   return 0
 }
 
-/** Returns 0–1 progress based on the simplified journey (not all 13 stages). */
 export function clientProgress(stage: ProductionStage | null): number {
-  if (!stage || stage === 'CANCELLED') return 0
+  if (!stage || stage === 'CANCELLED' || stage === 'CLOSED_SAMPLE_ONLY') return 0
   if (stage === 'DELIVERED') return 1
   const idx = journeyMilestoneIndex(stage)
   if (idx === -1) return 0

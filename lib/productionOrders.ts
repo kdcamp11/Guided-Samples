@@ -91,6 +91,16 @@ function rowToProductionOrder(row: Record<string, unknown>): ProductionOrder {
     sample_delivered_at:   row.sample_delivered_at   as string | null,
     shipped_at:            row.shipped_at            as string | null,
     delivered_at:          row.delivered_at          as string | null,
+    production_path:             (row.production_path             as 'SAMPLE' | 'DIRECT' | null) ?? null,
+    sample_fee_cents:            (row.sample_fee_cents            as number | null) ?? null,
+    sample_stripe_session_id:    (row.sample_stripe_session_id    as string | null) ?? null,
+    sample_paid_at:              (row.sample_paid_at              as string | null) ?? null,
+    deposit_amount_cents:        (row.deposit_amount_cents        as number | null) ?? null,
+    deposit_stripe_session_id:   (row.deposit_stripe_session_id   as string | null) ?? null,
+    deposit_paid_at:             (row.deposit_paid_at             as string | null) ?? null,
+    final_amount_cents:          (row.final_amount_cents          as number | null) ?? null,
+    final_stripe_session_id:     (row.final_stripe_session_id     as string | null) ?? null,
+    final_paid_at:               (row.final_paid_at               as string | null) ?? null,
   }
 }
 

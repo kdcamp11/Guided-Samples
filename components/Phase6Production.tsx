@@ -1,11 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import { ArrowLeft, Download, CheckCircle2, Loader2, AlertCircle, Image as ImageIcon, CreditCard, ShieldCheck } from 'lucide-react'
+import { ArrowLeft, Download, CheckCircle2, Loader2, AlertCircle, Image as ImageIcon, CreditCard, ShieldCheck, Clock, Zap } from 'lucide-react'
 import { AppState } from '@/app/page'
 
-const ACTIVATION_FEE = 100
 const LOGO_FEE = 4
+const SAMPLE_FEE = 50
+const ACTIVATION_FEE = 100
 const GARMENT_PRICES: Record<string, number> = {
   'T-Shirt': 25,
   'Hoodie': 45,
@@ -23,6 +24,7 @@ interface Props {
   state: AppState
   techPack: TechPackData
   onBack: () => void
+  projectId: string | null
 }
 
 export interface TechPackData {
@@ -32,9 +34,10 @@ export interface TechPackData {
   placements: { location: string; description: string }[]
 }
 
-export default function Phase6Production({ state, techPack, onBack }: Props) {
+export default function Phase6Production({ state, techPack, onBack, projectId }: Props) {
   const [notes, setNotes] = useState('')
-  const [checkoutLoading, setCheckoutLoading] = useState(false)
+  const [sampleLoading, setSampleLoading] = useState(false)
+  const [directLoading, setDirectLoading] = useState(false)
   const [downloadDone, setDownloadDone] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
 
@@ -44,13 +47,17 @@ export default function Phase6Production({ state, techPack, onBack }: Props) {
 
   const garmentType = techPack.styleInfo.garmentType || state.garment?.type || 'T-Shirt'
   const garmentPrice = GARMENT_PRICES[garmentType] ?? 35
+  const styleName = techPack.styleInfo.styleName ?? ''
 
-  // Count logo placements; each beyond the first costs $4 extra
   const logoCount = techPack.placements.length
   const extraLogos = Math.max(0, logoCount - 1)
   const logoFeeTotal = extraLogos * LOGO_FEE
 
-  const orderTotal = ACTIVATION_FEE + garmentPrice + logoFeeTotal
+  const sampleTotal = ACTIVATION_FEE + SAMPLE_FEE + logoFeeTotal
+
+  // 50% deposit = half of (garment_price + logo fees)
+  const productionTotal = garmentPrice + logoFeeTotal
+  const depositAmount = Math.round(productionTotal / 2 * 100) / 100
 
   const assets = [
     { label: 'Logo', image: logo, present: !!logo },
@@ -59,19 +66,18 @@ export default function Phase6Production({ state, techPack, onBack }: Props) {
     { label: 'Tech Pack', image: null, present: !!techPack.styleInfo.styleName },
   ]
 
-  const handleCheckout = async () => {
-    setCheckoutLoading(true)
+  const handleSampleCheckout = async () => {
+    setSampleLoading(true)
     setErrorMsg('')
     try {
-      const res = await fetch('/api/create-checkout', {
+      const res = await fetch('/api/checkout/sample', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          garmentType,
-          styleName: techPack.styleInfo.styleName,
-          logoCount,
-          extraLogos,
-          logoFeeTotal,
+          design_order_id: projectId,
+          garment_type: garmentType,
+          style_name: styleName,
+          extra_logos: extraLogos,
           notes,
         }),
       })
@@ -79,10 +85,34 @@ export default function Phase6Production({ state, techPack, onBack }: Props) {
       if (!res.ok) throw new Error(data.error ?? 'Checkout failed')
       window.location.href = data.url
     } catch (e) {
-      console.error(e)
       setErrorMsg(e instanceof Error ? e.message : 'Payment setup failed. Please try again.')
     } finally {
-      setCheckoutLoading(false)
+      setSampleLoading(false)
+    }
+  }
+
+  const handleDirectCheckout = async () => {
+    setDirectLoading(true)
+    setErrorMsg('')
+    try {
+      const res = await fetch('/api/checkout/direct', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          design_order_id: projectId,
+          garment_type: garmentType,
+          style_name: styleName,
+          extra_logos: extraLogos,
+          notes,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Checkout failed')
+      window.location.href = data.url
+    } catch (e) {
+      setErrorMsg(e instanceof Error ? e.message : 'Payment setup failed. Please try again.')
+    } finally {
+      setDirectLoading(false)
     }
   }
 
@@ -116,7 +146,7 @@ export default function Phase6Production({ state, techPack, onBack }: Props) {
         <div>
           <p className="phase-header">Phase 6</p>
           <h1 className="text-xl font-bold text-gray-900">Send to Production</h1>
-          <p className="text-gray-500 text-sm mt-1">Review your order and submit for production</p>
+          <p className="text-gray-500 text-sm mt-1">Choose your production path</p>
         </div>
         <button onClick={onBack} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-700 transition-colors mt-1">
           <ArrowLeft size={14}/>
@@ -124,9 +154,9 @@ export default function Phase6Production({ state, techPack, onBack }: Props) {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4 max-w-4xl">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-4 max-w-5xl">
 
-        {/* Left: Package preview + notes */}
+        {/* Left: Package preview + notes + path selection */}
         <div className="space-y-4">
 
           {/* Assets summary */}
@@ -211,11 +241,8 @@ export default function Phase6Production({ state, techPack, onBack }: Props) {
               )}
             </div>
           </div>
-        </div>
 
-        {/* Right: Order summary + actions */}
-        <div className="space-y-3">
-
+          {/* Error message */}
           {errorMsg && (
             <div className="card bg-red-50 border-red-100">
               <div className="flex items-start gap-3">
@@ -224,6 +251,109 @@ export default function Phase6Production({ state, techPack, onBack }: Props) {
               </div>
             </div>
           )}
+
+          {/* Path selection cards */}
+          <div>
+            <p className="text-xs font-semibold text-gray-700 mb-3">Choose Your Production Path</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+
+              {/* Card 1 — First Piece Sample (SAMPLE path) */}
+              <div className="card flex flex-col border-brand-green/20 hover:border-brand-green/40 transition-colors">
+                <div className="flex items-start justify-between mb-2">
+                  <h3 className="text-sm font-semibold text-gray-900">First Piece Sample</h3>
+                  <span className="text-[10px] font-medium px-2 py-0.5 bg-brand-green/10 text-brand-green rounded-full whitespace-nowrap ml-2">
+                    Recommended
+                  </span>
+                </div>
+                <p className="text-[11px] text-gray-500 leading-relaxed mb-3">
+                  Receive a real sample before committing to full production. Review the physical product, request changes if needed, or stop the project.
+                </p>
+                <div className="flex items-center gap-1.5 text-[11px] text-gray-400 mb-4">
+                  <Clock size={11}/>
+                  Adds ~2–3 weeks
+                </div>
+
+                <div className="border-t border-slate-100 pt-3 mb-4 space-y-1.5 text-xs">
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-2">What you pay today</p>
+                  <div className="flex justify-between text-gray-600">
+                    <span>Activation Fee</span>
+                    <span>${ACTIVATION_FEE}.00</span>
+                  </div>
+                  <div className="flex justify-between text-gray-600">
+                    <span>Sample Fee</span>
+                    <span>${SAMPLE_FEE}.00</span>
+                  </div>
+                  {extraLogos > 0 && (
+                    <div className="flex justify-between text-gray-600">
+                      <span>{extraLogos} Extra Logo{extraLogos > 1 ? 's' : ''}</span>
+                      <span>+${logoFeeTotal}.00</span>
+                    </div>
+                  )}
+                  <div className="border-t border-slate-100 pt-1.5 flex justify-between font-semibold text-gray-900">
+                    <span>Total due today</span>
+                    <span>${sampleTotal}.00</span>
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleSampleCheckout}
+                  disabled={sampleLoading || directLoading}
+                  className="btn-primary mt-auto w-full flex items-center justify-center gap-2 text-xs py-2.5"
+                >
+                  {sampleLoading ? <Loader2 size={13} className="animate-spin"/> : <CreditCard size={13}/>}
+                  {sampleLoading ? 'Redirecting…' : 'Order First Piece Sample'}
+                </button>
+              </div>
+
+              {/* Card 2 — Start Production (DIRECT path) */}
+              <div className="card flex flex-col hover:border-slate-300 transition-colors">
+                <div className="flex items-start justify-between mb-2">
+                  <h3 className="text-sm font-semibold text-gray-900">Start Production</h3>
+                  <span className="text-[10px] font-medium px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full whitespace-nowrap ml-2">
+                    Repeat orders
+                  </span>
+                </div>
+                <p className="text-[11px] text-gray-500 leading-relaxed mb-3">
+                  Skip the sample and go straight to manufacturing. Faster turnaround for designs you've already validated.
+                </p>
+                <div className="flex items-center gap-1.5 text-[11px] text-gray-400 mb-4">
+                  <Zap size={11}/>
+                  Fastest option
+                </div>
+
+                <div className="border-t border-slate-100 pt-3 mb-4 space-y-1.5 text-xs">
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-2">What you pay today</p>
+                  <div className="flex justify-between text-gray-600">
+                    <span>50% Production Deposit</span>
+                    <span>${depositAmount.toFixed(2)}</span>
+                  </div>
+                  <p className="text-[10px] text-gray-400">Remaining 50% due after quality check</p>
+                  <div className="border-t border-slate-100 pt-1.5 flex justify-between font-semibold text-gray-900">
+                    <span>Total due today</span>
+                    <span>${depositAmount.toFixed(2)}</span>
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleDirectCheckout}
+                  disabled={sampleLoading || directLoading}
+                  className="btn-secondary mt-auto w-full flex items-center justify-center gap-2 text-xs py-2.5"
+                >
+                  {directLoading ? <Loader2 size={13} className="animate-spin"/> : <CreditCard size={13}/>}
+                  {directLoading ? 'Redirecting…' : 'Start Production'}
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-center gap-1.5 text-[10px] text-gray-400 mt-3">
+              <ShieldCheck size={11}/>
+              Secure checkout via Stripe
+            </div>
+          </div>
+        </div>
+
+        {/* Right: Download + package contents */}
+        <div className="space-y-3">
 
           {downloadDone && (
             <div className="card bg-green-50 border-green-100">
@@ -236,45 +366,6 @@ export default function Phase6Production({ state, techPack, onBack }: Props) {
               </div>
             </div>
           )}
-
-          {/* Order Summary */}
-          <div className="card">
-            <p className="text-xs font-medium text-gray-600 mb-3">Order Summary</p>
-            <div className="space-y-2 text-xs">
-              <div className="flex justify-between text-gray-600">
-                <span>Order Activation Fee</span>
-                <span>${ACTIVATION_FEE}.00</span>
-              </div>
-              <div className="flex justify-between text-gray-600">
-                <span>{garmentType} Sample</span>
-                <span>${garmentPrice}.00</span>
-              </div>
-              {extraLogos > 0 && (
-                <div className="flex justify-between text-gray-600">
-                  <span>{extraLogos} Additional Logo{extraLogos > 1 ? 's' : ''} (×${LOGO_FEE})</span>
-                  <span>${logoFeeTotal}.00</span>
-                </div>
-              )}
-              <div className="border-t border-slate-100 pt-2 flex justify-between font-semibold text-gray-900 text-sm">
-                <span>Total</span>
-                <span>${orderTotal}.00</span>
-              </div>
-            </div>
-            <p className="text-[10px] text-gray-400 mt-2">Single sample · USD · One-time payment</p>
-          </div>
-
-          <button
-            onClick={handleCheckout}
-            disabled={checkoutLoading}
-            className="btn-primary w-full flex items-center justify-center gap-2 py-3"
-          >
-            {checkoutLoading ? <Loader2 size={14} className="animate-spin"/> : <CreditCard size={14}/>}
-            {checkoutLoading ? 'Redirecting…' : 'Pay & Send to Production'}
-          </button>
-          <div className="flex items-center justify-center gap-1.5 text-[10px] text-gray-400">
-            <ShieldCheck size={11}/>
-            Secure checkout via Stripe
-          </div>
 
           <div className="card">
             <p className="text-xs font-medium text-gray-600 mb-3">Download Package</p>

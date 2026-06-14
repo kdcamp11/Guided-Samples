@@ -119,6 +119,16 @@ export async function getSupplierOrder(orderId: string): Promise<ProductionOrder
     sample_delivered_at:   row.sample_delivered_at   as string | null,
     shipped_at:            row.shipped_at            as string | null,
     delivered_at:          row.delivered_at          as string | null,
+    production_path:           null,
+    sample_fee_cents:          null,
+    sample_stripe_session_id:  null,
+    sample_paid_at:            null,
+    deposit_amount_cents:      null,
+    deposit_stripe_session_id: null,
+    deposit_paid_at:           null,
+    final_amount_cents:        null,
+    final_stripe_session_id:   null,
+    final_paid_at:             null,
   }
 }
 
