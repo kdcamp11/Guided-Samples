@@ -1,31 +1,37 @@
 import { createClient } from '@supabase/supabase-js'
 import type { NextRequest } from 'next/server'
 
-function getAnonClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? ''
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? ''
-  if (!url || !key) return null
-  return createClient(url, key, { auth: { persistSession: false } })
+const URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? ''
+const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? ''
+
+function bareClient() {
+  if (!URL || !ANON) return null
+  return createClient(URL, ANON, { auth: { persistSession: false } })
 }
 
 export function createRouteClient() {
-  return getAnonClient()
+  return bareClient()
 }
 
 export async function getRouteUser(req: NextRequest) {
-  const sb = getAnonClient()
-  if (!sb) return { sb: null, user: null }
+  if (!URL || !ANON) return { sb: null, user: null }
 
   const authHeader = req.headers.get('authorization') ?? ''
   const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null
+  if (!token) return { sb: bareClient(), user: null }
 
-  if (!token) return { sb, user: null }
+  // Verify the token and resolve the user identity.
+  const verifier = createClient(URL, ANON, { auth: { persistSession: false } })
+  const { data: { user }, error } = await verifier.auth.getUser(token)
+  if (error || !user) return { sb: bareClient(), user: null }
 
-  const { data: { user }, error } = await sb.auth.getUser(token)
-  if (error || !user) return { sb, user: null }
-
-  // Attach token so subsequent queries run as this user
-  sb.auth.setSession({ access_token: token, refresh_token: '' }).catch(() => {})
+  // Return a client whose every request carries the user's JWT, so Postgres
+  // row-level security evaluates auth.uid() as this user. Without this, queries
+  // run as the anon role and RLS hides the user's own rows (causing 404s).
+  const sb = createClient(URL, ANON, {
+    auth: { persistSession: false },
+    global: { headers: { Authorization: `Bearer ${token}` } },
+  })
 
   return { sb, user }
 }
