@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { ArrowLeft, Download, CheckCircle2, Loader2, AlertCircle, Image as ImageIcon, CreditCard, ShieldCheck, Clock, Zap } from 'lucide-react'
 import { AppState } from '@/app/page'
 import { createClient } from '@/lib/supabase'
+import AuthModal from '@/components/AuthModal'
 
 const LOGO_FEE = 4
 const SAMPLE_FEE = 50
@@ -26,6 +27,7 @@ interface Props {
   techPack: TechPackData
   onBack: () => void
   projectId: string | null
+  onEnsureProject: () => Promise<string | null>
 }
 
 export interface TechPackData {
@@ -35,12 +37,14 @@ export interface TechPackData {
   placements: { location: string; description: string }[]
 }
 
-export default function Phase6Production({ state, techPack, onBack, projectId }: Props) {
+export default function Phase6Production({ state, techPack, onBack, projectId, onEnsureProject }: Props) {
   const [notes, setNotes] = useState('')
   const [sampleLoading, setSampleLoading] = useState(false)
   const [directLoading, setDirectLoading] = useState(false)
   const [downloadDone, setDownloadDone] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
+  const [authOpen, setAuthOpen] = useState(false)
+  const [pendingPath, setPendingPath] = useState<'sample' | 'direct' | null>(null)
 
   const logo = state.logo?.dataUrl
   const garment = state.garment?.dataUrl
@@ -75,16 +79,30 @@ export default function Phase6Production({ state, techPack, onBack, projectId }:
     return { 'Authorization': `Bearer ${session.access_token}` }
   }
 
-  const handleSampleCheckout = async () => {
-    setSampleLoading(true)
+  const runCheckout = async (path: 'sample' | 'direct') => {
+    const setLoading = path === 'sample' ? setSampleLoading : setDirectLoading
+    setLoading(true)
     setErrorMsg('')
     try {
+      // Sign-in gate: payment + order tracking require a real user identity.
       const auth = await getAuthHeader()
-      const res = await fetch('/api/checkout/sample', {
+      if (!auth.Authorization) {
+        setPendingPath(path)
+        setAuthOpen(true)
+        setLoading(false)
+        return
+      }
+
+      // Make sure the design is persisted so the order has a project to attach to.
+      const pid = projectId ?? (await onEnsureProject())
+      if (!pid) throw new Error('Could not save your project. Please try again.')
+
+      const endpoint = path === 'sample' ? '/api/checkout/sample' : '/api/checkout/direct'
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...auth },
         body: JSON.stringify({
-          design_order_id: projectId,
+          design_order_id: pid,
           garment_type: garmentType,
           style_name: styleName,
           extra_logos: extraLogos,
@@ -97,34 +115,18 @@ export default function Phase6Production({ state, techPack, onBack, projectId }:
     } catch (e) {
       setErrorMsg(e instanceof Error ? e.message : 'Payment setup failed. Please try again.')
     } finally {
-      setSampleLoading(false)
+      setLoading(false)
     }
   }
 
-  const handleDirectCheckout = async () => {
-    setDirectLoading(true)
-    setErrorMsg('')
-    try {
-      const auth = await getAuthHeader()
-      const res = await fetch('/api/checkout/direct', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...auth },
-        body: JSON.stringify({
-          design_order_id: projectId,
-          garment_type: garmentType,
-          style_name: styleName,
-          extra_logos: extraLogos,
-          notes,
-        }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? 'Checkout failed')
-      window.location.href = data.url
-    } catch (e) {
-      setErrorMsg(e instanceof Error ? e.message : 'Payment setup failed. Please try again.')
-    } finally {
-      setDirectLoading(false)
-    }
+  const handleSampleCheckout = () => runCheckout('sample')
+  const handleDirectCheckout = () => runCheckout('direct')
+
+  const handleAuthSuccess = () => {
+    setAuthOpen(false)
+    const next = pendingPath
+    setPendingPath(null)
+    if (next) runCheckout(next)
   }
 
   const handleDownload = async () => {
@@ -153,6 +155,11 @@ export default function Phase6Production({ state, techPack, onBack, projectId }:
 
   return (
     <div className="p-6 w-full">
+      <AuthModal
+        open={authOpen}
+        onClose={() => { setAuthOpen(false); setPendingPath(null) }}
+        onSuccess={handleAuthSuccess}
+      />
       <div className="mb-5 flex items-start justify-between">
         <div>
           <p className="phase-header">Phase 6</p>
