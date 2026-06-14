@@ -6,6 +6,7 @@ import { saveProject, saveTechPack } from '@/lib/projects'
 import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import SignIn from '@/components/SignIn'
+import AuthModal from '@/components/AuthModal'
 import ProjectsDashboard from '@/components/ProjectsDashboard'
 import Phase1Logo from '@/components/Phase1Logo'
 import Phase2Garment from '@/components/Phase2Garment'
@@ -57,6 +58,7 @@ function App() {
   const [section, setSection] = useState('design')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [techPack, setTechPack] = useState<TechPackData | null>(null)
+  const [authOpen, setAuthOpen] = useState(false)
   const projectIdRef = useRef<string | undefined>(undefined)
 
   // Auto-save to Supabase whenever phase advances
@@ -130,10 +132,17 @@ function App() {
   // Landing page
   if (view === 'landing') {
     return (
-      <LandingPage
-        onEnter={() => setView('studio')}
-        onSignIn={() => setView('studio')}
-      />
+      <>
+        <LandingPage
+          onEnter={() => setView('studio')}
+          onSignIn={() => setAuthOpen(true)}
+        />
+        <AuthModal
+          open={authOpen}
+          onClose={() => setAuthOpen(false)}
+          onSuccess={() => { setAuthOpen(false); setView('projects') }}
+        />
+      </>
     )
   }
 
