@@ -17,6 +17,7 @@ import type { ProductionStage } from '@/types/productionStages'
 
 export type NotificationType =
   | 'first_piece_ready'
+  | 'first_piece_revision'
   | 'revision_requested'
   | 'sample_shipped'
   | 'sample_delivered'
@@ -58,6 +59,16 @@ const TRANSITION_NOTIFICATIONS: Partial<Record<ProductionStage, NotificationSpec
     type:      'first_piece_ready',
     title:     'Your First Sample is Ready to Review',
     body:      () => 'Your factory has completed the first sample and shared photos for your approval. Log in to review and decide whether to ship or request changes.',
+  },
+  // Triggered when the client requests changes on the first-piece photos —
+  // the order returns to production so the supplier can address the notes.
+  FIRST_PIECE_IN_PRODUCTION: {
+    recipient: 'supplier',
+    type:      'first_piece_revision',
+    title:     'Client Requested Changes to First Piece',
+    body:      (m) => m.revision_notes
+      ? `The client has requested changes before shipping: "${String(m.revision_notes).slice(0, 200)}". Please update the first piece and re-submit photos.`
+      : 'The client has requested changes to the first piece. Check the order notes and re-submit photos when ready.',
   },
   REVISION_REQUIRED: {
     recipient: 'supplier',

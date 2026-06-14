@@ -27,8 +27,9 @@ function timeAgo(iso: string): string {
 // ─── Icon per type ────────────────────────────────────────────────────────────
 
 const TYPE_COLORS: Record<NotificationType, string> = {
-  first_piece_ready:  'bg-brand-green/10 text-brand-green',
-  revision_requested: 'bg-amber-100 text-amber-600',
+  first_piece_ready:    'bg-brand-green/10 text-brand-green',
+  first_piece_revision: 'bg-amber-100 text-amber-600',
+  revision_requested:   'bg-amber-100 text-amber-600',
   sample_shipped:     'bg-blue-50 text-blue-500',
   sample_delivered:   'bg-blue-50 text-blue-600',
   bulk_approved:      'bg-brand-green/10 text-brand-green',

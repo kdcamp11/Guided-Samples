@@ -292,6 +292,7 @@ export default function ClientOrderDetail({ orderId, onBack }: Props) {
                 orderId={orderId}
                 stage={stage!}
                 media={media}
+                history={history}
                 onTransition={load}
               />
             )}

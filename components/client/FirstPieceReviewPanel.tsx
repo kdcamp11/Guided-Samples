@@ -14,17 +14,25 @@
 import { useState } from 'react'
 import { CheckCircle2, AlertTriangle, ChevronDown, ChevronUp, Loader2, Camera } from 'lucide-react'
 import { clientTransition } from '@/lib/clientPortal'
-import type { ProductionStage } from '@/types/productionStages'
+import type { ProductionStage, StageTransitionEvent } from '@/types/productionStages'
 import type { OrderMedia } from '@/types/supplier'
 
 interface Props {
   orderId:      string
   stage:        ProductionStage
   media:        OrderMedia[]
+  history:      StageTransitionEvent[]
   onTransition: () => void
 }
 
 type Decision = 'approve' | 'revise' | null
+
+/** True if the client already used their one revision on the first-piece photos. */
+function hasUsedFirstPieceRevision(history: StageTransitionEvent[]): boolean {
+  return history.some(
+    e => e.from_stage === 'FIRST_PIECE_REVIEW' && e.to_stage === 'FIRST_PIECE_IN_PRODUCTION',
+  )
+}
 
 function MediaGrid({ media }: { media: OrderMedia[] }) {
   const [expanded, setExpanded] = useState(false)
@@ -178,8 +186,9 @@ function ReviseForm({ orderId, onTransition, onBack }: { orderId: string; onTran
   )
 }
 
-function DecisionStep({ orderId, media, onTransition }: { orderId: string; media: OrderMedia[]; onTransition: () => void }) {
+function DecisionStep({ orderId, media, history, onTransition }: { orderId: string; media: OrderMedia[]; history: StageTransitionEvent[]; onTransition: () => void }) {
   const [decision, setDecision] = useState<Decision>(null)
+  const revisionUsed = hasUsedFirstPieceRevision(history)
 
   if (decision === 'approve') return <ApproveForm orderId={orderId} onTransition={onTransition} onBack={() => setDecision(null)} />
   if (decision === 'revise')  return <ReviseForm  orderId={orderId} onTransition={onTransition} onBack={() => setDecision(null)} />
@@ -204,18 +213,30 @@ function DecisionStep({ orderId, media, onTransition }: { orderId: string; media
           </div>
         </button>
 
-        <button
-          onClick={() => setDecision('revise')}
-          className="w-full flex items-center gap-3 p-3.5 rounded-xl border border-amber-200 bg-amber-50/30 hover:bg-amber-50 hover:border-amber-300 transition-all text-left group"
-        >
-          <div className="w-8 h-8 rounded-xl bg-amber-100 flex items-center justify-center shrink-0 group-hover:bg-amber-200 transition-colors">
-            <AlertTriangle size={15} className="text-amber-600" />
+        {revisionUsed ? (
+          <div className="w-full flex items-center gap-3 p-3.5 rounded-xl border border-slate-200 bg-slate-50 text-left opacity-60 cursor-not-allowed">
+            <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
+              <AlertTriangle size={15} className="text-slate-400" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-gray-500">Request Changes</p>
+              <p className="text-[11px] text-gray-400 mt-0.5">You have already used your one revision. Please approve or close the project.</p>
+            </div>
           </div>
-          <div>
-            <p className="text-xs font-semibold text-gray-900">Request Changes</p>
-            <p className="text-[11px] text-gray-500 mt-0.5">Something needs fixing before the sample ships.</p>
-          </div>
-        </button>
+        ) : (
+          <button
+            onClick={() => setDecision('revise')}
+            className="w-full flex items-center gap-3 p-3.5 rounded-xl border border-amber-200 bg-amber-50/30 hover:bg-amber-50 hover:border-amber-300 transition-all text-left group"
+          >
+            <div className="w-8 h-8 rounded-xl bg-amber-100 flex items-center justify-center shrink-0 group-hover:bg-amber-200 transition-colors">
+              <AlertTriangle size={15} className="text-amber-600" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-gray-900">Request Changes</p>
+              <p className="text-[11px] text-gray-500 mt-0.5">Something needs fixing before the sample ships.</p>
+            </div>
+          </button>
+        )}
       </div>
     </div>
   )
@@ -225,7 +246,7 @@ export function isFirstPieceReviewStage(stage: ProductionStage | null): boolean 
   return stage === 'FIRST_PIECE_REVIEW'
 }
 
-export default function FirstPieceReviewPanel({ orderId, stage, media, onTransition }: Props) {
+export default function FirstPieceReviewPanel({ orderId, stage, media, history, onTransition }: Props) {
   if (stage !== 'FIRST_PIECE_REVIEW') return null
 
   return (
@@ -239,7 +260,7 @@ export default function FirstPieceReviewPanel({ orderId, stage, media, onTransit
           Your Decision
         </span>
       </div>
-      <DecisionStep orderId={orderId} media={media} onTransition={onTransition} />
+      <DecisionStep orderId={orderId} media={media} history={history} onTransition={onTransition} />
     </div>
   )
 }

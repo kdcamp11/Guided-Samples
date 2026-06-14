@@ -39,6 +39,28 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, errors: ['Transition not permitted'] }, { status: 403 })
   }
 
+  // Clients may only request one revision on the first-piece photo review.
+  // Check the audit log for any prior FIRST_PIECE_REVIEW → FIRST_PIECE_IN_PRODUCTION event.
+  if (fromStage === 'FIRST_PIECE_REVIEW' && to_stage === 'FIRST_PIECE_IN_PRODUCTION') {
+    const { data: events } = await supabase
+      .from('production_order_events')
+      .select('metadata')
+      .eq('production_order_id', order_id)
+      .eq('event_type', 'stage_transition')
+
+    const alreadyRevised = (events ?? []).some((e: { metadata: unknown }) => {
+      const m = e.metadata as Record<string, unknown>
+      return m.from_stage === 'FIRST_PIECE_REVIEW' && m.to_stage === 'FIRST_PIECE_IN_PRODUCTION'
+    })
+
+    if (alreadyRevised) {
+      return NextResponse.json(
+        { ok: false, errors: ['You have already requested one change on this sample. Please approve or close the project.'] },
+        { status: 403 },
+      )
+    }
+  }
+
   const result = await transitionStage(order_id, to_stage, metadata, session.id, supabase)
   if (!result.ok) {
     const messages = result.errors.map(e => e.message)
