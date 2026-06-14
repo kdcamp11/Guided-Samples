@@ -1,8 +1,22 @@
 'use client'
 
 import { useState } from 'react'
-import { ArrowLeft, Send, Download, CheckCircle2, Loader2, Package, AlertCircle, Image as ImageIcon } from 'lucide-react'
+import { ArrowLeft, Send, Download, CheckCircle2, Loader2, Package, AlertCircle, Image as ImageIcon, CreditCard, ShieldCheck } from 'lucide-react'
 import { AppState } from '@/app/page'
+
+const ACTIVATION_FEE = 100
+const GARMENT_PRICES: Record<string, number> = {
+  'T-Shirt': 25,
+  'Hoodie': 45,
+  'Crewneck': 40,
+  'Zip Hoodie': 50,
+  'Track Jacket': 35,
+  'Windbreaker': 40,
+  'Basketball Jersey': 40,
+  'Sweatpants': 35,
+  'Track Pants': 35,
+  'Basketball Shorts': 25,
+}
 
 interface Props {
   state: AppState
@@ -25,6 +39,37 @@ export default function Phase6Production({ state, techPack, onBack }: Props) {
   const [notes, setNotes] = useState('')
   const [sendState, setSendState] = useState<SendState>('idle')
   const [errorMsg, setErrorMsg] = useState('')
+  const [checkoutLoading, setCheckoutLoading] = useState(false)
+
+  const garmentType = techPack.styleInfo.garmentType || state.garment?.type || 'T-Shirt'
+  const garmentPrice = GARMENT_PRICES[garmentType] ?? 35
+  const orderTotal = ACTIVATION_FEE + garmentPrice
+
+  const handleCheckout = async () => {
+    setCheckoutLoading(true)
+    try {
+      const res = await fetch('/api/create-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          garmentType,
+          styleName: techPack.styleInfo.styleName,
+          supplierEmail,
+          supplierName,
+          notes,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error ?? 'Checkout failed')
+      window.location.href = data.url
+    } catch (e) {
+      console.error(e)
+      setErrorMsg(e instanceof Error ? e.message : 'Payment setup failed. Please try again.')
+      setSendState('error')
+    } finally {
+      setCheckoutLoading(false)
+    }
+  }
 
   const logo = state.logo?.dataUrl
   const garment = state.garment?.dataUrl
@@ -233,18 +278,52 @@ export default function Phase6Production({ state, techPack, onBack }: Props) {
             </div>
           )}
 
+          {/* Order Summary */}
+          <div className="card border-brand-green/20">
+            <p className="text-xs font-medium text-gray-600 mb-3">Order Summary</p>
+            <div className="space-y-2 text-xs">
+              <div className="flex justify-between text-gray-600">
+                <span>Order Activation Fee</span>
+                <span>${ACTIVATION_FEE}.00</span>
+              </div>
+              <div className="flex justify-between text-gray-600">
+                <span>{garmentType} Sample</span>
+                <span>${garmentPrice}.00</span>
+              </div>
+              <div className="border-t border-slate-100 pt-2 flex justify-between font-semibold text-gray-900 text-sm">
+                <span>Total</span>
+                <span>${orderTotal}.00</span>
+              </div>
+            </div>
+            <p className="text-[10px] text-gray-400 mt-2">Single sample · USD · One-time payment</p>
+          </div>
+
+          {/* Pay & Send */}
+          <button
+            onClick={handleCheckout}
+            disabled={checkoutLoading}
+            className="btn-primary w-full flex items-center justify-center gap-2 py-3"
+          >
+            {checkoutLoading ? <Loader2 size={14} className="animate-spin"/> : <CreditCard size={14}/>}
+            {checkoutLoading ? 'Redirecting…' : 'Pay & Send to Production'}
+          </button>
+          <div className="flex items-center justify-center gap-1.5 text-[10px] text-gray-400">
+            <ShieldCheck size={11}/>
+            Secure checkout via Stripe
+          </div>
+
           <div className="card">
             <p className="text-xs font-medium text-gray-600 mb-3">Send Options</p>
             <div className="space-y-2">
               <button
                 onClick={handleSend}
                 disabled={!supplierEmail.trim() || sendState === 'sending'}
-                className="btn-primary w-full flex items-center justify-center gap-2"
+                className="btn-secondary w-full flex items-center justify-center gap-2"
               >
                 {sendState === 'sending' ? <Loader2 size={14} className="animate-spin"/> : <Send size={14}/>}
                 {sendState === 'sending' ? 'Sending…' : 'Email to Supplier'}
               </button>
-              <p className="text-[10px] text-gray-400 text-center">Requires RESEND_API_KEY — auto-downloads if not configured</p>
+              <p className="text-[10px] text-gray-400 text-center">Send assets without payment (testing)</p>
             </div>
           </div>
 
