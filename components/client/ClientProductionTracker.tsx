@@ -6,9 +6,11 @@ import { STAGE_LABELS, stageProgress, type ProductionStage } from '@/types/produ
 import { clientCanAct } from '@/types/client'
 import { listClientOrders } from '@/lib/clientPortal'
 import { useRealtimeOrderList } from '@/lib/useRealtimeOrder'
+import NotificationBell from '@/components/NotificationBell'
 import type { ProductionOrder } from '@/types/production'
 
 interface Props {
+  userEmail:     string
   onSelectOrder: (orderId: string) => void
   onSignOut:     () => void
 }
@@ -98,7 +100,7 @@ function OrderCard({ order, onSelect }: { order: ProductionOrder; onSelect: () =
   )
 }
 
-export default function ClientProductionTracker({ onSelectOrder, onSignOut }: Props) {
+export default function ClientProductionTracker({ userEmail, onSelectOrder, onSignOut }: Props) {
   const [orders,  setOrders]  = useState<ProductionOrder[]>([])
   const [loading, setLoading] = useState(true)
   const [error,   setError]   = useState('')
@@ -134,6 +136,7 @@ export default function ClientProductionTracker({ onSelectOrder, onSignOut }: Pr
           <p className="text-sm font-bold text-gray-900">Production Tracker</p>
         </div>
         <div className="flex items-center gap-2">
+          <NotificationBell userEmail={userEmail} />
           <button onClick={load} className="p-1.5 rounded-lg hover:bg-slate-100 text-gray-400 transition-colors">
             <RefreshCw size={13} />
           </button>

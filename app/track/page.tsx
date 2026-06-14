@@ -52,6 +52,7 @@ export default function TrackPage() {
 
   return (
     <ClientProductionTracker
+      userEmail={user.email}
       onSelectOrder={setSelectedOrderId}
       onSignOut={signOut}
     />

@@ -6,6 +6,7 @@ import { STAGE_LABELS, stageProgress, type ProductionStage } from '@/types/produ
 import { supplierCanAct, supplierIsWaiting } from '@/types/supplier'
 import { listSupplierOrders } from '@/lib/supplierPortal'
 import { useRealtimeOrderList } from '@/lib/useRealtimeOrder'
+import NotificationBell from '@/components/NotificationBell'
 import type { SupplierOrderSummary } from '@/types/supplier'
 
 interface Props {
@@ -149,6 +150,7 @@ export default function SupplierDashboard({ supplierEmail, supplierName, onSelec
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <NotificationBell userEmail={supplierEmail} />
           <button onClick={load} className="p-1.5 rounded-lg hover:bg-slate-100 text-gray-400 transition-colors">
             <RefreshCw size={13} />
           </button>

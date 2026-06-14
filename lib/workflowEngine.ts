@@ -168,7 +168,7 @@ export async function transitionStage(
   // ── 1. Fetch current order ──────────────────────────────────────────────────
   const { data: row, error: fetchErr } = await supabase
     .from('production_orders')
-    .select('id, production_stage, user_id, design_order_id')
+    .select('id, production_stage, user_id, design_order_id, supplier_email, user_email')
     .eq('id', orderId)
     .single()
 
@@ -243,6 +243,16 @@ export async function transitionStage(
     // Log but do not fail — the stage update succeeded
     console.error('workflowEngine: audit event write failed', eventErr)
   }
+
+  // ── 6. Fire notifications (non-blocking) ────────────────────────────────────
+  const { triggerNotifications } = await import('@/lib/notifications')
+  triggerNotifications({
+    orderId,
+    toStage,
+    metadata,
+    clientEmail:   (row as Record<string, unknown>).user_email as string | null,
+    supplierEmail: (row as Record<string, unknown>).supplier_email as string | null,
+  }).catch(err => console.error('workflowEngine: notification trigger failed', err))
 
   // Map updated DB row to ProductionOrder shape (reuse existing mapper pattern)
   const order = rowToProductionOrder(updatedRow as Record<string, unknown>)
