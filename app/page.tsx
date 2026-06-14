@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react'
 import { AuthProvider, useAuth } from '@/lib/auth'
 import { saveProject, saveTechPack } from '@/lib/projects'
+import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import SignIn from '@/components/SignIn'
 import ProjectsDashboard from '@/components/ProjectsDashboard'
@@ -71,6 +72,31 @@ function App() {
       autoSave(next)
       return next
     })
+  }
+
+  // Persist the current design for the signed-in user and return its project id.
+  // Reads the live session so it works immediately after sign-in at checkout,
+  // before the `user` state from context has re-rendered.
+  const ensureProject = async (): Promise<string | null> => {
+    const sb = createClient()
+    if (!sb) return null
+    const { data: { session } } = await sb.auth.getSession()
+    const uid = session?.user?.id
+    if (!uid) return null
+
+    const id = await saveProject(uid, state, projectIdRef.current)
+    if (id) {
+      projectIdRef.current = id
+      if (techPack) {
+        await saveTechPack(id, {
+          style_info: techPack.styleInfo,
+          measurements: techPack.measurements,
+          pantones: techPack.pantones,
+          placements: techPack.placements,
+        })
+      }
+    }
+    return id
   }
 
   const goToPhase = (phase: number) => {
@@ -216,6 +242,7 @@ function App() {
               techPack={techPack}
               onBack={() => goToPhase(5)}
               projectId={projectIdRef.current ?? null}
+              onEnsureProject={ensureProject}
             />
           )}
         </main>
