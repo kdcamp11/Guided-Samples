@@ -1,12 +1,18 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { ArrowLeft, Package, RefreshCw, Loader2 } from 'lucide-react'
+import { ArrowLeft, RefreshCw, Loader2, Truck, Package, ChevronDown, ChevronUp } from 'lucide-react'
 import { useAuth } from '@/lib/auth'
-import { STAGE_LABELS, STAGE_DESCRIPTIONS, type ProductionStage } from '@/types/productionStages'
+import type { ProductionStage } from '@/types/productionStages'
 import { getClientOrder, getOrderMediaForClient, getStageHistory } from '@/lib/clientPortal'
 import { useRealtimeOrder } from '@/lib/useRealtimeOrder'
 import { useStageToasts, StageToastContainer } from '@/components/StageToast'
+import {
+  CLIENT_STAGE_LABELS,
+  CLIENT_STAGE_MESSAGES,
+  STAGE_RESPONSIBLE,
+  RESPONSIBLE_LABELS,
+} from '@/lib/clientStagePresentation'
 import type { ProductionOrder } from '@/types/production'
 import type { OrderMedia } from '@/types/supplier'
 import type { StageTransitionEvent } from '@/types/productionStages'
@@ -20,36 +26,159 @@ interface Props {
   onBack:  () => void
 }
 
-function StageBadge({ stage }: { stage: ProductionStage | null }) {
-  if (!stage) return null
-  const isDelivered  = stage === 'DELIVERED'
-  const isCancelled  = stage === 'CANCELLED'
-  const isRevision   = stage === 'REVISION_REQUIRED'
-  const needsAction  = !isDelivered && !isCancelled && !isRevision
-
-  return (
-    <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1 rounded-full ${
-      isDelivered ? 'bg-green-100 text-green-700' :
-      isCancelled ? 'bg-red-100 text-red-600' :
-      isRevision  ? 'bg-amber-100 text-amber-700' :
-      'bg-brand-green/10 text-brand-green'
-    }`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${
-        isDelivered ? 'bg-green-500' :
-        isCancelled ? 'bg-red-400' :
-        isRevision  ? 'bg-amber-500' :
-        needsAction ? 'bg-brand-green animate-pulse' :
-        'bg-brand-green'
-      }`} />
-      {STAGE_LABELS[stage]}
-    </span>
-  )
-}
-
 function formatDate(iso: string | null) {
   if (!iso) return '—'
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 }
+
+// ─── Hero status card ─────────────────────────────────────────────────────────
+
+function StatusHero({ order }: { order: ProductionOrder }) {
+  const stage = order.production_stage
+  if (!stage) return null
+
+  const isCancelled  = stage === 'CANCELLED'
+  const isDelivered  = stage === 'DELIVERED'
+  const isRevision   = stage === 'REVISION_REQUIRED'
+  const responsible  = STAGE_RESPONSIBLE[stage]
+  const resp         = RESPONSIBLE_LABELS[responsible]
+  const label        = CLIENT_STAGE_LABELS[stage]
+  const message      = CLIENT_STAGE_MESSAGES[stage]
+
+  return (
+    <div className={`rounded-2xl p-5 mb-5 ${
+      isDelivered  ? 'bg-green-50 border border-green-100' :
+      isCancelled  ? 'bg-red-50 border border-red-100' :
+      isRevision   ? 'bg-amber-50 border border-amber-100' :
+      responsible === 'you'
+        ? 'bg-amber-50 border border-amber-100'
+        : 'bg-brand-green/5 border border-brand-green/15'
+    }`}>
+      {/* Who's responsible */}
+      <div className="flex items-center gap-1.5 mb-3">
+        <span className={`w-2 h-2 rounded-full shrink-0 ${resp.dot}`} />
+        <p className={`text-[11px] font-semibold uppercase tracking-wider ${resp.color}`}>
+          {resp.label}
+        </p>
+      </div>
+
+      {/* Current status */}
+      <p className={`text-xl font-bold leading-tight mb-1 ${
+        isCancelled ? 'text-red-700' :
+        isRevision  ? 'text-amber-800' :
+        responsible === 'you' ? 'text-amber-900' :
+        'text-gray-900'
+      }`}>
+        {label}
+      </p>
+      <p className={`text-sm leading-relaxed ${
+        isCancelled ? 'text-red-600' :
+        isRevision  ? 'text-amber-700' :
+        'text-gray-600'
+      }`}>
+        {message}
+      </p>
+
+      {/* Revision notes */}
+      {isRevision && order.revision_notes && (
+        <div className="mt-3 p-3 bg-white/70 rounded-lg border border-amber-100">
+          <p className="text-[11px] font-semibold text-amber-700 mb-1">Your Requested Changes</p>
+          <p className="text-xs text-amber-800 leading-relaxed">{order.revision_notes}</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Tracking card ─────────────────────────────────────────────────────────────
+
+function TrackingCard({ order }: { order: ProductionOrder }) {
+  if (!order.tracking_number && !order.carrier) return null
+  return (
+    <div className="card mb-4">
+      <div className="flex items-center gap-2 mb-3">
+        <Truck size={14} className="text-brand-green" />
+        <p className="text-xs font-semibold text-gray-900">Tracking</p>
+      </div>
+      <div className="space-y-2 text-xs">
+        {order.carrier && (
+          <div className="flex justify-between">
+            <span className="text-gray-500">Carrier</span>
+            <span className="text-gray-800 font-medium">{order.carrier}</span>
+          </div>
+        )}
+        {order.tracking_number && (
+          <div className="flex justify-between">
+            <span className="text-gray-500">Tracking Number</span>
+            <span className="text-gray-800 font-mono text-[11px]">{order.tracking_number}</span>
+          </div>
+        )}
+        {order.sample_shipped_at && (
+          <div className="flex justify-between">
+            <span className="text-gray-500">Sample Shipped</span>
+            <span className="text-gray-700">{formatDate(order.sample_shipped_at)}</span>
+          </div>
+        )}
+        {order.shipped_at && (
+          <div className="flex justify-between">
+            <span className="text-gray-500">Order Shipped</span>
+            <span className="text-gray-700">{formatDate(order.shipped_at)}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── Collapsible order details ─────────────────────────────────────────────────
+
+function OrderDetailsCollapsible({ order }: { order: ProductionOrder }) {
+  const [open, setOpen] = useState(false)
+  const si = order.tech_pack_snapshot?.style_info
+  if (!si) return null
+
+  const details = [
+    ['Style Name',   si.styleName],
+    ['SKU',          si.sku],
+    ['Garment Type', si.garmentType],
+    ['Gender',       si.gender],
+    ['Size Range',   si.sizeRange],
+    ['Season',       si.season],
+    ['Revision',     si.revision],
+  ].filter(([, v]) => v) as [string, string][]
+
+  if (details.length === 0) return null
+
+  return (
+    <div className="card mb-4">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between"
+      >
+        <div className="flex items-center gap-2">
+          <Package size={13} className="text-gray-400" />
+          <p className="text-xs font-semibold text-gray-700">Order Details</p>
+        </div>
+        {open
+          ? <ChevronUp size={13} className="text-gray-400" />
+          : <ChevronDown size={13} className="text-gray-400" />
+        }
+      </button>
+      {open && (
+        <div className="mt-3 pt-3 border-t border-slate-100 grid grid-cols-2 gap-x-6 gap-y-2 text-xs">
+          {details.map(([k, v]) => (
+            <div key={k} className="flex justify-between gap-2">
+              <span className="text-gray-400 shrink-0">{k}</span>
+              <span className="text-gray-700 text-right">{v}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
 
 export default function ClientOrderDetail({ orderId, onBack }: Props) {
   const { user }                        = useAuth()
@@ -81,7 +210,6 @@ export default function ClientOrderDetail({ orderId, onBack }: Props) {
 
   useEffect(() => { load() }, [load])
 
-  // Real-time sync: reloads when supplier acts and shows a notification
   useRealtimeOrder({
     orderId,
     onOrderChange: load,
@@ -109,141 +237,94 @@ export default function ClientOrderDetail({ orderId, onBack }: Props) {
     )
   }
 
-  const tp = order.tech_pack_snapshot
-  const si = tp?.style_info
+  const si    = order.tech_pack_snapshot?.style_info
+  const stage = order.production_stage
+
+  // Show tracking when the sample or order is in transit or delivered
+  const showTracking = !!(
+    order.tracking_number ||
+    order.carrier ||
+    order.sample_shipped_at ||
+    order.shipped_at
+  )
+
+  // Show media only when it's relevant (after first piece is done)
+  const showMedia = media.length > 0 && stage !== 'PRODUCTION_FILES_RECEIVED'
 
   return (
-    <div className="p-6 w-full">
+    <div className="min-h-screen bg-gray-50">
       <StageToastContainer toasts={toasts} onDismiss={dismiss} />
 
-      <div className="mb-5 flex items-start justify-between">
-        <div>
-          <button onClick={onBack} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-700 transition-colors mb-2">
-            <ArrowLeft size={13} /> All orders
-          </button>
-          <h1 className="text-xl font-bold text-gray-900">{si?.styleName ?? 'Untitled'}</h1>
-          <div className="flex items-center gap-3 mt-1.5">
-            <StageBadge stage={order.production_stage} />
-            {si?.garmentType && <span className="text-xs text-gray-400">{si.garmentType}</span>}
-          </div>
-        </div>
+      {/* Sticky header */}
+      <header className="sticky top-0 z-10 bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between">
+        <button
+          onClick={onBack}
+          className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-900 transition-colors"
+        >
+          <ArrowLeft size={13} /> All Orders
+        </button>
+        <p className="text-xs font-semibold text-gray-700 absolute left-1/2 -translate-x-1/2">
+          {si?.styleName ?? 'Order'}
+        </p>
         <button
           onClick={load}
-          className="p-2 rounded-lg hover:bg-slate-100 text-gray-400 hover:text-gray-700 transition-colors"
-          title="Refresh"
+          className="p-1.5 rounded-lg hover:bg-slate-100 text-gray-400 hover:text-gray-700 transition-colors"
         >
-          <RefreshCw size={14} />
+          <RefreshCw size={13} />
         </button>
-      </div>
+      </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-5">
-        {/* Left column */}
-        <div className="space-y-4">
+      <div className="max-w-2xl mx-auto px-4 py-6">
 
-          {/* Current stage info */}
-          {order.production_stage && (
-            <div className={`card ${
-              order.production_stage === 'REVISION_REQUIRED'
-                ? 'border-amber-200 bg-amber-50/40'
-                : 'border-brand-green/20 bg-brand-green/5'
-            }`}>
-              <p className={`text-xs font-semibold mb-1 ${
-                order.production_stage === 'REVISION_REQUIRED' ? 'text-amber-700' : 'text-brand-green'
-              }`}>
-                {STAGE_LABELS[order.production_stage]}
-              </p>
-              <p className="text-xs text-gray-600 leading-relaxed">
-                {STAGE_DESCRIPTIONS[order.production_stage]}
-              </p>
-              {order.revision_notes && order.production_stage === 'REVISION_REQUIRED' && (
-                <div className="mt-3 p-3 bg-white border border-amber-100 rounded-lg">
-                  <p className="text-[11px] font-semibold text-amber-700 mb-1">Your Revision Notes</p>
-                  <p className="text-xs text-amber-800 leading-relaxed">{order.revision_notes}</p>
-                </div>
-              )}
-            </div>
-          )}
+        {/* Hero status */}
+        <StatusHero order={order} />
 
-          {/* Media gallery */}
-          <MediaGallery media={media} />
+        {/* Two-column on large screens */}
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-5">
 
-          {/* Tech pack snapshot */}
-          {si && (
-            <div className="card">
-              <div className="flex items-center gap-2 mb-4">
-                <Package size={14} className="text-brand-green" />
-                <p className="text-xs font-semibold text-gray-900">Order Details</p>
-                <span className="text-[10px] text-gray-400 ml-auto">Locked at production start</span>
+          {/* Left: actions + media + collapsible details */}
+          <div className="space-y-4 order-2 lg:order-1">
+
+            {/* Sample evaluation (only during those stages) */}
+            {isSampleEvaluationStage(stage) && (
+              <SampleEvaluationPanel
+                orderId={orderId}
+                stage={stage!}
+                media={media}
+                onTransition={load}
+              />
+            )}
+
+            {/* Other client actions (non-evaluation) */}
+            {!isSampleEvaluationStage(stage) && (
+              <ClientDecisionPanel
+                orderId={orderId}
+                currentStage={stage}
+                onTransition={load}
+              />
+            )}
+
+            {/* Tracking (surface prominently when available) */}
+            {showTracking && <TrackingCard order={order} />}
+
+            {/* Production photos — only when visible to client */}
+            {showMedia && (
+              <div>
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-2 px-0.5">
+                  Production Photos
+                </p>
+                <MediaGallery media={media} />
               </div>
-              <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-xs">
-                {([
-                  ['Style Name',   si.styleName],
-                  ['SKU',          si.sku],
-                  ['Garment Type', si.garmentType],
-                  ['Gender',       si.gender],
-                  ['Size Range',   si.sizeRange],
-                  ['Season',       si.season],
-                ] as [string, string | undefined][]).filter(([, v]) => v).map(([k, v]) => (
-                  <div key={k} className="flex justify-between gap-2">
-                    <span className="text-gray-400 shrink-0">{k}</span>
-                    <span className="text-gray-700 text-right">{v}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+            )}
 
-          {/* Logistics */}
-          {(order.tracking_number || order.carrier || order.sample_shipped_at || order.shipped_at) && (
-            <div className="card">
-              <p className="text-xs font-semibold text-gray-900 mb-3">Shipping & Logistics</p>
-              <div className="space-y-2 text-xs">
-                {order.tracking_number && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Tracking Number</span>
-                    <span className="text-gray-700 font-mono">{order.tracking_number}</span>
-                  </div>
-                )}
-                {order.carrier && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Carrier</span>
-                    <span className="text-gray-700">{order.carrier}</span>
-                  </div>
-                )}
-                {order.sample_shipped_at && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Sample Shipped</span>
-                    <span className="text-gray-700">{formatDate(order.sample_shipped_at)}</span>
-                  </div>
-                )}
-                {order.shipped_at && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Bulk Shipped</span>
-                    <span className="text-gray-700">{formatDate(order.shipped_at)}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
+            {/* Order details — collapsed by default to reduce noise */}
+            <OrderDetailsCollapsible order={order} />
+          </div>
 
-        {/* Right column */}
-        <div className="space-y-4">
-          <ClientTimeline currentStage={order.production_stage} history={history} />
-          {isSampleEvaluationStage(order.production_stage) ? (
-            <SampleEvaluationPanel
-              orderId={orderId}
-              stage={order.production_stage!}
-              media={media}
-              onTransition={load}
-            />
-          ) : (
-            <ClientDecisionPanel
-              orderId={orderId}
-              currentStage={order.production_stage}
-              onTransition={load}
-            />
-          )}
+          {/* Right: timeline */}
+          <div className="order-1 lg:order-2">
+            <ClientTimeline currentStage={stage} history={history} />
+          </div>
         </div>
       </div>
     </div>
