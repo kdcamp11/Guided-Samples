@@ -326,7 +326,17 @@ function buildSpecSheet(tp: TechPackData, notes: string): string {
     `Designer: ${si.designer ?? ''}   Date: ${si.dateCreated ?? ''}`,
     '',
   ]
-  if (notes) lines.push('NOTES', notes, '')
+  if (si.fabricContent || si.fabricWeight || si.construction) {
+    lines.push('FABRIC & MATERIAL')
+    if (si.fabricContent) lines.push(`  Content: ${si.fabricContent}`)
+    if (si.fabricWeight) lines.push(`  Weight: ${si.fabricWeight}`)
+    if (si.construction) lines.push(`  Construction: ${si.construction}`)
+    if (si.fabricFinish) lines.push(`  Finish: ${si.fabricFinish}`)
+    if (si.careInstructions) lines.push(`  Care: ${si.careInstructions}`)
+    lines.push('')
+  }
+  const supplierNotes = notes || si.supplierNotes
+  if (supplierNotes) lines.push('NOTES TO SUPPLIER', supplierNotes, '')
   lines.push('PANTONES')
   tp.pantones.forEach(p => lines.push(`  ${p.color}  ${p.name}`))
   lines.push('')

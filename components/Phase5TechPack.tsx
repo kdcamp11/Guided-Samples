@@ -173,6 +173,9 @@ type StyleInfo = {
   collection: string; brandName: string; clientName: string
   dateCreated: string; designer: string; garmentType: string
   gender: string; ageCategory: string; fitDescription: string; sizeRange: string
+  fabricContent: string; fabricWeight: string; construction: string
+  fabricFinish: string; careInstructions: string
+  supplierNotes: string
 }
 
 const GENDERS = ['Unisex', "Men's", "Women's", 'Kids']
@@ -206,6 +209,12 @@ export default function Phase5TechPack({ state, onBack, onSendToProduction }: Pr
     ageCategory: 'Adult',
     fitDescription: 'Oversized',
     sizeRange: 'XS–3XL',
+    fabricContent: '',
+    fabricWeight: '',
+    construction: '',
+    fabricFinish: '',
+    careInstructions: '',
+    supplierNotes: '',
   })
 
   const [measurements, setMeasurements] = useState<Record<string, number[]>>(
@@ -388,9 +397,11 @@ export default function Phase5TechPack({ state, onBack, onSendToProduction }: Pr
 
   const sectionComplete = (section: string) => {
     if (section === 'Style Information') return !!styleInfo.styleName && !!styleInfo.sku
+    if (section === 'Fabric & Material') return !!styleInfo.fabricContent
     if (section === 'Measurements') return Object.keys(measurements).length > 0
     if (section === 'Pantones') return pantones.length > 0
     if (section === 'Graphic Placement') return placements.length > 0
+    if (section === 'Notes & Finishes') return !!styleInfo.supplierNotes
     return true
   }
 
@@ -476,6 +487,43 @@ export default function Phase5TechPack({ state, onBack, onSendToProduction }: Pr
               <SelectField label="Age Category" value={styleInfo.ageCategory} onChange={v => set('ageCategory', v)} options={AGE_CATEGORIES}/>
               <SelectField label="Size Range"   value={styleInfo.sizeRange}   onChange={v => set('sizeRange', v)}   options={SIZE_RANGES}/>
             </div>
+          </div>
+
+          {/* Fabric & Material */}
+          <div className="card">
+            <p className="text-xs font-semibold text-gray-900 mb-4">Fabric &amp; Material</p>
+            <div className="space-y-3">
+              {([
+                ['Fabric Content',     'fabricContent',     'e.g. 80% Cotton, 20% Polyester'],
+                ['Fabric Weight (GSM)','fabricWeight',      'e.g. 320 GSM'],
+                ['Construction',       'construction',      'e.g. French Terry, Fleece, Jersey'],
+                ['Fabric Finish',      'fabricFinish',      'e.g. Enzyme Wash, Garment Dye, Raw'],
+                ['Care Instructions',  'careInstructions',  'e.g. Cold wash, tumble dry low'],
+              ] as [string, keyof StyleInfo, string][]).map(([label, key, placeholder]) => (
+                <div key={key}>
+                  <label className="text-[11px] text-gray-500 mb-1 block">{label}</label>
+                  <input
+                    type="text"
+                    className="input-field text-xs py-2"
+                    value={styleInfo[key]}
+                    onChange={e => set(key, e.target.value)}
+                    placeholder={placeholder}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Supplier Notes */}
+          <div className="card">
+            <p className="text-xs font-semibold text-gray-900 mb-3">Notes to Supplier</p>
+            <textarea
+              className="w-full text-xs rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-gray-700 focus:outline-none focus:border-brand-green resize-none"
+              rows={5}
+              placeholder="Special instructions, timeline requirements, quality standards, packaging notes, reference samples…"
+              value={styleInfo.supplierNotes}
+              onChange={e => set('supplierNotes', e.target.value)}
+            />
           </div>
         </div>
 
