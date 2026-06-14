@@ -28,6 +28,7 @@ export const PRODUCTION_STAGES = [
   'DELIVERED',
   'CANCELLED',
   'AWAITING_FIRST_PIECE',
+  'AWAITING_SAMPLE_SHIPMENT',
   'CLOSED_SAMPLE_ONLY',
   'AWAITING_PRODUCTION_DEPOSIT',
   'AWAITING_FINAL_PAYMENT',
@@ -53,6 +54,7 @@ export const STAGE_LABELS: Record<ProductionStage, string> = {
   DELIVERED:                    'Delivered',
   CANCELLED:                    'Cancelled',
   AWAITING_FIRST_PIECE:         'Awaiting First Piece',
+  AWAITING_SAMPLE_SHIPMENT:     'Awaiting Sample Shipment',
   CLOSED_SAMPLE_ONLY:           'Sample Only — Closed',
   AWAITING_PRODUCTION_DEPOSIT:  'Awaiting Production Deposit',
   AWAITING_FINAL_PAYMENT:       'Awaiting Final Payment',
@@ -90,6 +92,8 @@ export const STAGE_DESCRIPTIONS: Record<ProductionStage, string> = {
     'Production order has been cancelled.',
   AWAITING_FIRST_PIECE:
     'Waiting for the factory to produce the first piece sample.',
+  AWAITING_SAMPLE_SHIPMENT:
+    'First piece approved. Factory is preparing to ship the physical sample.',
   CLOSED_SAMPLE_ONLY:
     'Client opted not to proceed to bulk production after sample review.',
   AWAITING_PRODUCTION_DEPOSIT:
@@ -120,8 +124,9 @@ export const CANCELLABLE_STAGES = new Set<ProductionStage>([
 export const TRANSITION_GRAPH: Record<ProductionStage, ProductionStage[]> = {
   PRODUCTION_FILES_RECEIVED:    ['FIRST_PIECE_IN_PRODUCTION', 'CANCELLED'],
   FIRST_PIECE_IN_PRODUCTION:    ['FIRST_PIECE_REVIEW', 'CANCELLED'],
-  FIRST_PIECE_REVIEW:           ['SAMPLE_SHIPPED', 'FIRST_PIECE_IN_PRODUCTION', 'CANCELLED',
-                                  'CLOSED_SAMPLE_ONLY', 'AWAITING_PRODUCTION_DEPOSIT'],
+  FIRST_PIECE_REVIEW:           ['AWAITING_SAMPLE_SHIPMENT', 'FIRST_PIECE_IN_PRODUCTION',
+                                  'CANCELLED', 'CLOSED_SAMPLE_ONLY'],
+  AWAITING_SAMPLE_SHIPMENT:     ['SAMPLE_SHIPPED', 'CANCELLED'],
   SAMPLE_SHIPPED:               ['SAMPLE_DELIVERED'],
   SAMPLE_DELIVERED:             ['CLIENT_SAMPLE_EVALUATION'],
   CLIENT_SAMPLE_EVALUATION:     ['BULK_PRODUCTION', 'REVISION_REQUIRED', 'CANCELLED'],
@@ -186,6 +191,7 @@ export const HAPPY_PATH_SEQUENCE: ProductionStage[] = [
   'PRODUCTION_FILES_RECEIVED',
   'FIRST_PIECE_IN_PRODUCTION',
   'FIRST_PIECE_REVIEW',
+  'AWAITING_SAMPLE_SHIPMENT',
   'SAMPLE_SHIPPED',
   'SAMPLE_DELIVERED',
   'CLIENT_SAMPLE_EVALUATION',
