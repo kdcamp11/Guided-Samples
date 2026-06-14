@@ -142,9 +142,17 @@ export async function adminTransition(
   toStage:  ProductionStage,
   metadata: Record<string, unknown> = {},
 ): Promise<{ ok: boolean; error?: string }> {
+  const sb = createClient()
+  const token = sb
+    ? (await sb.auth.getSession()).data.session?.access_token
+    : null
+
   const res = await fetch('/api/admin/transition', {
     method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body:    JSON.stringify({ order_id: orderId, to_stage: toStage, metadata }),
   })
   return res.json()

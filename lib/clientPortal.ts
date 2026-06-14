@@ -54,9 +54,17 @@ export async function getOrderMediaForClient(orderId: string): Promise<OrderMedi
 export async function clientTransition(
   req: ClientTransitionRequest,
 ): Promise<ClientTransitionResponse> {
+  const client = supabase()
+  const token = client
+    ? (await client.auth.getSession()).data.session?.access_token
+    : null
+
   const res = await fetch('/api/client/transition', {
     method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body:    JSON.stringify(req),
   })
   return res.json() as Promise<ClientTransitionResponse>
