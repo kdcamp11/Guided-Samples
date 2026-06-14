@@ -9,7 +9,10 @@ import { createClient } from '@supabase/supabase-js'
 function createWebhookClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? ''
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? ''
-  if (!url || !key) return null
+  if (!url || !key) {
+    console.error('[stripe-webhook] Missing env vars:', { hasUrl: !!url, hasServiceKey: !!key })
+    return null
+  }
   return createClient(url, key, { auth: { persistSession: false } })
 }
 
@@ -76,7 +79,7 @@ async function handleSamplePayment(
     .eq('project_id', design_order_id)
     .single()
 
-  await sb.from('production_orders').insert({
+  const { error: insertError } = await sb.from('production_orders').insert({
     design_order_id,
     user_id,
     production_path: 'SAMPLE',
@@ -93,11 +96,17 @@ async function handleSamplePayment(
     tech_pack_snapshot: techPack ?? null,
     status: 'paid',
   })
+  if (insertError) {
+    console.error('[stripe-webhook] sample insert failed:', insertError)
+  } else {
+    console.log('[stripe-webhook] sample order created for user', user_id)
+  }
 
-  await sb
+  const { error: lockError } = await sb
     .from('projects')
     .update({ locked_at: new Date().toISOString() })
     .eq('id', design_order_id)
+  if (lockError) console.error('[stripe-webhook] project lock failed:', lockError)
 }
 
 async function handleDirectDeposit(
