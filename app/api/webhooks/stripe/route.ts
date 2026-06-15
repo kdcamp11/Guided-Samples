@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { createClient } from '@supabase/supabase-js'
+import { transitionStage } from '@/lib/workflowEngine'
+import type { ProductionStage } from '@/types/productionStages'
 
 // The webhook runs as trusted server code with no user session. It MUST use the
 // service-role key to bypass row-level security — the anon key would be blocked
@@ -87,9 +89,12 @@ async function handleSamplePayment(
     .eq('project_id', design_order_id)
     .single()
 
+  const userEmail = await lookupClientEmail(sb, user_id)
+
   const { error: insertError } = await sb.from('production_orders').insert({
     design_order_id,
     user_id,
+    user_email: userEmail,
     production_path: 'SAMPLE',
     production_stage: 'AWAITING_FIRST_PIECE',
     supplier_email: DEFAULT_SUPPLIER_EMAIL,
@@ -134,9 +139,12 @@ async function handleDirectDeposit(
     .eq('project_id', design_order_id)
     .single()
 
+  const userEmail = await lookupClientEmail(sb, user_id)
+
   const { error: insertError } = await sb.from('production_orders').insert({
     design_order_id,
     user_id,
+    user_email: userEmail,
     production_path: 'DIRECT',
     production_stage: 'BULK_PRODUCTION',
     supplier_email: DEFAULT_SUPPLIER_EMAIL,
@@ -165,6 +173,21 @@ async function handleDirectDeposit(
   if (lockError) console.error('[stripe-webhook] project lock failed:', lockError)
 }
 
+// Resolve a client's email from their user_id via the service-role auth admin API.
+async function lookupClientEmail(
+  sb: ReturnType<typeof createWebhookClient>,
+  userId: string | undefined,
+): Promise<string | null> {
+  if (!sb || !userId) return null
+  try {
+    const { data } = await sb.auth.admin.getUserById(userId)
+    return data.user?.email ?? null
+  } catch (e) {
+    console.error('[stripe-webhook] client email lookup failed:', e)
+    return null
+  }
+}
+
 async function handleProductionDeposit(
   session: Stripe.Checkout.Session,
   meta: Record<string, string>,
@@ -172,18 +195,30 @@ async function handleProductionDeposit(
   const sb = createWebhookClient()
   if (!sb) return
 
-  const { order_id } = meta
+  const { order_id, user_id } = meta
 
+  // Record the payment first, then advance the stage through the workflow
+  // engine so the transition is audited and notifications fire.
   await sb
     .from('production_orders')
     .update({
       deposit_paid_at: new Date().toISOString(),
       deposit_stripe_session_id: session.id,
       deposit_amount_cents: session.amount_total,
-      production_stage: 'BULK_PRODUCTION',
       status: 'in_production',
     })
     .eq('id', order_id)
+
+  const clientEmail = await lookupClientEmail(sb, user_id)
+  const result = await transitionStage(
+    order_id,
+    'BULK_PRODUCTION' as ProductionStage,
+    { trigger: 'production_deposit_paid' },
+    'stripe-webhook',
+    sb,
+    clientEmail,
+  )
+  if (!result.ok) console.error('[stripe-webhook] deposit transition failed:', result.errors, result.systemError)
 }
 
 async function handleFinalPayment(
@@ -193,7 +228,7 @@ async function handleFinalPayment(
   const sb = createWebhookClient()
   if (!sb) return
 
-  const { order_id } = meta
+  const { order_id, user_id } = meta
 
   await sb
     .from('production_orders')
@@ -201,9 +236,19 @@ async function handleFinalPayment(
       final_paid_at: new Date().toISOString(),
       final_stripe_session_id: session.id,
       final_amount_cents: session.amount_total,
-      production_stage: 'READY_TO_SHIP',
     })
     .eq('id', order_id)
+
+  const clientEmail = await lookupClientEmail(sb, user_id)
+  const result = await transitionStage(
+    order_id,
+    'READY_TO_SHIP' as ProductionStage,
+    { trigger: 'final_payment_paid' },
+    'stripe-webhook',
+    sb,
+    clientEmail,
+  )
+  if (!result.ok) console.error('[stripe-webhook] final payment transition failed:', result.errors, result.systemError)
 }
 
 async function handleLegacy(

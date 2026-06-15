@@ -11,6 +11,7 @@
  */
 
 import { createClient } from '@/lib/supabase'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import type { ProductionStage } from '@/types/productionStages'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -125,6 +126,12 @@ const TRANSITION_NOTIFICATIONS: Partial<Record<ProductionStage, NotificationSpec
     type:      'final_payment_due',
     title:     'Final Payment Required',
     body:      () => 'Your order passed quality check. Pay the remaining balance to authorize shipment.',
+  },
+  READY_TO_SHIP: {
+    recipient: 'supplier',
+    type:      'bulk_approved',
+    title:     'Final Payment Received — Ready to Ship',
+    body:      () => 'The client has paid the final balance. Ship the bulk order and upload tracking details.',
   },
   PACKING: {
     recipient: 'client',
@@ -263,13 +270,17 @@ export async function triggerNotifications(params: {
   metadata:       Record<string, unknown>
   clientEmail:    string | null
   supplierEmail:  string | null
+  // Server contexts (e.g. the Stripe webhook) inject an authenticated client;
+  // createClient() returns null outside the browser, which would silently drop
+  // in-app notification inserts.
+  client?:        SupabaseClient
 }): Promise<void> {
-  const { orderId, toStage, metadata, clientEmail, supplierEmail } = params
+  const { orderId, toStage, metadata, clientEmail, supplierEmail, client } = params
 
   const spec = TRANSITION_NOTIFICATIONS[toStage]
   if (!spec) return
 
-  const supabase = createClient()
+  const supabase = (client ?? createClient()) as ReturnType<typeof createClient>
   const body     = spec.body(metadata)
 
   const targets: Array<{ email: string; label: 'client' | 'supplier' }> = []

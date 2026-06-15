@@ -159,6 +159,9 @@ export async function transitionStage(
   // Server routes (no browser) inject an authenticated client; the browser
   // client returned by createClient() is null server-side.
   client?: SupabaseClient,
+  // production_orders has no user_email column, so callers that know the
+  // client's email (e.g. the Stripe webhook) can supply it for notifications.
+  clientEmailOverride?: string | null,
 ): Promise<TransitionResult> {
   const supabase = client ?? createClient()
   if (!supabase) {
@@ -254,8 +257,9 @@ export async function transitionStage(
     orderId,
     toStage,
     metadata,
-    clientEmail:   (row as Record<string, unknown>).user_email as string | null,
+    clientEmail:   clientEmailOverride ?? ((row as Record<string, unknown>).user_email as string | null),
     supplierEmail: (row as Record<string, unknown>).supplier_email as string | null,
+    client:        supabase as unknown as import('@supabase/supabase-js').SupabaseClient,
   }).catch(err => console.error('workflowEngine: notification trigger failed', err))
 
   // Map updated DB row to ProductionOrder shape (reuse existing mapper pattern)
