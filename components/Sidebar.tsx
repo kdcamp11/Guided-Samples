@@ -116,13 +116,7 @@ export default function Sidebar({ currentPhase, onPhaseChange, state, section, o
                       : 'text-grace-stone hover:bg-grace-mist hover:text-grace-ink'
                   }`}
                 >
-                  <span className={`w-5 h-5 rounded-full border flex items-center justify-center text-[10px] shrink-0 ${
-                    complete ? 'border-grace-ink bg-grace-ink text-white' :
-                    active ? 'border-white text-white' :
-                    'border-grace-border text-grace-stone'
-                  }`}>
-                    {complete ? <CheckCircle2 size={11}/> : phase.id}
-                  </span>
+                  {complete && <CheckCircle2 size={11} className={active ? 'text-white shrink-0' : 'text-grace-ink shrink-0'}/>}
                   <span className="truncate font-medium">{phase.label}</span>
                 </button>
               )

@@ -322,7 +322,7 @@ export default function Phase5TechPack({ state, onBack, onSendToProduction }: Pr
 
       {/* ── Section 1: Garment selector ───────────────────────────────────── */}
       <div className="mb-6">
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-1.5 justify-center">
           {PHASE5_GARMENTS.map(g => (
             <button
               key={g.key}
@@ -343,11 +343,10 @@ export default function Phase5TechPack({ state, onBack, onSendToProduction }: Pr
       <div className="mb-6 card">
         <div className="flex items-start gap-4 flex-wrap">
           <div className="flex-1">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="w-6 h-6 rounded-full bg-[#0A0A0A] text-white text-[10px] font-bold flex items-center justify-center shrink-0">1</span>
+            <div className="flex items-center justify-center gap-2 mb-3">
               <p className="text-[11px] font-bold tracking-[0.18em] uppercase text-grace-ink">Select Fit</p>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 justify-center">
               {library.availableFits.map(f => {
                 const selected = resolvedFit === f
                 return (
