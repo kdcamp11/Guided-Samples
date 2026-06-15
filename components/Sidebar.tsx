@@ -85,6 +85,20 @@ export default function Sidebar({ currentPhase, onPhaseChange, state, section, o
         <NavItem icon={<Library size={14}/>} label="Library" active={section === 'library'} onClick={() => onSectionChange('library')} />
         <NavItem icon={<Settings size={14}/>} label="Settings" active={section === 'settings'} onClick={() => onSectionChange('settings')} />
 
+        {/* Expert help — visible in nav, not buried at bottom */}
+        {onExpertHelp && (
+          <div className="my-3 p-3 rounded-xl border border-grace-border bg-grace-mist">
+            <p className="text-[9px] font-bold tracking-[0.18em] uppercase text-grace-stone mb-0.5">Need help?</p>
+            <p className="text-[11px] font-bold text-grace-ink leading-tight mb-2">Work with GRACE Studios</p>
+            <button
+              onClick={onExpertHelp}
+              className="w-full flex items-center justify-center gap-1 py-1.5 px-3 rounded-full bg-grace-ink text-white text-[9px] font-bold tracking-widest uppercase hover:bg-zinc-800 transition-colors"
+            >
+              Talk to an Expert <ArrowRight size={9}/>
+            </button>
+          </div>
+        )}
+
         {/* Phase progress */}
         <div className="pt-5 pb-1">
           <p className="text-[9px] font-bold text-grace-stone uppercase tracking-[0.2em] px-2 mb-2">Workflow</p>
@@ -117,20 +131,6 @@ export default function Sidebar({ currentPhase, onPhaseChange, state, section, o
         </div>
       </nav>
 
-      {/* Expert help upsell */}
-      {onExpertHelp && (
-        <div className="mx-3 mb-3 p-3 rounded-xl border border-grace-border bg-grace-mist">
-          <p className="text-[9px] font-bold tracking-[0.18em] uppercase text-grace-stone mb-0.5">Need help?</p>
-          <p className="text-[11px] font-bold text-grace-ink leading-tight mb-2">Work with GRACE Studios</p>
-          <button
-            onClick={onExpertHelp}
-            className="w-full flex items-center justify-center gap-1 py-1.5 px-3 rounded-full bg-grace-ink text-white text-[9px] font-bold tracking-widest uppercase hover:bg-zinc-800 transition-colors"
-          >
-            Talk to an Expert <ArrowRight size={9}/>
-          </button>
-        </div>
-      )}
-
       {/* User */}
       <div className="p-3 border-t border-grace-border space-y-1">
         <button
@@ -155,7 +155,7 @@ export default function Sidebar({ currentPhase, onPhaseChange, state, section, o
 function NavItem({ icon, label, active, onClick, href }: {
   icon: React.ReactNode; label: string; active: boolean; onClick?: () => void; href?: string
 }) {
-  const cls = `w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-xs transition-colors font-medium ${
+  const cls = `w-full flex items-center justify-center gap-2.5 px-2 py-2 rounded-lg text-xs transition-colors font-medium ${
     active ? 'bg-grace-mist text-grace-ink' : 'text-grace-stone hover:bg-grace-mist hover:text-grace-ink'
   }`
   if (href) {

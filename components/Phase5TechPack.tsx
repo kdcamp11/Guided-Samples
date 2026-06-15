@@ -366,9 +366,14 @@ export default function Phase5TechPack({ state, onBack, onSendToProduction }: Pr
               })}
             </div>
           </div>
-          <p className="text-[10px] text-grace-stone max-w-[180px] leading-relaxed self-end pb-0.5">
-            Measurements are generated based on your selected fit. You can edit any size below.
-          </p>
+          <div className="relative self-end pb-0.5 group/tip">
+            <button className="w-5 h-5 rounded-full border border-grace-border text-grace-stone flex items-center justify-center text-[10px] hover:border-grace-ink hover:text-grace-ink transition-colors" aria-label="About measurements">
+              i
+            </button>
+            <div className="absolute bottom-full right-0 mb-2 w-52 bg-grace-ink text-white text-[11px] leading-relaxed rounded-xl px-3 py-2.5 opacity-0 group-hover/tip:opacity-100 pointer-events-none transition-opacity z-20">
+              Measurements are generated based on your selected fit. You can edit any value in the table below.
+            </div>
+          </div>
         </div>
       </div>
 
@@ -394,7 +399,7 @@ export default function Phase5TechPack({ state, onBack, onSendToProduction }: Pr
               CM
             </button>
           </div>
-          <span className="ml-auto text-[10px] text-grace-stone">{GARMENT_LABEL[garmentType]} · {guide?.rows.length ?? 0} rows</span>
+          <span className="ml-auto text-[10px] text-grace-stone">{GARMENT_LABEL[garmentType]} · <span className="italic">tap any cell to edit</span></span>
         </div>
 
         <div className="flex flex-col lg:flex-row gap-6">
@@ -474,7 +479,7 @@ export default function Phase5TechPack({ state, onBack, onSendToProduction }: Pr
         <div className="card">
           <div className="flex items-center gap-2 mb-4">
             <span className="w-6 h-6 rounded-full bg-[#0A0A0A] text-white text-[10px] font-bold flex items-center justify-center shrink-0">3</span>
-            <p className="text-[11px] font-bold tracking-[0.18em] uppercase text-grace-ink">Pantones</p>
+            <p className="text-[11px] font-bold tracking-[0.18em] uppercase text-grace-ink">Color Swatches</p>
           </div>
           <div className="space-y-2 mb-3">
             {pantones.map((p, i) => (
@@ -561,6 +566,14 @@ export default function Phase5TechPack({ state, onBack, onSendToProduction }: Pr
           <div className="flex items-center gap-2 mb-4">
             <span className="w-6 h-6 rounded-full bg-[#0A0A0A] text-white text-[10px] font-bold flex items-center justify-center shrink-0">4</span>
             <p className="text-[11px] font-bold tracking-[0.18em] uppercase text-grace-ink">Graphic Placement</p>
+            <div className="relative group/tip inline-block ml-1">
+              <button className="w-5 h-5 rounded-full border border-grace-border text-grace-stone flex items-center justify-center text-[10px] hover:border-grace-ink hover:text-grace-ink transition-colors" aria-label="About graphic placement">
+                i
+              </button>
+              <div className="absolute bottom-full left-0 mb-2 w-52 bg-grace-ink text-white text-[11px] leading-relaxed rounded-xl px-3 py-2.5 opacity-0 group-hover/tip:opacity-100 pointer-events-none transition-opacity z-20">
+                Placement measurements are based on the selected size and fit.
+              </div>
+            </div>
           </div>
           <div className="space-y-3 mb-3">
             {(drawingM?.placements ?? []).filter(p => ['center_chest', 'left_chest', 'left_hip', 'right_hip'].includes(p.location)).map((p, i) => (
