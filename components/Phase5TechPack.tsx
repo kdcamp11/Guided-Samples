@@ -447,19 +447,8 @@ export default function Phase5TechPack({ state, onBack, onSendToProduction }: Pr
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-6">
-          <div>
-            <p className="text-[9px] font-bold tracking-[0.2em] uppercase text-grace-stone mb-3 text-center">Front</p>
-            <div className="flex items-center justify-center">
-              <TechFlat kind={flatKind} view="front" />
-            </div>
-          </div>
-          <div>
-            <p className="text-[9px] font-bold tracking-[0.2em] uppercase text-grace-stone mb-3 text-center">Back</p>
-            <div className="flex items-center justify-center">
-              <TechFlat kind={flatKind} view="back" />
-            </div>
-          </div>
+        <div className="flex justify-center">
+          <TechFlat kind={flatKind} />
         </div>
       </div>
 
