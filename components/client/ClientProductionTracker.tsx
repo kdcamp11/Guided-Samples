@@ -109,7 +109,7 @@ function OrderCard({ order, onSelect }: { order: ProductionOrder; onSelect: () =
       {/* Action needed banner */}
       {needsAction && (
         <div className="mx-4 mb-4 px-3 py-2 bg-amber-50 border border-amber-100 rounded-xl">
-          <p className="text-[11px] font-semibold text-amber-700">👆 Your decision needed</p>
+          <p className="text-[11px] font-semibold text-amber-700">Your decision needed</p>
         </div>
       )}
     </button>
