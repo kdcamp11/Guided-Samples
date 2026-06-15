@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Ruler, Pencil, Check, X, RotateCcw } from 'lucide-react'
+import { ChevronDown, Pencil, Check, X, RotateCcw } from 'lucide-react'
 import {
   getConsumerSizeGuide,
   fitLabel,
@@ -12,17 +12,11 @@ import { getAllGarmentTypes } from '@/lib/fitBlocks'
 import type { GarmentType, FitVariant, SizeKey } from '@/lib/fitBlocks/types'
 
 interface Props {
-  /** Garment to show. Defaults to short_sleeve_tee. */
   garmentType?: GarmentType
-  /** Initial fit. Defaults to the garment's benchmark fit. */
   fit?: FitVariant
-  /** Allow the user to switch garments. Default true. */
   allowGarmentSwitch?: boolean
-  /** Show the "Edit Size Guide" affordance. Default true. */
   editable?: boolean
-  /** Persisted overrides (consumer measurements only). */
   overrides?: SizeGuideOverrides
-  /** Called when the user saves edits. */
   onOverridesChange?: (next: SizeGuideOverrides) => void
 }
 
@@ -39,6 +33,18 @@ const GARMENT_LABELS: Record<GarmentType, string> = {
   shorts:           'Shorts',
 }
 
+const FIT_DESCRIPTIONS: Partial<Record<FitVariant, string>> = {
+  standard:         'True-to-size. Clean lines, structured shoulder.',
+  relaxed:          'Easy, lived-in feel. A little extra room throughout.',
+  oversized:        'Intentionally large. Dropped shoulder, boxy silhouette.',
+  vintage_oversized:'Soft oversize with a slightly shorter body. Faded-era proportions.',
+  cropped:          'Cut above the natural waist. Pairs with high-rise bottoms.',
+  wide_leg:         'Full, open leg from hip to hem. Contemporary silhouette.',
+  tapered:          'Roomy at the hip, narrowing toward the ankle.',
+  open_bottom:      'Relaxed through the leg with an open, unfinished hem.',
+  vintage:          'Slightly shorter rise. Authentic retro proportions.',
+}
+
 export default function SizeGuide({
   garmentType: initialGarment = 'short_sleeve_tee',
   fit: initialFit,
@@ -52,7 +58,6 @@ export default function SizeGuide({
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<SizeGuideOverrides>(externalOverrides ?? {})
 
-  // The committed overrides drive the displayed table; the draft is the in-edit copy.
   const activeOverrides = editing ? draft : (externalOverrides ?? {})
 
   const guide = useMemo(
@@ -65,6 +70,7 @@ export default function SizeGuide({
   }
 
   const resolvedFit = guide.fit
+  const fitDesc = FIT_DESCRIPTIONS[resolvedFit]
 
   function setDraftValue(measurementKey: string, size: SizeKey, raw: string) {
     const value = parseFloat(raw)
@@ -82,21 +88,9 @@ export default function SizeGuide({
     })
   }
 
-  function startEdit() {
-    setDraft(externalOverrides ?? {})
-    setEditing(true)
-  }
-
-  function cancelEdit() {
-    setDraft(externalOverrides ?? {})
-    setEditing(false)
-  }
-
-  function saveEdit() {
-    onOverridesChange?.(draft)
-    setEditing(false)
-  }
-
+  function startEdit() { setDraft(externalOverrides ?? {}); setEditing(true) }
+  function cancelEdit() { setDraft(externalOverrides ?? {}); setEditing(false) }
+  function saveEdit() { onOverridesChange?.(draft); setEditing(false) }
   function resetFit() {
     setDraft(prev => {
       const next: SizeGuideOverrides = JSON.parse(JSON.stringify(prev))
@@ -106,39 +100,11 @@ export default function SizeGuide({
   }
 
   return (
-    <div className="p-4 md:p-6 max-w-[1100px]">
-      {/* Header */}
-      <div className="mb-6 flex items-start justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-grace-mist border border-grace-border flex items-center justify-center text-grace-ink">
-            <Ruler size={18} />
-          </div>
-          <div>
-            <h1 className="text-xl font-black text-grace-ink uppercase tracking-tight">Size Guide</h1>
-            <p className="text-grace-stone text-sm">All measurements in inches. Garment measured flat.</p>
-          </div>
-        </div>
-
-        {editable && !editing && (
-          <button onClick={startEdit} className="btn-secondary flex items-center gap-2 shrink-0">
-            <Pencil size={13} /> Edit Size Guide
-          </button>
-        )}
-        {editing && (
-          <div className="flex items-center gap-2 shrink-0">
-            <button onClick={cancelEdit} className="btn-secondary flex items-center gap-1.5">
-              <X size={13} /> Cancel
-            </button>
-            <button onClick={saveEdit} className="btn-primary flex items-center gap-1.5">
-              <Check size={13} /> Save
-            </button>
-          </div>
-        )}
-      </div>
+    <div className="p-4 md:p-6 max-w-[900px]">
 
       {/* Garment selector */}
       {allowGarmentSwitch && (
-        <div className="mb-4 flex flex-wrap gap-1.5">
+        <div className="mb-8 flex flex-wrap gap-1.5">
           {getAllGarmentTypes().map(g => (
             <button
               key={g}
@@ -156,26 +122,67 @@ export default function SizeGuide({
         </div>
       )}
 
-      {/* Fit selector */}
-      <div className="mb-5 flex flex-wrap items-center gap-1.5">
-        <span className="text-[10px] font-bold tracking-[0.2em] uppercase text-grace-stone mr-1">Fit</span>
-        {guide.availableFits.map(f => (
+      {/* Fit selector — hero */}
+      <div className="mb-8">
+        <p className="text-[10px] font-bold tracking-[0.22em] uppercase text-grace-stone mb-3">Select Your Fit</p>
+        <div className="flex flex-wrap gap-2">
+          {guide.availableFits.map(f => (
+            <button
+              key={f}
+              onClick={() => { setFit(f); setEditing(false) }}
+              disabled={editing}
+              className={`px-5 py-2.5 rounded-full text-[12px] font-bold tracking-wide transition-all disabled:opacity-40 ${
+                f === resolvedFit
+                  ? 'bg-grace-ink text-white shadow-md'
+                  : 'bg-white text-grace-stone hover:text-grace-ink border border-grace-border hover:border-grace-ink'
+              }`}
+            >
+              {fitLabel(f)}
+              {f === guide.defaultFit && (
+                <span className={`ml-2 text-[9px] font-semibold uppercase tracking-widest ${f === resolvedFit ? 'text-white/60' : 'text-grace-stone/60'}`}>
+                  Default
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+        {fitDesc && (
+          <p className="mt-2 text-[12px] text-grace-stone leading-relaxed pl-1">
+            {fitDesc}
+          </p>
+        )}
+      </div>
+
+      {/* GRACE attribution + edit toggle */}
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <p className="text-[10px] font-bold tracking-[0.22em] uppercase text-grace-stone">
+            {GARMENT_LABELS[garment]} · {fitLabel(resolvedFit)}
+          </p>
+          <p className="text-[11px] text-grace-stone mt-0.5">
+            Generated by GRACE based on your selected fit.
+            {guide.edited && !editing && (
+              <span className="ml-2 font-semibold text-grace-red">Edited</span>
+            )}
+          </p>
+        </div>
+        {editable && !editing && (
           <button
-            key={f}
-            onClick={() => { setFit(f); setEditing(false) }}
-            disabled={editing}
-            className={`px-3 py-1.5 rounded-full text-[11px] font-semibold tracking-wide transition-colors disabled:opacity-40 ${
-              f === resolvedFit
-                ? 'bg-grace-ink text-white'
-                : 'bg-white text-grace-stone hover:text-grace-ink border border-grace-border'
-            }`}
+            onClick={startEdit}
+            className="flex items-center gap-1.5 text-[11px] text-grace-stone hover:text-grace-ink font-medium transition-colors"
           >
-            {fitLabel(f)}
-            {f === guide.defaultFit && <span className="ml-1 opacity-50">·</span>}
+            <Pencil size={12} /> Adjust
           </button>
-        ))}
-        {guide.edited && !editing && (
-          <span className="ml-2 text-[10px] font-semibold uppercase tracking-widest text-grace-red">Edited</span>
+        )}
+        {editing && (
+          <div className="flex items-center gap-2">
+            <button onClick={cancelEdit} className="flex items-center gap-1 text-[11px] text-grace-stone hover:text-grace-ink">
+              <X size={12}/> Cancel
+            </button>
+            <button onClick={saveEdit} className="flex items-center gap-1.5 text-[11px] font-semibold text-grace-ink bg-grace-ink text-white px-3 py-1 rounded-full">
+              <Check size={12}/> Save
+            </button>
+          </div>
         )}
       </div>
 
@@ -196,7 +203,7 @@ export default function SizeGuide({
           </thead>
           <tbody>
             {guide.rows.map(row => (
-              <tr key={row.key} className="border-b border-grace-border last:border-0 hover:bg-grace-mist/50">
+              <tr key={row.key} className="border-b border-grace-border last:border-0 hover:bg-grace-mist/40">
                 <td className="px-4 py-3 sticky left-0 bg-white">
                   <div className="font-semibold text-grace-ink text-[13px]">{row.label}</div>
                   <div className="text-[10px] text-grace-stone leading-tight mt-0.5 max-w-[200px]">{row.hint}</div>
@@ -222,18 +229,18 @@ export default function SizeGuide({
         </table>
       </div>
 
-      {/* Footnotes */}
+      {/* Footer */}
       <div className="mt-4 flex items-start justify-between gap-4">
         <p className="text-[11px] text-grace-stone leading-relaxed max-w-xl">
-          Half-measurements (Chest, Waist, Thigh, Leg Opening) are taken with the garment laid flat —
-          double for the full body circumference. Sizes graded XS–3XL from the {fitLabel(resolvedFit)} fit block.
+          Measurements shown flat in inches. Half-measurements (Chest, Waist, Thigh, Leg Opening) double for full circumference.
+          Graded XS–3XL from the {fitLabel(resolvedFit)} fit block.
         </p>
         {editing && (
           <button
             onClick={resetFit}
             className="text-[11px] font-semibold text-grace-stone hover:text-grace-ink flex items-center gap-1 shrink-0"
           >
-            <RotateCcw size={12} /> Reset {fitLabel(resolvedFit)}
+            <RotateCcw size={12} /> Reset to default
           </button>
         )}
       </div>
