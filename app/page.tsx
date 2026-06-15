@@ -61,6 +61,7 @@ function App() {
       ? 'studio' as const
       : 'landing' as const
   const [view, setView] = useState<'landing' | 'projects' | 'studio' | 'creative-direction'>(initialView)
+  const prevViewRef = useRef<'landing' | 'studio'>('landing')
   const [state, setState] = useState<AppState>(EMPTY_STATE)
   const [section, setSection] = useState(initialView === 'studio' ? 'dashboard' : 'design')
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -138,7 +139,7 @@ function App() {
 
   // Creative Direction form
   if (view === 'creative-direction') {
-    return <CreativeDirectionForm onBack={() => setView('landing')} />
+    return <CreativeDirectionForm onBack={() => setView(prevViewRef.current)} />
   }
 
   // Landing page
@@ -147,7 +148,7 @@ function App() {
       <>
         <LandingPage
           onSelfService={() => setView('studio')}
-          onCreativeDirection={() => setView('creative-direction')}
+          onCreativeDirection={() => { prevViewRef.current = 'landing'; setView('creative-direction') }}
           onSignIn={() => setAuthOpen(true)}
         />
         <AuthModal
@@ -189,7 +190,7 @@ function App() {
         onSectionChange={handleSectionChange}
         mobileOpen={sidebarOpen}
         onMobileClose={() => setSidebarOpen(false)}
-        onExpertHelp={() => setView('creative-direction')}
+        onExpertHelp={() => { prevViewRef.current = 'studio'; setView('creative-direction') }}
       />
 
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -266,7 +267,7 @@ function App() {
               onBack={() => goToPhase(5)}
               projectId={projectIdRef.current ?? null}
               onEnsureProject={ensureProject}
-              onExpertHelp={() => setView('creative-direction')}
+              onExpertHelp={() => { prevViewRef.current = 'studio'; setView('creative-direction') }}
             />
           )}
         </main>
