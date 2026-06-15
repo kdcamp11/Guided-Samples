@@ -8,6 +8,7 @@ import { AppState } from '@/app/page'
 import { useAuth } from '@/lib/auth'
 import SizeGuide from '@/components/SizeGuide'
 import TechnicalDrawing from '@/components/TechnicalDrawing'
+import TechPackExport from '@/components/TechPackExport'
 import type { SizeGuideOverrides } from '@/lib/fitBlocks/sizeGuide'
 import { resolveGarmentType } from '@/lib/fitBlocks'
 import type { GarmentType } from '@/lib/fitBlocks/types'
@@ -21,7 +22,7 @@ interface Props {
 export default function SectionView({ section, state, onStartDesign }: Props) {
   if (section === 'dashboard') return <Dashboard state={state} onStartDesign={onStartDesign} />
   if (section === 'projects') return <Projects state={state} onStartDesign={onStartDesign} />
-  if (section === 'techpacks') return <TechPacks state={state} />
+  if (section === 'techpacks') return <TechPacksSection state={state} />
   if (section === 'sizeguide') return <SizeGuideSection state={state} />
   if (section === 'techdrawing') return <TechnicalDrawingSection state={state} />
   if (section === 'orders') return <Orders />
@@ -138,23 +139,19 @@ function Projects({ state, onStartDesign }: { state: AppState; onStartDesign: ()
   )
 }
 
-function TechPacks({ state }: { state: AppState }) {
-  return (
-    <div className="p-4 md:p-6 max-w-[1100px]">
-      <Header icon={<Package size={20} />} title="Tech Packs" subtitle="Specification sheets for manufacturing" />
-      {state.design ? (
-        <div className="card flex items-center justify-between gap-4">
-          <div>
-            <p className="text-sm font-medium text-gray-900">GRACE HOODIE — GRH-001</p>
-            <p className="text-xs text-gray-500 mt-0.5">FW25 · Revision A</p>
-          </div>
-          <span className="text-xs px-2 py-1 rounded-full bg-brand-green/10 text-brand-green shrink-0">Ready</span>
-        </div>
-      ) : (
-        <EmptyState icon={<Package size={28} />} title="No tech packs yet" subtitle="Complete a design to generate a tech pack." />
-      )}
-    </div>
-  )
+// Tech Pack Export section. Sources measurements, callouts, and placements from
+// getTechnicalDrawingData() (via buildTechPackDocument) — no sizing logic here and
+// no reads from the consumer size guide. Defaults to the garment being designed
+// and seeds style metadata from it.
+function TechPacksSection({ state }: { state: AppState }) {
+  const designed: GarmentType | undefined =
+    (state.garment?.type ? resolveGarmentType(state.garment.type) ?? undefined : undefined)
+  const meta = {
+    brand: 'GRACE',
+    season: 'FW25',
+    revision: 'A',
+  }
+  return <TechPackExport garmentType={designed} meta={meta} />
 }
 
 function Orders() {
