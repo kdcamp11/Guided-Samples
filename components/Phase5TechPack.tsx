@@ -101,7 +101,22 @@ export default function Phase5TechPack({ state, onBack, onSendToProduction }: Pr
     collection: '',
   })
 
-  const [saved, setSaved] = useState(false)
+  const isUniform = state.garment?.mode === 'uniform'
+
+  // ── Team uniform state (only used when isUniform) ────────────────────────
+  const [teamInfo, setTeamInfo] = useState({
+    teamName: state.garment?.sport ? `${state.garment.sport} Team` : '',
+    sport: state.garment?.sport ?? '',
+    uniformType: state.garment?.uniformType ?? '',
+    teamColors: '',
+    decorationMethod: 'Sublimation' as 'Sublimation' | 'Twill / Stitched Appliqué',
+    teamNotes: '',
+  })
+  type RosterRow = { name: string; number: string; size: string; position: string; youth: 'Youth' | 'Adult' }
+  const [roster, setRoster] = useState<RosterRow[]>([{ name: '', number: '', size: 'M', position: '', youth: 'Adult' }])
+  const [csvError, setCsvError] = useState('')
+
+    const [saved, setSaved] = useState(false)
   const [unit, setUnit] = useState<'in' | 'cm'>('in')
 
   // ── Fit block derivation ─────────────────────────────────────────────────
@@ -175,12 +190,12 @@ export default function Phase5TechPack({ state, onBack, onSendToProduction }: Pr
     }
     return {
       styleInfo: {
-        styleName: styleMeta.styleName || `GRACE ${GARMENT_LABEL[garmentType] ?? garmentType}`,
+        styleName: isUniform ? (teamInfo.teamName || `${teamInfo.sport} Team`) : (styleMeta.styleName || `GRACE ${GARMENT_LABEL[garmentType] ?? garmentType}`),
         sku: styleMeta.sku,
         revision: styleMeta.revision,
         season: styleMeta.season,
         brandName: styleMeta.brandName,
-        garmentType: GARMENT_LABEL[garmentType] ?? garmentType,
+        garmentType: isUniform ? `${teamInfo.sport} · ${teamInfo.uniformType}` : (GARMENT_LABEL[garmentType] ?? garmentType),
         gender: styleMeta.gender,
         sizeRange: styleMeta.sizeRange,
         fitDescription: resolvedFit ? fitLabel(resolvedFit) : '',
@@ -188,7 +203,9 @@ export default function Phase5TechPack({ state, onBack, onSendToProduction }: Pr
         fabricWeight: styleMeta.fabricWeight,
         construction: styleMeta.construction,
         careInstructions: styleMeta.careInstructions,
-        supplierNotes: styleMeta.supplierNotes,
+        supplierNotes: isUniform
+          ? `Decoration: ${teamInfo.decorationMethod}. Colors: ${teamInfo.teamColors}. ${teamInfo.teamNotes}\n\nROSTER:\n${roster.map(r => `${r.name} | #${r.number} | ${r.size} | ${r.youth}${r.position ? ' | ' + r.position : ''}`).join('\n')}`
+          : styleMeta.supplierNotes,
         clientName: styleMeta.clientName,
         designer: styleMeta.designer,
         collection: styleMeta.collection,
@@ -320,8 +337,8 @@ export default function Phase5TechPack({ state, onBack, onSendToProduction }: Pr
         </div>
       )}
 
-      {/* ── Section 1: Garment selector ───────────────────────────────────── */}
-      <div className="mb-6">
+      {/* ── Section 1: Garment selector (hidden for uniforms) ───────────── */}
+      {!isUniform && <div className="mb-6">
         <div className="flex flex-wrap gap-1.5 justify-center">
           {PHASE5_GARMENTS.map(g => (
             <button
@@ -337,9 +354,11 @@ export default function Phase5TechPack({ state, onBack, onSendToProduction }: Pr
             </button>
           ))}
         </div>
-      </div>
+      </div>}
 
-      {/* ── Section 2: Fit selector ───────────────────────────────────────── */}
+      {/* ── Section 2: Fit selector + Measurements (apparel only) ──────── */}
+      {!isUniform && (
+        <>
       <div className="mb-6 card">
         <div className="flex items-start gap-4 flex-wrap">
           <div className="flex-1">
@@ -478,7 +497,126 @@ export default function Phase5TechPack({ state, onBack, onSendToProduction }: Pr
         </div>
       </div>
 
-      {/* ── Section 4: Pantones + Graphic Placement ───────────────────────── */}
+        </>
+      )} {/* end !isUniform apparel sections */}
+
+      {/* ── Team Info + Roster (uniform only) ───────────────────────────────── */}
+      {isUniform && (
+        <div className="mb-6 space-y-4">
+          {/* Team Information */}
+          <div className="card">
+            <p className="text-[11px] font-bold tracking-[0.18em] uppercase text-grace-ink mb-4">Team Information</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {([
+                ['Team Name', 'teamName'],
+                ['Team Colors', 'teamColors'],
+              ] as const).map(([label, key]) => (
+                <div key={key}>
+                  <label className="text-[10px] text-grace-stone mb-1 block">{label}</label>
+                  <input
+                    className="w-full text-xs border border-grace-border rounded-lg px-2.5 py-2 focus:outline-none focus:border-grace-ink"
+                    value={teamInfo[key]}
+                    onChange={e => setTeamInfo(t => ({ ...t, [key]: e.target.value }))}
+                  />
+                </div>
+              ))}
+              <div>
+                <label className="text-[10px] text-grace-stone mb-1 block">Sport</label>
+                <input className="w-full text-xs border border-grace-border rounded-lg px-2.5 py-2 bg-grace-mist text-grace-stone" value={teamInfo.sport} readOnly/>
+              </div>
+              <div>
+                <label className="text-[10px] text-grace-stone mb-1 block">Uniform Type</label>
+                <input className="w-full text-xs border border-grace-border rounded-lg px-2.5 py-2 bg-grace-mist text-grace-stone" value={teamInfo.uniformType} readOnly/>
+              </div>
+              <div className="sm:col-span-2">
+                <label className="text-[10px] text-grace-stone mb-1 block">Decoration Method</label>
+                <div className="flex gap-2">
+                  {(['Sublimation', 'Twill / Stitched Appliqué'] as const).map(m => (
+                    <button key={m} onClick={() => setTeamInfo(t => ({ ...t, decorationMethod: m }))}
+                      className={`px-4 py-2 rounded-full text-[11px] font-semibold border transition-colors ${teamInfo.decorationMethod === m ? 'bg-grace-ink text-white border-grace-ink' : 'border-grace-border text-grace-stone hover:border-grace-ink hover:text-grace-ink'}`}>
+                      {m}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="sm:col-span-2">
+                <label className="text-[10px] text-grace-stone mb-1 block">Team Notes</label>
+                <textarea className="w-full text-xs border border-grace-border rounded-lg px-2.5 py-2 focus:outline-none focus:border-grace-ink resize-none" rows={2}
+                  value={teamInfo.teamNotes} onChange={e => setTeamInfo(t => ({ ...t, teamNotes: e.target.value }))} placeholder="Special instructions, timeline, quality notes…"/>
+              </div>
+            </div>
+          </div>
+
+          {/* Roster */}
+          <div className="card">
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-[11px] font-bold tracking-[0.18em] uppercase text-grace-ink">Roster</p>
+              <label className="flex items-center gap-1.5 text-[11px] font-semibold text-grace-stone hover:text-grace-ink cursor-pointer border border-grace-border rounded-full px-3 py-1 transition-colors">
+                <Plus size={11}/> Upload CSV
+                <input type="file" accept=".csv" className="hidden" onChange={e => {
+                  const file = e.target.files?.[0]; if (!file) return
+                  const reader = new FileReader()
+                  reader.onload = ev => {
+                    try {
+                      const lines = (ev.target?.result as string).split('\n').filter(l => l.trim())
+                      const rows = lines.slice(1).map(line => {
+                        const [name='', number='', size='M', position='', youth='Adult'] = line.split(',').map(c => c.trim().replace(/^"|"$/g,''))
+                        return { name, number, size, position, youth: (youth === 'Youth' ? 'Youth' : 'Adult') as 'Youth' | 'Adult' }
+                      })
+                      if (rows.length) { setRoster(rows); setCsvError('') }
+                    } catch { setCsvError('Could not parse CSV. Expected columns: Name, Number, Size, Position, Youth/Adult') }
+                  }
+                  reader.readAsText(file); e.target.value = ''
+                }}/>
+              </label>
+            </div>
+            {csvError && <p className="text-[11px] text-red-500 mb-2">{csvError}</p>}
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-grace-border">
+                    {['Player Name', 'Number', 'Size', 'Position', 'Youth/Adult', ''].map(h => (
+                      <th key={h} className="text-left text-[10px] text-grace-stone font-semibold uppercase tracking-wider pb-2 pr-2">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {roster.map((row, i) => (
+                    <tr key={i} className="border-b border-grace-border last:border-0">
+                      {(['name', 'number', 'size', 'position'] as const).map(field => (
+                        <td key={field} className="py-1.5 pr-2">
+                          <input className="w-full border border-grace-border rounded px-2 py-1 text-xs focus:outline-none focus:border-grace-ink"
+                            placeholder={field === 'position' ? 'Optional' : ''}
+                            value={row[field]}
+                            onChange={e => setRoster(r => r.map((x,j) => j===i ? {...x, [field]: e.target.value} : x))}/>
+                        </td>
+                      ))}
+                      <td className="py-1.5 pr-2">
+                        <select className="border border-grace-border rounded px-2 py-1 text-xs focus:outline-none focus:border-grace-ink"
+                          value={row.youth} onChange={e => setRoster(r => r.map((x,j) => j===i ? {...x, youth: e.target.value as 'Youth'|'Adult'} : x))}>
+                          <option>Adult</option><option>Youth</option>
+                        </select>
+                      </td>
+                      <td className="py-1.5">
+                        <button onClick={() => setRoster(r => r.filter((_,j) => j!==i))} className="text-grace-stone hover:text-grace-red transition-colors">
+                          <X size={13}/>
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <button onClick={() => setRoster(r => [...r, { name:'', number:'', size:'M', position:'', youth:'Adult' }])}
+              className="mt-3 w-full flex items-center justify-center gap-1 text-[11px] font-semibold text-grace-stone hover:text-grace-ink border border-grace-border rounded-full py-1.5 transition-colors">
+              <Plus size={11}/> Add Player
+            </button>
+            <p className="mt-2 text-[10px] text-grace-stone text-center">CSV format: Name, Number, Size, Position (optional), Youth/Adult</p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Section 4: Pantones + Graphic Placement ───────────────────────────────────────── */}
       <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
 
         {/* Pantones */}

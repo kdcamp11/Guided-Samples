@@ -34,6 +34,9 @@ export type AppState = {
     views: { front?: string; back?: string; side?: string }
     type: string
     color: string
+    mode?: 'apparel' | 'uniform'
+    sport?: string
+    uniformType?: string
   } | null
   design: {
     confirmed: boolean

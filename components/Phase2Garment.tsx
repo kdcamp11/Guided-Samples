@@ -22,7 +22,7 @@ interface Props {
 
 const ALL_VIEWS: View[] = ['front', 'back', 'side']
 
-export default function Phase2Garment({ state, onComplete, onBack }: Props) {
+function ApparelFlow({ state, onComplete, onBack }: Props) {
   const [mode, setMode] = useState<'upload' | 'generate'>('generate')
   const [prompt, setPrompt] = useState(
     'Oversized unisex hoodie, 450gsm, french terry cotton, drop shoulder, double layered hood, ribbed cuffs and hem.'
@@ -433,6 +433,175 @@ export default function Phase2Garment({ state, onComplete, onBack }: Props) {
           )}
         </div>
 
+      </div>
+    </div>
+  )
+}
+
+// ─── Team Uniforms data ────────────────────────────────────────────────────────
+
+const SPORTS = ['Basketball', 'Football', 'Soccer', 'Baseball', 'Track', 'Volleyball', '7v7'] as const
+type Sport = typeof SPORTS[number]
+
+const UNIFORM_TYPES: Record<Sport, string[]> = {
+  Basketball: ['Game Uniform', 'Practice Uniform'],
+  Football:   ['Game Uniform', 'Practice Uniform'],
+  Soccer:     ['Game Uniform', 'Practice Uniform'],
+  Baseball:   ['Game Uniform', 'Practice Uniform'],
+  Track:      ['Competition Uniform', 'Practice Uniform'],
+  Volleyball: ['Game Uniform', 'Practice Uniform'],
+  '7v7':      ['Game Uniform', 'Practice Uniform'],
+}
+
+// ─── Uniform selection flow ────────────────────────────────────────────────────
+
+function UniformFlow({ onComplete, onBack }: { onComplete: (garment: AppState['garment']) => void; onBack: () => void }) {
+  const [sport, setSport] = useState<Sport | null>(null)
+  const [uniformType, setUniformType] = useState<string | null>(null)
+
+  const handleProceed = () => {
+    if (!sport || !uniformType) return
+    onComplete({
+      svg: '',
+      dataUrl: '',
+      views: {},
+      type: `${sport} ${uniformType}`,
+      color: '',
+      mode: 'uniform',
+      sport,
+      uniformType,
+    })
+  }
+
+  return (
+    <div className="p-6 w-full max-w-2xl mx-auto">
+      <div className="mb-6 flex items-start justify-between">
+        <div>
+          <p className="phase-header">Phase 2</p>
+          <h1 className="text-xl font-bold text-gray-900">Team Uniforms</h1>
+          <p className="text-gray-500 text-sm mt-1">Select your sport and uniform type</p>
+        </div>
+        <button onClick={onBack} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-700 transition-colors mt-1">
+          <ArrowLeft size={14}/>Back
+        </button>
+      </div>
+
+      {/* Sport selection */}
+      <div className="mb-6">
+        <p className="text-xs font-semibold text-gray-600 uppercase tracking-widest mb-3">Select Sport</p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          {SPORTS.map(s => (
+            <button
+              key={s}
+              onClick={() => { setSport(s); setUniformType(null) }}
+              className={`py-3 px-4 rounded-xl border text-sm font-medium transition-all text-left ${
+                sport === s
+                  ? 'border-grace-ink bg-grace-ink text-white'
+                  : 'border-grace-border text-grace-stone hover:border-grace-ink hover:text-grace-ink'
+              }`}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Uniform type selection */}
+      {sport && (
+        <div className="mb-8">
+          <p className="text-xs font-semibold text-gray-600 uppercase tracking-widest mb-3">Uniform Type</p>
+          <div className="flex flex-col gap-2">
+            {UNIFORM_TYPES[sport].map(ut => (
+              <button
+                key={ut}
+                onClick={() => setUniformType(ut)}
+                className={`py-3 px-4 rounded-xl border text-sm font-medium transition-all text-left ${
+                  uniformType === ut
+                    ? 'border-grace-ink bg-grace-ink text-white'
+                    : 'border-grace-border text-grace-stone hover:border-grace-ink hover:text-grace-ink'
+                }`}
+              >
+                {ut}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <button
+        onClick={handleProceed}
+        disabled={!sport || !uniformType}
+        className={`w-full flex items-center justify-center gap-2 font-medium py-3 px-4 rounded-xl transition-colors text-sm ${
+          sport && uniformType
+            ? 'bg-grace-ink hover:bg-zinc-800 text-white'
+            : 'bg-slate-100 text-gray-400 cursor-not-allowed'
+        }`}
+      >
+        Continue to Apply Design <ArrowRight size={15}/>
+      </button>
+    </div>
+  )
+}
+
+// ─── Shell: top-level toggle between Custom Apparel and Team Uniforms ──────────
+
+export default function Phase2Garment({ state, onComplete, onBack }: Props) {
+  const [productMode, setProductMode] = useState<'apparel' | 'uniform' | null>(null)
+
+  if (productMode === 'apparel') {
+    return <ApparelFlow state={state} onComplete={(g) => onComplete(g ? { ...g, mode: 'apparel' } : g)} onBack={() => setProductMode(null)} />
+  }
+
+  if (productMode === 'uniform') {
+    return <UniformFlow onComplete={onComplete} onBack={() => setProductMode(null)} />
+  }
+
+  // Top-level selection
+  return (
+    <div className="p-6 w-full max-w-2xl mx-auto">
+      <div className="mb-6 flex items-start justify-between">
+        <div>
+          <p className="phase-header">Phase 2</p>
+          <h1 className="text-xl font-bold text-gray-900">Product Selection</h1>
+          <p className="text-gray-500 text-sm mt-1">What are you creating?</p>
+        </div>
+        <button onClick={onBack} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-700 transition-colors mt-1">
+          <ArrowLeft size={14}/>Back
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <button
+          onClick={() => setProductMode('apparel')}
+          className="group text-left p-7 rounded-2xl border border-grace-border hover:border-grace-ink transition-all flex flex-col gap-3"
+        >
+          <p className="text-[10px] font-bold tracking-[0.2em] text-grace-stone uppercase">Self Service</p>
+          <div>
+            <h2 className="text-lg font-black text-grace-ink uppercase tracking-tight mb-1">Custom Apparel</h2>
+            <p className="text-xs text-grace-stone leading-relaxed">
+              Hoodies, tees, crewnecks, jackets, pants, and more. Choose your garment, apply your design, and build a full tech pack.
+            </p>
+          </div>
+          <span className="flex items-center gap-1 text-xs font-bold text-grace-ink tracking-widest uppercase mt-auto">
+            Select <ArrowRight size={12}/>
+          </span>
+        </button>
+
+        <button
+          onClick={() => setProductMode('uniform')}
+          className="group text-left p-7 rounded-2xl border border-grace-border hover:border-grace-ink transition-all flex flex-col gap-3"
+        >
+          <p className="text-[10px] font-bold tracking-[0.2em] text-grace-stone uppercase">Team</p>
+          <div>
+            <h2 className="text-lg font-black text-grace-ink uppercase tracking-tight mb-1">Team Uniforms</h2>
+            <p className="text-xs text-grace-stone leading-relaxed">
+              Basketball, football, soccer, baseball, track, volleyball, and 7v7. Built for team roster management and production.
+            </p>
+          </div>
+          <span className="flex items-center gap-1 text-xs font-bold text-grace-ink tracking-widest uppercase mt-auto">
+            Select <ArrowRight size={12}/>
+          </span>
+        </button>
       </div>
     </div>
   )
