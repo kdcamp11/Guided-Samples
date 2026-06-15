@@ -80,7 +80,7 @@ export default function DepositPaymentPanel({
         <div className="flex items-center justify-between">
           <div>
             <p className="text-xs font-semibold text-gray-900">Production Quantity</p>
-            <p className="text-[10px] text-gray-400 mt-0.5">{money(perPiece)} per piece</p>
+            <p className="text-[10px] text-gray-400 mt-0.5">{money(perPiece)} per piece · {MIN_PRODUCTION_QUANTITY} pc minimum</p>
           </div>
           <div className="flex items-center gap-2">
             <button

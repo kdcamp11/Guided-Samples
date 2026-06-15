@@ -63,8 +63,10 @@ export default function Phase6Production({ state, techPack, onBack, projectId, o
   const sampleTotal = ACTIVATION_FEE + sampleFee + logoFeeTotal
 
   // DIRECT path: client chooses bulk quantity; deposit is 50% of the full run.
-  const [quantity, setQuantity] = useState(1)
-  const clampQty = (q: number) => Math.max(1, Math.min(100000, Math.floor(q) || 1))
+  // MOQ (minimum order quantity) is 15 pieces.
+  const MOQ = 15
+  const [quantity, setQuantity] = useState(MOQ)
+  const clampQty = (q: number) => Math.max(MOQ, Math.min(100000, Math.floor(q) || MOQ))
   const productionTotal = (garmentPrice + logoFeeTotal) * quantity
   const depositAmount = Math.round(productionTotal / 2 * 100) / 100
 
@@ -346,12 +348,12 @@ export default function Phase6Production({ state, techPack, onBack, projectId, o
 
                 <div className="border-t border-slate-100 pt-3 mb-4 space-y-1.5 text-xs">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Quantity</span>
+                    <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Quantity <span className="normal-case font-normal">(min {MOQ})</span></span>
                     <div className="flex items-center gap-1.5">
                       <button
                         type="button"
                         onClick={() => setQuantity(q => clampQty(q - 1))}
-                        disabled={quantity <= 1}
+                        disabled={quantity <= MOQ}
                         className="w-6 h-6 rounded-md border border-slate-200 flex items-center justify-center text-gray-600 hover:bg-slate-50 disabled:opacity-40"
                         aria-label="Decrease quantity"
                       >
@@ -359,7 +361,7 @@ export default function Phase6Production({ state, techPack, onBack, projectId, o
                       </button>
                       <input
                         type="number"
-                        min={1}
+                        min={MOQ}
                         value={quantity}
                         onChange={e => setQuantity(clampQty(Number(e.target.value)))}
                         className="w-14 text-center text-xs font-semibold text-gray-900 border border-slate-200 rounded-md py-0.5 focus:outline-none focus:border-brand-green"

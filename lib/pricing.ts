@@ -34,8 +34,8 @@ export const PRODUCTION_PRICE_CENTS: Record<string, number> = {
 // Fallback used when a garment type isn't in the table above.
 const DEFAULT_PRODUCTION_PRICE_CENTS = 3_500 // $35
 
-// Bulk production quantity bounds.
-export const MIN_PRODUCTION_QUANTITY = 1
+// Bulk production quantity bounds. MOQ (minimum order quantity) is 15 pieces.
+export const MIN_PRODUCTION_QUANTITY = 15
 export const MAX_PRODUCTION_QUANTITY = 100_000
 
 /** Per-piece production (bulk) price for a garment type. */
