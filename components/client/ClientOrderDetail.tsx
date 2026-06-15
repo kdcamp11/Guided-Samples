@@ -20,6 +20,8 @@ import ClientTimeline from './ClientTimeline'
 import ClientDecisionPanel from './ClientDecisionPanel'
 import SampleEvaluationPanel, { isSampleEvaluationStage } from './SampleEvaluationPanel'
 import FirstPieceReviewPanel, { isFirstPieceReviewStage } from './FirstPieceReviewPanel'
+import DepositPaymentPanel from './DepositPaymentPanel'
+import AwaitingFinalPaymentPanel from './AwaitingFinalPaymentPanel'
 import MediaGallery from './MediaGallery'
 
 interface Props {
@@ -307,8 +309,27 @@ export default function ClientOrderDetail({ orderId, onBack }: Props) {
               />
             )}
 
+            {/* Production deposit payment prompt */}
+            {stage === 'AWAITING_PRODUCTION_DEPOSIT' && (
+              <DepositPaymentPanel
+                orderId={orderId}
+                depositAmount={Math.round(((order.pricing?.garment_price_cents ?? 0) + (order.pricing?.extra_logo_fee_cents ?? 0)) / 2)}
+                onSuccess={load}
+              />
+            )}
+
+            {/* Final payment prompt */}
+            {stage === 'AWAITING_FINAL_PAYMENT' && (
+              <AwaitingFinalPaymentPanel
+                orderId={orderId}
+                finalAmount={order.deposit_amount_cents ?? Math.round(((order.pricing?.garment_price_cents ?? 0) + (order.pricing?.extra_logo_fee_cents ?? 0)) / 2)}
+                onSuccess={load}
+              />
+            )}
+
             {/* Other client actions */}
-            {!isFirstPieceReviewStage(stage) && !isSampleEvaluationStage(stage) && (
+            {!isFirstPieceReviewStage(stage) && !isSampleEvaluationStage(stage) &&
+              stage !== 'AWAITING_PRODUCTION_DEPOSIT' && stage !== 'AWAITING_FINAL_PAYMENT' && (
               <ClientDecisionPanel
                 orderId={orderId}
                 currentStage={stage}

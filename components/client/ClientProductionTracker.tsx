@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { Package, ChevronRight, Loader2, AlertCircle, RefreshCw, LogOut, Settings, CheckCircle2, ArrowLeft } from 'lucide-react'
-import { clientCanAct } from '@/types/client'
+import { clientActionNeeded } from '@/types/client'
 import { listClientOrders } from '@/lib/clientPortal'
 import { useRealtimeOrderList } from '@/lib/useRealtimeOrder'
 import NotificationBell from '@/components/NotificationBell'
@@ -35,7 +35,7 @@ function timeAgo(iso: string): string {
 function OrderCard({ order, onSelect }: { order: ProductionOrder; onSelect: () => void }) {
   const stage       = order.production_stage as ProductionStage | null
   const progress    = clientProgress(stage)
-  const needsAction = clientCanAct(stage)
+  const needsAction = clientActionNeeded(stage)
   const si          = order.tech_pack_snapshot?.style_info
 
   const label       = stage ? CLIENT_STAGE_LABELS[stage] : 'Getting started'
@@ -171,9 +171,9 @@ export default function ClientProductionTracker({ userEmail, onSelectOrder, onSi
     return () => { if (pollRef.current) clearInterval(pollRef.current) }
   }, [paid.paid])
 
-  const actionNeeded = orders.filter(o => clientCanAct(o.production_stage))
+  const actionNeeded = orders.filter(o => clientActionNeeded(o.production_stage))
   const inProgress   = orders.filter(o =>
-    !clientCanAct(o.production_stage) &&
+    !clientActionNeeded(o.production_stage) &&
     o.production_stage !== 'DELIVERED' &&
     o.production_stage !== 'CANCELLED'
   )

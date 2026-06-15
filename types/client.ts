@@ -5,8 +5,21 @@ export const CLIENT_CONTROLLED_TRANSITIONS: Partial<
   Record<ProductionStage, ProductionStage[]>
 > = {
   FIRST_PIECE_REVIEW:        ['AWAITING_SAMPLE_SHIPMENT', 'FIRST_PIECE_IN_PRODUCTION', 'CLOSED_SAMPLE_ONLY'],
-  CLIENT_SAMPLE_EVALUATION:  ['BULK_PRODUCTION', 'REVISION_REQUIRED', 'CANCELLED'],
+  // Client confirms they physically received the sample, which opens evaluation.
+  SAMPLE_SHIPPED:            ['CLIENT_SAMPLE_EVALUATION'],
+  // Approving the sample routes the client to pay the production deposit
+  // before bulk production begins.
+  CLIENT_SAMPLE_EVALUATION:  ['AWAITING_PRODUCTION_DEPOSIT', 'REVISION_REQUIRED', 'CANCELLED'],
+  // Client confirms the bulk order arrived, completing the workflow.
+  SHIPPED:                   ['DELIVERED'],
 }
+
+// Stages where the client must complete a payment (handled via Stripe checkout,
+// not a direct stage transition). Surfaced as "action needed" in the portal.
+export const CLIENT_PAYMENT_STAGES = new Set<ProductionStage>([
+  'AWAITING_PRODUCTION_DEPOSIT',
+  'AWAITING_FINAL_PAYMENT',
+])
 
 export const CLIENT_WAITING_STAGES = new Set<ProductionStage>([
   'PRODUCTION_FILES_RECEIVED',
@@ -15,9 +28,7 @@ export const CLIENT_WAITING_STAGES = new Set<ProductionStage>([
   'BULK_PRODUCTION',
   'QUALITY_CHECK',
   'PACKING',
-  'SAMPLE_SHIPPED',
   'SAMPLE_DELIVERED',
-  'SHIPPED',
   'AWAITING_FIRST_PIECE',
   'AWAITING_SAMPLE_SHIPMENT',
   'READY_TO_SHIP',
@@ -41,6 +52,28 @@ export type ClientActionField = {
 }
 
 export const CLIENT_ACTIONS: Partial<Record<ProductionStage, ClientAction[]>> = {
+  SAMPLE_SHIPPED: [
+    {
+      id:          'confirm_sample_received',
+      label:       'Confirm Sample Received',
+      description: 'Mark your sample as delivered. Once confirmed, you can review it and decide how to proceed.',
+      toStage:     'CLIENT_SAMPLE_EVALUATION',
+      requiredFields: [],
+      variant:        'primary',
+      confirmMessage: 'Confirm you have physically received your sample. You\'ll then be able to approve, request changes, or cancel.',
+    },
+  ],
+  SHIPPED: [
+    {
+      id:          'confirm_order_received',
+      label:       'Confirm Order Delivered',
+      description: 'Mark your bulk order as delivered. This completes your order.',
+      toStage:     'DELIVERED',
+      requiredFields: [],
+      variant:        'primary',
+      confirmMessage: 'Confirm you have received your full order. This will mark the order complete.',
+    },
+  ],
   FIRST_PIECE_REVIEW: [
     {
       id:          'approve_first_piece',
@@ -68,14 +101,14 @@ export const CLIENT_ACTIONS: Partial<Record<ProductionStage, ClientAction[]>> = 
   CLIENT_SAMPLE_EVALUATION: [
     {
       id:          'approve_sample',
-      label:       'Approve — Start Bulk Production',
-      description: 'The sample meets your standards. Authorise the factory to begin the full production run.',
-      toStage:     'BULK_PRODUCTION',
+      label:       'Approve — Pay Production Deposit',
+      description: 'The sample meets your standards. Pay the production deposit to authorise the full production run.',
+      toStage:     'AWAITING_PRODUCTION_DEPOSIT',
       requiredFields: [
         { key: 'evaluation_notes', label: 'Approval Notes (optional)', type: 'textarea', placeholder: 'Any notes for the factory…' },
       ],
       variant:        'primary',
-      confirmMessage: 'Approving the sample will authorise bulk production. This cannot be undone.',
+      confirmMessage: 'Approving the sample will move you to the production deposit payment.',
     },
     {
       id:          'request_revision',
@@ -104,6 +137,17 @@ export const CLIENT_ACTIONS: Partial<Record<ProductionStage, ClientAction[]>> = 
 export function clientCanAct(stage: ProductionStage | null): boolean {
   if (!stage) return false
   return stage in CLIENT_CONTROLLED_TRANSITIONS
+}
+
+/** True if the client owes a payment at this stage. */
+export function clientNeedsPayment(stage: ProductionStage | null): boolean {
+  if (!stage) return false
+  return CLIENT_PAYMENT_STAGES.has(stage)
+}
+
+/** True if the client has any pending action (decision or payment) at this stage. */
+export function clientActionNeeded(stage: ProductionStage | null): boolean {
+  return clientCanAct(stage) || clientNeedsPayment(stage)
 }
 
 export function clientIsWaiting(stage: ProductionStage | null): boolean {

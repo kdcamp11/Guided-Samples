@@ -22,10 +22,13 @@ interface Props {
 
 const WAITING_MESSAGES: Partial<Record<ProductionStage, string>> = {
   FIRST_PIECE_REVIEW:       'The client is reviewing your photos. Once approved, ship the physical sample.',
-  SAMPLE_SHIPPED:           'The sample is in transit. GRACE will confirm delivery.',
-  SAMPLE_DELIVERED:         'GRACE has confirmed delivery. Awaiting client evaluation.',
+  SAMPLE_SHIPPED:           'The sample is in transit. The client will confirm delivery.',
+  SAMPLE_DELIVERED:         'Sample delivered. Awaiting client evaluation.',
   CLIENT_SAMPLE_EVALUATION: 'Awaiting the client\'s decision on the physical sample.',
-  SHIPPED:                  'The bulk order is in transit. GRACE will confirm delivery.',
+  QUALITY_CHECK:            'GRACE is inspecting your quality-check photos. You\'ll be notified once the order is cleared.',
+  AWAITING_PRODUCTION_DEPOSIT: 'Awaiting the client\'s production deposit before bulk production begins.',
+  AWAITING_FINAL_PAYMENT:   'Quality check passed. Awaiting the client\'s final payment before you ship.',
+  SHIPPED:                  'The bulk order is in transit. The client will confirm delivery.',
   DELIVERED:                'This order has been delivered. No further actions required.',
   CANCELLED:                'This production order has been cancelled.',
 }
@@ -69,9 +72,14 @@ function ActionForm({
       }
     }
 
-    if (action.requiresMedia && mediaFiles.length === 0) {
-      setError('Please attach at least one photo or file.')
-      return
+    if (action.requiresMedia) {
+      const min = action.minMedia ?? 1
+      if (mediaFiles.length < min) {
+        setError(min > 1
+          ? `Please attach at least ${min} photos (e.g. front and back).`
+          : 'Please attach at least one photo or file.')
+        return
+      }
     }
 
     setUploading(true)

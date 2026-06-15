@@ -27,6 +27,8 @@ export type NotificationType =
   | 'order_cancelled'
   | 'qc_passed'
   | 'order_packed'
+  | 'deposit_due'
+  | 'final_payment_due'
 
 export type InAppNotification = {
   id:                   string
@@ -106,11 +108,23 @@ const TRANSITION_NOTIFICATIONS: Partial<Record<ProductionStage, NotificationSpec
       ? `The client approved the sample and left a note: "${String(m.evaluation_notes).slice(0, 200)}"`
       : 'The client approved the sample. Begin bulk production.',
   },
+  AWAITING_PRODUCTION_DEPOSIT: {
+    recipient: 'client',
+    type:      'deposit_due',
+    title:     'Production Deposit Required',
+    body:      () => 'Your sample is approved! Pay the 50% production deposit to authorize bulk manufacturing.',
+  },
   QUALITY_CHECK: {
     recipient: 'client',
     type:      'qc_passed',
     title:     'Quality Check in Progress',
     body:      () => 'Bulk production is complete. Your order is undergoing final quality inspection.',
+  },
+  AWAITING_FINAL_PAYMENT: {
+    recipient: 'client',
+    type:      'final_payment_due',
+    title:     'Final Payment Required',
+    body:      () => 'Your order passed quality check. Pay the remaining balance to authorize shipment.',
   },
   PACKING: {
     recipient: 'client',

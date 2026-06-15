@@ -105,7 +105,7 @@ function ApprovalForm({ orderId, onTransition, onBack }: { orderId: string; onTr
 
   async function submit() {
     setSubmit(true); setError('')
-    const res = await clientTransition({ order_id: orderId, to_stage: 'BULK_PRODUCTION', metadata: { evaluation_notes: notes.trim() || undefined } })
+    const res = await clientTransition({ order_id: orderId, to_stage: 'AWAITING_PRODUCTION_DEPOSIT', metadata: { evaluation_notes: notes.trim() || undefined } })
     setSubmit(false)
     if (res.ok) onTransition()
     else setError(res.errors.join(', '))
@@ -116,9 +116,9 @@ function ApprovalForm({ orderId, onTransition, onBack }: { orderId: string; onTr
       <div className="flex items-start gap-2">
         <CheckCircle2 size={14} className="text-brand-green shrink-0 mt-0.5" />
         <div>
-          <p className="text-xs font-semibold text-brand-green">Approve — Start Bulk Production</p>
+          <p className="text-xs font-semibold text-brand-green">Approve — Pay Production Deposit</p>
           <p className="text-[11px] text-gray-600 mt-0.5 leading-relaxed">
-            Authorise the factory to begin the full production run. Any notes will be passed to them.
+            Approve the sample and pay the production deposit to authorise the full production run. Any notes will be passed to the factory.
           </p>
         </div>
       </div>
@@ -127,7 +127,7 @@ function ApprovalForm({ orderId, onTransition, onBack }: { orderId: string; onTr
       <div className="flex gap-2">
         <button onClick={onBack} className="btn-secondary flex-1 text-xs" disabled={submitting}>Back</button>
         <button onClick={submit} disabled={submitting} className="btn-primary flex-1 text-xs flex items-center justify-center gap-1.5">
-          {submitting ? <Loader2 size={12} className="animate-spin" /> : <><CheckCircle2 size={12} /> Approve & Start</>}
+          {submitting ? <Loader2 size={12} className="animate-spin" /> : <><CheckCircle2 size={12} /> Approve & Continue</>}
         </button>
       </div>
     </div>
@@ -241,8 +241,8 @@ function EvaluationDecisionStep({ orderId, media, onTransition }: { orderId: str
             <CheckCircle2 size={15} className="text-brand-green" />
           </div>
           <div>
-            <p className="text-xs font-semibold text-gray-900">Approve — Start Bulk Production</p>
-            <p className="text-[11px] text-gray-500 mt-0.5">Sample meets your standards. Authorise the full run.</p>
+            <p className="text-xs font-semibold text-gray-900">Approve — Pay Production Deposit</p>
+            <p className="text-[11px] text-gray-500 mt-0.5">Sample meets your standards. Pay the deposit to authorise the full run.</p>
           </div>
         </button>
 

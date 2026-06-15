@@ -61,10 +61,26 @@ export async function getAdminOrderMedia(orderId: string): Promise<OrderMedia[]>
   if (!sb) return []
   const { data } = await sb
     .from('production_order_media')
-    .select('id, stage, media_type, public_url, file_name, mime_type, notes, created_at')
+    .select('id, stage, media_type, storage_path, public_url, file_name, mime_type, notes, created_at')
     .eq('production_order_id', orderId)
     .order('created_at', { ascending: true })
-  return (data ?? []) as OrderMedia[]
+
+  // The production-media bucket is private — the stored public_url won't load.
+  // Generate short-lived signed URLs from storage_path so the admin can view media.
+  const rows = (data ?? []) as Record<string, unknown>[]
+  return Promise.all(
+    rows.map(async row => {
+      const path = row.storage_path as string | null
+      let url = row.public_url as string
+      if (path) {
+        const { data: s } = await sb.storage
+          .from('production-media')
+          .createSignedUrl(path, 60 * 60)
+        if (s?.signedUrl) url = s.signedUrl
+      }
+      return { ...row, public_url: url } as OrderMedia
+    }),
+  )
 }
 
 export async function getAdminOrderHistory(orderId: string): Promise<StageTransitionEvent[]> {
