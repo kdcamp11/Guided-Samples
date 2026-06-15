@@ -18,14 +18,16 @@ interface Props {
   state: AppState
   onComplete: (garment: AppState['garment']) => void
   onBack: () => void
+  initialPrompt?: string
+  uniformContext?: { sport: string; uniformType: string }
 }
 
 const ALL_VIEWS: View[] = ['front', 'back', 'side']
 
-function ApparelFlow({ state, onComplete, onBack }: Props) {
+function ApparelFlow({ state, onComplete, onBack, initialPrompt, uniformContext }: Props) {
   const [mode, setMode] = useState<'upload' | 'generate'>('generate')
   const [prompt, setPrompt] = useState(
-    'Oversized unisex hoodie, 450gsm, french terry cotton, drop shoulder, double layered hood, ribbed cuffs and hem.'
+    initialPrompt ?? 'Oversized unisex hoodie, 450gsm, french terry cotton, drop shoulder, double layered hood, ribbed cuffs and hem.'
   )
   const [selectedViews, setSelectedViews] = useState<View[]>(['front'])
   const [activeView, setActiveView] = useState<View>('front')
@@ -150,7 +152,16 @@ function ApparelFlow({ state, onComplete, onBack }: Props) {
         <div>
           <p className="phase-header">Phase 2</p>
           <h1 className="text-xl font-bold text-gray-900">Create or Upload Blank Garment</h1>
-          <p className="text-gray-500 text-sm mt-1">Upload photos of your blank garment or generate one with AI</p>
+          {uniformContext ? (
+            <div className="flex items-center gap-2 mt-1">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-grace-ink text-white text-[11px] font-semibold">
+                {uniformContext.sport} · {uniformContext.uniformType}
+              </span>
+              <p className="text-gray-500 text-sm">Upload or generate your blank uniform</p>
+            </div>
+          ) : (
+            <p className="text-gray-500 text-sm mt-1">Upload photos of your blank garment or generate one with AI</p>
+          )}
         </div>
         <button onClick={onBack} className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-700 transition-colors mt-1">
           <ArrowLeft size={14}/>Back
@@ -458,19 +469,19 @@ const UNIFORM_TYPES: Record<Sport, string[]> = {
 function UniformFlow({ onComplete, onBack }: { onComplete: (garment: AppState['garment']) => void; onBack: () => void }) {
   const [sport, setSport] = useState<Sport | null>(null)
   const [uniformType, setUniformType] = useState<string | null>(null)
+  const [confirmed, setConfirmed] = useState(false)
 
-  const handleProceed = () => {
-    if (!sport || !uniformType) return
-    onComplete({
-      svg: '',
-      dataUrl: '',
-      views: {},
-      type: `${sport} ${uniformType}`,
-      color: '',
-      mode: 'uniform',
-      sport,
-      uniformType,
-    })
+  if (confirmed && sport && uniformType) {
+    const initialPrompt = `${sport} ${uniformType.toLowerCase()}, sublimation-ready blank uniform, front view`
+    return (
+      <ApparelFlowWithContext
+        sport={sport}
+        uniformType={uniformType}
+        initialPrompt={initialPrompt}
+        onComplete={onComplete}
+        onBack={() => setConfirmed(false)}
+      />
+    )
   }
 
   return (
@@ -529,7 +540,7 @@ function UniformFlow({ onComplete, onBack }: { onComplete: (garment: AppState['g
       )}
 
       <button
-        onClick={handleProceed}
+        onClick={() => { if (sport && uniformType) setConfirmed(true) }}
         disabled={!sport || !uniformType}
         className={`w-full flex items-center justify-center gap-2 font-medium py-3 px-4 rounded-xl transition-colors text-sm ${
           sport && uniformType
@@ -537,9 +548,33 @@ function UniformFlow({ onComplete, onBack }: { onComplete: (garment: AppState['g
             : 'bg-slate-100 text-gray-400 cursor-not-allowed'
         }`}
       >
-        Continue to Apply Design <ArrowRight size={15}/>
+        Continue to Garment Creation <ArrowRight size={15}/>
       </button>
     </div>
+  )
+}
+
+// Wraps ApparelFlow with uniform context: pre-fills the prompt and merges
+// mode/sport/uniformType into the garment when the user proceeds.
+function ApparelFlowWithContext({
+  sport, uniformType, initialPrompt, onComplete, onBack,
+}: {
+  sport: Sport
+  uniformType: string
+  initialPrompt: string
+  onComplete: (garment: AppState['garment']) => void
+  onBack: () => void
+}) {
+  return (
+    <ApparelFlow
+      state={{ currentPhase: 2, logo: null, garment: null, design: null, preview: null }}
+      initialPrompt={initialPrompt}
+      uniformContext={{ sport, uniformType }}
+      onComplete={(garment) =>
+        onComplete(garment ? { ...garment, mode: 'uniform', sport, uniformType } : garment)
+      }
+      onBack={onBack}
+    />
   )
 }
 
