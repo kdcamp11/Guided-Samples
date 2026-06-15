@@ -38,6 +38,8 @@ const TYPE_COLORS: Record<NotificationType, string> = {
   order_cancelled:    'bg-red-50 text-red-500',
   qc_passed:          'bg-brand-green/10 text-brand-green',
   order_packed:       'bg-brand-green/10 text-brand-green',
+  deposit_due:        'bg-amber-100 text-amber-600',
+  final_payment_due:  'bg-amber-100 text-amber-600',
 }
 
 // ─── Single notification row ──────────────────────────────────────────────────

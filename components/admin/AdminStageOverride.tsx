@@ -171,38 +171,26 @@ export default function AdminStageOverride({ orderId, currentStage, onTransition
     <div className="space-y-3">
       <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Admin Actions</p>
 
-      {/* Targeted delivery confirmations */}
-      {currentStage === 'SAMPLE_SHIPPED' && (
-        <DeliveryConfirmAction
-          orderId={orderId}
-          fromStage="SAMPLE_SHIPPED"
-          toStage="SAMPLE_DELIVERED"
-          label="Confirm Sample Delivered"
-          description="Mark the physical sample as delivered to the client. This advances the order to Sample Delivered and will prompt the client to begin their evaluation."
-          onSuccess={onTransition}
-        />
-      )}
-
-      {currentStage === 'SAMPLE_DELIVERED' && (
-        <DeliveryConfirmAction
-          orderId={orderId}
-          fromStage="SAMPLE_DELIVERED"
-          toStage="CLIENT_SAMPLE_EVALUATION"
-          label="Open for Client Evaluation"
-          description="Delivery confirmed. Notify the client that their sample is ready for review and move it to Client Sample Evaluation."
-          onSuccess={onTransition}
-        />
-      )}
-
-      {currentStage === 'SHIPPED' && (
-        <DeliveryConfirmAction
-          orderId={orderId}
-          fromStage="SHIPPED"
-          toStage="DELIVERED"
-          label="Confirm Order Delivered"
-          description="Mark the bulk order as delivered. This completes the production workflow."
-          onSuccess={onTransition}
-        />
+      {/* Quality check — GRACE inspects the supplier's photos and decides */}
+      {currentStage === 'QUALITY_CHECK' && (
+        <>
+          <DeliveryConfirmAction
+            orderId={orderId}
+            fromStage="QUALITY_CHECK"
+            toStage="AWAITING_FINAL_PAYMENT"
+            label="Complete Quality Check — Pass"
+            description="The product passed inspection. This advances the order and prompts the client for their final payment before shipment."
+            onSuccess={onTransition}
+          />
+          <DeliveryConfirmAction
+            orderId={orderId}
+            fromStage="QUALITY_CHECK"
+            toStage="BULK_PRODUCTION"
+            label="Quality Check — Fail / Rework"
+            description="The product did not pass inspection. Return it to bulk production for correction."
+            onSuccess={onTransition}
+          />
+        </>
       )}
 
       {/* General override — always available for non-terminal stages */}

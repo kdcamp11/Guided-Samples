@@ -43,11 +43,9 @@ export const SUPPLIER_CONTROLLED_TRANSITIONS: Partial<
   //  is not listed here because it is NOT supplier-controlled)
   BULK_PRODUCTION:            ['QUALITY_CHECK'],
 
-  // QC done: either advance to packing or send back for rework
-  QUALITY_CHECK:              ['PACKING', 'BULK_PRODUCTION'],
-
-  // Packing complete; supplier ships and enters tracking info
-  PACKING:                    ['SHIPPED'],
+  // Final payment received; supplier ships the bulk order with tracking
+  READY_TO_SHIP:             ['SHIPPED'],
+  // (QUALITY_CHECK pass/fail is controlled by GRACE admins, not the supplier)
 }
 
 /**
@@ -56,10 +54,13 @@ export const SUPPLIER_CONTROLLED_TRANSITIONS: Partial<
  */
 export const SUPPLIER_WAITING_STAGES = new Set<ProductionStage>([
   'FIRST_PIECE_REVIEW',      // client reviewing photos before sample ships
-  'SAMPLE_SHIPPED',          // GRACE confirms delivery
+  'SAMPLE_SHIPPED',          // client confirms delivery
   'SAMPLE_DELIVERED',        // GRACE opens for client evaluation
   'CLIENT_SAMPLE_EVALUATION',// client is deciding
-  'SHIPPED',                 // GRACE confirms delivery
+  'QUALITY_CHECK',           // GRACE admin inspects QC photos
+  'AWAITING_PRODUCTION_DEPOSIT', // client paying deposit
+  'AWAITING_FINAL_PAYMENT',  // client paying final balance
+  'SHIPPED',                 // client confirms delivery
   'DELIVERED',               // terminal — complete
   'CANCELLED',               // terminal — voided
 ])
@@ -79,6 +80,8 @@ export type SupplierAction = {
   requiredFields: SupplierActionField[]
   /** Whether one or more media files must be attached */
   requiresMedia:  boolean
+  /** Minimum number of media files required (defaults to 1 when requiresMedia is true) */
+  minMedia?:      number
   mediaType?:     SupplierMediaType
   /** Visual emphasis for destructive or significant actions */
   variant:        'primary' | 'secondary' | 'warning'
@@ -175,53 +178,30 @@ export const SUPPLIER_ACTIONS: Partial<Record<ProductionStage, SupplierAction[]>
     {
       id:          'submit_for_qc',
       label:       'Submit for Quality Check',
-      description: 'Bulk run is complete. Move goods to the QC station for inspection.',
+      description: 'Bulk run is complete. Upload clear front and back photos of the finished product. GRACE will inspect and approve before the order proceeds.',
       toStage:     'QUALITY_CHECK',
-      requiredFields: [
-        { key: 'qc_inspector', label: 'QC Inspector Name', type: 'text', placeholder: 'Inspector name or ID' },
-      ],
-      requiresMedia: false,
-      variant:       'primary',
-    },
-  ],
-
-  QUALITY_CHECK: [
-    {
-      id:          'pass_qc',
-      label:       'Complete Quality Check — Pass',
-      description: 'All units have passed inspection. Proceed to packing.',
-      toStage:     'PACKING',
-      requiredFields: [
-        { key: 'qc_notes', label: 'QC Notes', type: 'textarea', placeholder: 'Summary of inspection results…' },
-      ],
+      requiredFields: [],
       requiresMedia:  true,
+      minMedia:       2,
       mediaType:      'qc_report',
       variant:        'primary',
     },
-    {
-      id:          'fail_qc',
-      label:       'QC Failed — Return to Production',
-      description: 'Units did not pass inspection. Return to bulk production for correction.',
-      toStage:     'BULK_PRODUCTION',
-      requiredFields: [
-        { key: 'qc_notes', label: 'Failure Notes', type: 'textarea', placeholder: 'Describe the defects found…' },
-      ],
-      requiresMedia: false,
-      variant:       'warning',
-    },
   ],
 
-  PACKING: [
+  // QUALITY_CHECK pass/fail is maintained by GRACE admins, not the supplier.
+
+  READY_TO_SHIP: [
     {
       id:          'ship_bulk',
-      label:       'Mark Packed & Upload Tracking',
-      description: 'All units are packed and ready. Enter final shipping details to dispatch.',
+      label:       'Mark Shipped & Upload Tracking',
+      description: 'Final payment received. Enter shipping details to dispatch the bulk order.',
       toStage:     'SHIPPED',
       requiredFields: [
         { key: 'tracking_number', label: 'Tracking Number', type: 'text', placeholder: '1Z999AA10123456784' },
         { key: 'carrier',         label: 'Carrier',         type: 'text', placeholder: 'UPS, FedEx, DHL…' },
       ],
       requiresMedia:  true,
+      minMedia:       1,
       mediaType:      'packing_photo',
       variant:        'primary',
     },
