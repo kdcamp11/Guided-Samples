@@ -1,0 +1,361 @@
+'use client'
+
+import { useMemo, useState } from 'react'
+import { PenTool, Download } from 'lucide-react'
+import {
+  getTechnicalDrawingData,
+  type TechnicalDrawingData,
+  type DrawingPlacement,
+} from '@/lib/fitBlocks/technicalDrawing'
+import { fitLabel, formatInches, type SizeGuideOverrides } from '@/lib/fitBlocks/sizeGuide'
+import { getAllGarmentTypes, getFitLibrary } from '@/lib/fitBlocks'
+import { ALL_SIZES } from '@/lib/fitBlocks/types'
+import type { GarmentType, FitVariant, SizeKey } from '@/lib/fitBlocks/types'
+
+interface Props {
+  garmentType?: GarmentType
+  fit?: FitVariant
+  size?: SizeKey
+  /** Logo/artwork to render inside the placement boxes. */
+  artworkUrl?: string | null
+  overrides?: SizeGuideOverrides
+  allowGarmentSwitch?: boolean
+}
+
+const GARMENT_LABELS: Record<GarmentType, string> = {
+  short_sleeve_tee: 'Short Sleeve Tee', long_sleeve_tee: 'Long Sleeve Tee', crewneck: 'Crewneck',
+  hoodie: 'Hoodie', zip_hoodie: 'Zip Hoodie', track_jacket: 'Track Jacket', windbreaker: 'Windbreaker',
+  sweatpants: 'Sweatpants', track_pants: 'Track Pants', shorts: 'Shorts',
+}
+
+type Pt = { x: number; y: number }
+type Dim = { x1: number; y1: number; x2: number; y2: number; label: string; orient: 'h' | 'v' }
+type Box = { x: number; y: number; w: number; h: number; label: string; drawn: boolean }
+
+const FRONT_TOP_LOCS = new Set(['center_chest', 'left_chest'])
+const FRONT_BOTTOM_LOCS = new Set(['left_hip', 'right_hip'])
+
+export default function TechnicalDrawing({
+  garmentType: initialGarment = 'short_sleeve_tee',
+  fit: initialFit,
+  size: initialSize = 'M',
+  artworkUrl,
+  overrides,
+  allowGarmentSwitch = true,
+}: Props) {
+  const [garment, setGarment] = useState<GarmentType>(initialGarment)
+  const [fit, setFit] = useState<FitVariant | undefined>(initialFit)
+  const [size, setSize] = useState<SizeKey>(initialSize)
+
+  const data = useMemo(
+    () => getTechnicalDrawingData(garment, fit, size, overrides),
+    [garment, fit, size, overrides],
+  )
+
+  const library = getFitLibrary(garment)
+
+  if (!data) {
+    return <div className="p-6 text-sm text-grace-stone">No technical drawing available for this garment.</div>
+  }
+
+  return (
+    <div className="p-4 md:p-6 max-w-[1100px]">
+      {/* Header */}
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-grace-mist border border-grace-border flex items-center justify-center text-grace-ink">
+            <PenTool size={18} />
+          </div>
+          <div>
+            <h1 className="text-xl font-black text-grace-ink uppercase tracking-tight">Technical Drawing</h1>
+            <p className="text-grace-stone text-sm">Flat schematic with measurement callouts and artwork placement. All inches.</p>
+          </div>
+        </div>
+        <button onClick={() => exportSvg(garment, data.fit, size)} className="btn-secondary flex items-center gap-2 shrink-0">
+          <Download size={13} /> Export SVG
+        </button>
+      </div>
+
+      {/* Selectors */}
+      {allowGarmentSwitch && (
+        <div className="mb-3 flex flex-wrap gap-1.5">
+          {getAllGarmentTypes().map(g => (
+            <button key={g} onClick={() => { setGarment(g); setFit(undefined) }}
+              className={`px-3 py-1.5 rounded-full text-[11px] font-semibold tracking-wide transition-colors ${
+                g === garment ? 'bg-grace-ink text-white' : 'bg-grace-mist text-grace-stone hover:text-grace-ink border border-grace-border'
+              }`}>
+              {GARMENT_LABELS[g]}
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="mb-3 flex flex-wrap items-center gap-1.5">
+        <span className="text-[10px] font-bold tracking-[0.2em] uppercase text-grace-stone mr-1">Fit</span>
+        {library.availableFits.map(f => (
+          <button key={f} onClick={() => setFit(f)}
+            className={`px-3 py-1.5 rounded-full text-[11px] font-semibold tracking-wide transition-colors ${
+              f === data.fit ? 'bg-grace-ink text-white' : 'bg-white text-grace-stone hover:text-grace-ink border border-grace-border'
+            }`}>
+            {fitLabel(f)}
+          </button>
+        ))}
+      </div>
+      <div className="mb-5 flex flex-wrap items-center gap-1.5">
+        <span className="text-[10px] font-bold tracking-[0.2em] uppercase text-grace-stone mr-1">Size</span>
+        {ALL_SIZES.map(s => (
+          <button key={s} onClick={() => setSize(s)}
+            className={`px-3 py-1.5 rounded-full text-[11px] font-semibold tracking-wide transition-colors ${
+              s === size ? 'bg-grace-ink text-white' : 'bg-white text-grace-stone hover:text-grace-ink border border-grace-border'
+            }`}>
+            {s}
+          </button>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-4">
+        {/* Drawing */}
+        <div className="card p-2" id="grace-tech-drawing">
+          <FlatSvg data={data} artworkUrl={artworkUrl} />
+        </div>
+
+        {/* Spec legend */}
+        <div className="space-y-3">
+          <div className="card">
+            <p className="text-[10px] font-bold tracking-[0.2em] uppercase text-grace-stone mb-2">
+              Measurements · {data.fitLabel} · {size}
+            </p>
+            <table className="w-full text-xs">
+              <tbody>
+                {data.callouts.map(c => (
+                  <tr key={c.key} className="border-b border-grace-border last:border-0">
+                    <td className="py-1.5 text-grace-stone">
+                      {c.label}
+                      {c.tier === 'technical' && (
+                        <span className="ml-1.5 text-[8px] font-bold uppercase tracking-widest text-grace-red align-middle">Tech</span>
+                      )}
+                    </td>
+                    <td className="py-1.5 text-right font-semibold text-grace-ink tabular-nums">{c.display}"</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="text-[10px] text-grace-stone mt-2 leading-relaxed">
+              <span className="font-bold text-grace-red">Tech</span> rows are supplier-only — they appear on tech packs, never on consumer size guides.
+            </p>
+          </div>
+
+          <div className="card">
+            <p className="text-[10px] font-bold tracking-[0.2em] uppercase text-grace-stone mb-2">Artwork Placement</p>
+            <ul className="space-y-2">
+              {data.placements.map((p, i) => (
+                <li key={i} className="text-xs">
+                  <div className="flex justify-between">
+                    <span className="font-semibold text-grace-ink">{p.label}</span>
+                    <span className="text-grace-stone tabular-nums">{formatInches(p.widthInches)}" × {formatInches(p.heightInches)}"</span>
+                  </div>
+                  <p className="text-[10px] text-grace-stone leading-tight">{p.notes}</p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── SVG flat ─────────────────────────────────────────────────────────────────
+
+function FlatSvg({ data, artworkUrl }: { data: TechnicalDrawingData; artworkUrl?: string | null }) {
+  const m = data.measurements
+  const { polylines, dims, boxes } =
+    data.category === 'top' ? topGeometry(m, data.placements) : bottomGeometry(m, data.placements)
+
+  // Compute bounds across all geometry in inch-space.
+  const pts: Pt[] = [
+    ...polylines.flat(),
+    ...dims.flatMap(d => [{ x: d.x1, y: d.y1 }, { x: d.x2, y: d.y2 }]),
+    ...boxes.flatMap(b => [{ x: b.x, y: b.y }, { x: b.x + b.w, y: b.y + b.h }]),
+  ]
+  const minX = Math.min(...pts.map(p => p.x)), maxX = Math.max(...pts.map(p => p.x))
+  const minY = Math.min(...pts.map(p => p.y)), maxY = Math.max(...pts.map(p => p.y))
+
+  const PAD = 56 // px for labels
+  const TARGET_W = 460
+  const wIn = maxX - minX, hIn = maxY - minY
+  const scale = Math.min((TARGET_W - PAD * 2) / wIn, 560 / hIn)
+  const W = wIn * scale + PAD * 2
+  const H = hIn * scale + PAD * 2
+  const tx = (x: number) => (x - minX) * scale + PAD
+  const ty = (y: number) => (y - minY) * scale + PAD
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ maxHeight: 620 }} fontFamily="Inter, sans-serif">
+      {/* Garment outline */}
+      {polylines.map((poly, i) => (
+        <polygon key={i}
+          points={poly.map(p => `${tx(p.x)},${ty(p.y)}`).join(' ')}
+          fill="#FFFFFF" stroke="#0A0A0A" strokeWidth={1.6} strokeLinejoin="round" />
+      ))}
+
+      {/* Placement boxes */}
+      {boxes.filter(b => b.drawn).map((b, i) => (
+        <g key={i}>
+          {artworkUrl && (
+            <image href={artworkUrl} x={tx(b.x)} y={ty(b.y)} width={b.w * scale} height={b.h * scale}
+              preserveAspectRatio="xMidYMid meet" opacity={0.9} />
+          )}
+          <rect x={tx(b.x)} y={ty(b.y)} width={b.w * scale} height={b.h * scale}
+            fill={artworkUrl ? 'none' : '#C8372D11'} stroke="#C8372D" strokeWidth={1} strokeDasharray="4 3" />
+          <text x={tx(b.x) + (b.w * scale) / 2} y={ty(b.y) - 4} textAnchor="middle"
+            fontSize={9} fontWeight={700} fill="#C8372D">{b.label}</text>
+        </g>
+      ))}
+
+      {/* Dimension lines */}
+      {dims.map((d, i) => (
+        <Dimension key={i} d={d} tx={tx} ty={ty} />
+      ))}
+    </svg>
+  )
+}
+
+function Dimension({ d, tx, ty }: { d: Dim; tx: (n: number) => number; ty: (n: number) => number }) {
+  const x1 = tx(d.x1), y1 = ty(d.y1), x2 = tx(d.x2), y2 = ty(d.y2)
+  const mx = (x1 + x2) / 2, my = (y1 + y2) / 2
+  const tick = 4
+  return (
+    <g stroke="#6B6B6B" strokeWidth={0.8}>
+      <line x1={x1} y1={y1} x2={x2} y2={y2} />
+      {d.orient === 'h' ? (
+        <>
+          <line x1={x1} y1={y1 - tick} x2={x1} y2={y1 + tick} />
+          <line x1={x2} y1={y2 - tick} x2={x2} y2={y2 + tick} />
+          <text x={mx} y={my - 4} textAnchor="middle" fontSize={9} fontWeight={600} fill="#0A0A0A" stroke="none">{d.label}</text>
+        </>
+      ) : (
+        <>
+          <line x1={x1 - tick} y1={y1} x2={x1 + tick} y2={y1} />
+          <line x1={x2 - tick} y1={y2} x2={x2 + tick} y2={y2} />
+          <text x={mx + 5} y={my} textAnchor="start" fontSize={9} fontWeight={600} fill="#0A0A0A" stroke="none" dominantBaseline="middle">{d.label}</text>
+        </>
+      )}
+    </g>
+  )
+}
+
+// ── Top geometry (front flat) ──────────────────────────────────────────────────
+
+function topGeometry(m: Record<string, number>, placements: DrawingPlacement[]) {
+  const chest = m.chest, shoulder = m.shoulderWidth, bodyLen = m.frontLength
+  const neck = m.neckOpening ?? 7.5, hem = m.bottomOpening ?? chest
+  const sleeveLen = m.sleeveLength, sleeveOpen = m.sleeveOpening ?? 5.5
+  const armhole = m.armhole ?? 9.5
+
+  const cx = 0, yShoulder = 0, slope = 1.2, neckDrop = 2.2
+  const yUnderarm = armhole, yHem = bodyLen
+  const nH = neck / 2, sH = shoulder / 2, cH = chest / 2, hH = hem / 2
+
+  // Body outline (front), neck dip approximated with a mid point.
+  const body: Pt[] = [
+    { x: cx - nH, y: yShoulder },
+    { x: cx - sH, y: yShoulder + slope },
+    { x: cx - cH, y: yUnderarm },
+    { x: cx - hH, y: yHem },
+    { x: cx + hH, y: yHem },
+    { x: cx + cH, y: yUnderarm },
+    { x: cx + sH, y: yShoulder + slope },
+    { x: cx + nH, y: yShoulder },
+    { x: cx, y: yShoulder + neckDrop },
+  ]
+
+  // Sleeves (tapered to cuff).
+  const ang = (22 * Math.PI) / 180, ux = Math.cos(ang), uy = Math.sin(ang)
+  function sleeve(sign: number): Pt[] {
+    const a = { x: cx + sign * sH, y: yShoulder + slope }
+    const b = { x: cx + sign * cH, y: yUnderarm }
+    const cuffTop = { x: a.x + sign * sleeveLen * ux, y: a.y + sleeveLen * uy }
+    const armVec = { x: b.x - a.x, y: b.y - a.y }
+    const armLen = Math.hypot(armVec.x, armVec.y) || 1
+    const cuffBot = { x: cuffTop.x + (armVec.x / armLen) * sleeveOpen, y: cuffTop.y + (armVec.y / armLen) * sleeveOpen }
+    return [a, cuffTop, cuffBot, b]
+  }
+
+  const polylines = [body, sleeve(-1), sleeve(1)]
+
+  const dims: Dim[] = [
+    { x1: cx - cH, y1: yUnderarm, x2: cx + cH, y2: yUnderarm, label: `Chest ${formatInches(chest)}"`, orient: 'h' },
+    { x1: cx - sH, y1: yShoulder + slope, x2: cx + sH, y2: yShoulder + slope, label: `Shoulder ${formatInches(shoulder)}"`, orient: 'h' },
+    { x1: cx - hH, y1: yHem, x2: cx + hH, y2: yHem, label: `Hem ${formatInches(hem)}"`, orient: 'h' },
+    { x1: cx + cH + 2, y1: yShoulder, x2: cx + cH + 2, y2: yHem, label: `Length ${formatInches(bodyLen)}"`, orient: 'v' },
+  ]
+
+  const boxes = placements.map(p => ({
+    x: cx + p.xOffsetInches - p.widthInches / 2,
+    y: yShoulder + p.yOffsetInches,
+    w: p.widthInches,
+    h: p.heightInches,
+    label: p.label,
+    drawn: FRONT_TOP_LOCS.has(p.location),
+  }))
+
+  return { polylines, dims, boxes }
+}
+
+// ── Bottom geometry (front flat) ───────────────────────────────────────────────
+
+function bottomGeometry(m: Record<string, number>, placements: DrawingPlacement[]) {
+  const waist = m.waist, thigh = m.thigh, rise = m.frontRise, inseam = m.inseam
+  const legOpen = m.legOpening
+  const cx = 0, yWaist = 0
+  const yCrotch = rise, yHem = rise + inseam
+  const wH = waist / 2
+  const hipH = Math.max(wH + 1.5, thigh) // outer hip half
+
+  // Combined pants outline with crotch notch.
+  const outline: Pt[] = [
+    { x: cx - wH, y: yWaist },
+    { x: cx + wH, y: yWaist },
+    { x: cx + hipH, y: yCrotch },
+    { x: cx + hipH, y: yHem },
+    { x: cx + hipH - legOpen, y: yHem },
+    { x: cx, y: yCrotch },
+    { x: cx - hipH + legOpen, y: yHem },
+    { x: cx - hipH, y: yHem },
+    { x: cx - hipH, y: yCrotch },
+  ]
+
+  const dims: Dim[] = [
+    { x1: cx - wH, y1: yWaist, x2: cx + wH, y2: yWaist, label: `Waist ${formatInches(waist)}"`, orient: 'h' },
+    { x1: cx - hipH, y1: yCrotch, x2: cx + hipH, y2: yCrotch, label: `Thigh ${formatInches(thigh)}"`, orient: 'h' },
+    { x1: cx + hipH - legOpen, y1: yHem, x2: cx + hipH, y2: yHem, label: `Leg Opening ${formatInches(legOpen)}"`, orient: 'h' },
+    { x1: cx + hipH + 2, y1: yWaist, x2: cx + hipH + 2, y2: yCrotch, label: `Rise ${formatInches(rise)}"`, orient: 'v' },
+    { x1: cx + hipH + 2, y1: yCrotch, x2: cx + hipH + 2, y2: yHem, label: `Inseam ${formatInches(inseam)}"`, orient: 'v' },
+  ]
+
+  const boxes = placements.map(p => ({
+    x: cx + p.xOffsetInches - p.widthInches / 2,
+    y: yWaist + p.yOffsetInches,
+    w: p.widthInches,
+    h: p.heightInches,
+    label: p.label,
+    drawn: FRONT_BOTTOM_LOCS.has(p.location),
+  }))
+
+  return { polylines: [outline], dims, boxes }
+}
+
+// ── SVG export ─────────────────────────────────────────────────────────────────
+
+function exportSvg(garment: GarmentType, fit: FitVariant, size: SizeKey) {
+  const node = document.getElementById('grace-tech-drawing')?.querySelector('svg')
+  if (!node) return
+  const xml = new XMLSerializer().serializeToString(node)
+  const blob = new Blob([`<?xml version="1.0" encoding="UTF-8"?>\n${xml}`], { type: 'image/svg+xml' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${garment}_${fit}_${size}_technical.svg`
+  a.click()
+  URL.revokeObjectURL(url)
+}

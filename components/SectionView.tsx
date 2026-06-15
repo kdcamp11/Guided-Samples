@@ -7,6 +7,7 @@ import {
 import { AppState } from '@/app/page'
 import { useAuth } from '@/lib/auth'
 import SizeGuide from '@/components/SizeGuide'
+import TechnicalDrawing from '@/components/TechnicalDrawing'
 import type { SizeGuideOverrides } from '@/lib/fitBlocks/sizeGuide'
 import { resolveGarmentType } from '@/lib/fitBlocks'
 import type { GarmentType } from '@/lib/fitBlocks/types'
@@ -22,6 +23,7 @@ export default function SectionView({ section, state, onStartDesign }: Props) {
   if (section === 'projects') return <Projects state={state} onStartDesign={onStartDesign} />
   if (section === 'techpacks') return <TechPacks state={state} />
   if (section === 'sizeguide') return <SizeGuideSection state={state} />
+  if (section === 'techdrawing') return <TechnicalDrawingSection state={state} />
   if (section === 'orders') return <Orders />
   if (section === 'library') return <LibraryView state={state} />
   if (section === 'settings') return <SettingsView />
@@ -40,6 +42,21 @@ function SizeGuideSection({ state }: { state: AppState }) {
       garmentType={designed}
       overrides={overrides}
       onOverridesChange={setOverrides}
+    />
+  )
+}
+
+// Technical Drawing section. Reads ONLY getTechPackMeasurements() (via the drawing
+// data layer), so hidden technical specs and any consumer edits both flow through,
+// while consumer screens stay on the simplified guide. Renders the designed
+// garment's logo into the placement boxes when one exists.
+function TechnicalDrawingSection({ state }: { state: AppState }) {
+  const designed: GarmentType | undefined =
+    (state.garment?.type ? resolveGarmentType(state.garment.type) ?? undefined : undefined)
+  return (
+    <TechnicalDrawing
+      garmentType={designed}
+      artworkUrl={state.logo?.dataUrl ?? null}
     />
   )
 }
