@@ -17,6 +17,7 @@ import Phase6Production from '@/components/Phase6Production'
 import type { TechPackData } from '@/components/Phase6Production'
 import SectionView from '@/components/SectionView'
 import LandingPage from '@/components/LandingPage'
+import CreativeDirectionForm from '@/components/CreativeDirectionForm'
 import { Menu } from 'lucide-react'
 
 export type AppState = {
@@ -59,7 +60,7 @@ function App() {
     && new URLSearchParams(window.location.search).get('view') === 'studio'
       ? 'studio' as const
       : 'landing' as const
-  const [view, setView] = useState<'landing' | 'projects' | 'studio'>(initialView)
+  const [view, setView] = useState<'landing' | 'projects' | 'studio' | 'creative-direction'>(initialView)
   const [state, setState] = useState<AppState>(EMPTY_STATE)
   const [section, setSection] = useState(initialView === 'studio' ? 'dashboard' : 'design')
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -135,12 +136,18 @@ function App() {
     )
   }
 
+  // Creative Direction form
+  if (view === 'creative-direction') {
+    return <CreativeDirectionForm onBack={() => setView('landing')} />
+  }
+
   // Landing page
   if (view === 'landing') {
     return (
       <>
         <LandingPage
-          onEnter={() => setView('studio')}
+          onSelfService={() => setView('studio')}
+          onCreativeDirection={() => setView('creative-direction')}
           onSignIn={() => setAuthOpen(true)}
         />
         <AuthModal
