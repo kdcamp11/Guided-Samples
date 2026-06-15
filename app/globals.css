@@ -4,6 +4,11 @@
 
 :root {
   --brand-green: #184D3E;
+  --grace-ink: #0A0A0A;
+  --grace-red: #C8372D;
+  --grace-mist: #F7F7F7;
+  --grace-stone: #6B6B6B;
+  --grace-border: #E4E4E4;
 }
 
 * {
@@ -11,9 +16,11 @@
 }
 
 body {
-  background-color: #f9fafb;
-  color: #111827;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: #ffffff;
+  color: #0A0A0A;
+  font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* Custom scrollbar */
@@ -21,14 +28,14 @@ body {
   width: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #f1f5f9;
+  background: #F7F7F7;
 }
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: #E4E4E4;
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: #6B6B6B;
 }
 
 /* Checkerboard pattern for transparent backgrounds */
@@ -43,25 +50,25 @@ body {
 }
 
 .phase-header {
-  @apply text-xs font-semibold tracking-widest text-brand-green uppercase mb-4;
+  @apply text-[10px] font-bold tracking-[0.2em] text-grace-stone uppercase mb-4;
 }
 
 .card {
-  @apply bg-white border border-slate-200 rounded-xl p-4;
+  @apply bg-white border border-grace-border rounded-2xl p-4;
 }
 
 .btn-primary {
-  @apply bg-brand-green hover:bg-brand-green-light text-white font-medium py-2.5 px-4 rounded-lg transition-colors text-sm;
+  @apply bg-grace-ink hover:bg-zinc-800 text-white font-semibold py-2.5 px-6 rounded-full transition-colors text-xs tracking-widest uppercase;
 }
 
 .btn-secondary {
-  @apply bg-white hover:bg-slate-50 text-gray-700 font-medium py-2 px-4 rounded-lg transition-colors text-sm border border-slate-200 hover:border-slate-300;
+  @apply bg-white hover:bg-grace-mist text-grace-ink font-semibold py-2.5 px-6 rounded-full transition-colors text-xs tracking-widest uppercase border border-grace-border hover:border-grace-ink;
 }
 
 .input-field {
-  @apply bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-brand-green transition-colors w-full;
+  @apply bg-white border border-grace-border rounded-xl px-3 py-2.5 text-sm text-grace-ink placeholder-grace-stone focus:outline-none focus:border-grace-ink transition-colors w-full;
 }
 
 .textarea-field {
-  @apply bg-white border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-brand-green transition-colors w-full resize-none;
+  @apply bg-white border border-grace-border rounded-xl px-3 py-2.5 text-sm text-grace-ink placeholder-grace-stone focus:outline-none focus:border-grace-ink transition-colors w-full resize-none;
 }

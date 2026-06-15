@@ -8,22 +8,22 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['var(--font-inter)', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+      },
       colors: {
+        'grace-ink': '#0A0A0A',
+        'grace-red': '#C8372D',
+        'grace-mist': '#F7F7F7',
+        'grace-stone': '#6B6B6B',
+        'grace-border': '#E4E4E4',
+        // Keep brand-green for backward compat with design studio phases (Module 1)
         brand: {
           green: '#184D3E',
           'green-light': '#1a5c4a',
           'green-dark': '#0f2e25',
         },
-        dark: {
-          900: '#f9fafb',
-          800: '#f1f5f9',
-          700: '#ffffff',
-          600: '#f8fafc',
-          500: '#e2e8f0',
-          400: '#cbd5e1',
-          300: '#94a3b8',
-        }
-      }
+      },
     },
   },
   plugins: [],

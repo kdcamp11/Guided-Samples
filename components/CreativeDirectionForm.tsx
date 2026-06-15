@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Loader2, CheckCircle2, ArrowLeft, Send, Sparkles } from 'lucide-react'
+import { Loader2, CheckCircle2, ArrowLeft, Send } from 'lucide-react'
 import { useAuth } from '@/lib/auth'
 import AuthModal from '@/components/AuthModal'
 
@@ -10,6 +10,15 @@ interface Props {
 }
 
 type Step = 'auth-gate' | 'form' | 'success'
+
+function GraceMark({ size = 32 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 48 48" fill="none" aria-label="GRACE mark">
+      <circle cx="24" cy="24" r="23" stroke="#0A0A0A" strokeWidth="2"/>
+      <circle cx="24" cy="24" r="7" fill="#C8372D"/>
+    </svg>
+  )
+}
 
 export default function CreativeDirectionForm({ onBack }: Props) {
   const { user } = useAuth()
@@ -59,7 +68,7 @@ export default function CreativeDirectionForm({ onBack }: Props) {
 
   if (step === 'auth-gate') {
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4 py-16">
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center px-4 py-16">
         <AuthModal
           open={authOpen}
           onClose={() => setAuthOpen(false)}
@@ -68,17 +77,16 @@ export default function CreativeDirectionForm({ onBack }: Props) {
 
         <button
           onClick={onBack}
-          className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-700 transition-colors self-start mb-8 ml-4 sm:ml-0 max-w-lg w-full mx-auto"
+          className="flex items-center gap-1.5 text-xs text-grace-stone hover:text-grace-ink transition-colors self-start mb-8 ml-4 sm:ml-0 max-w-lg w-full mx-auto tracking-widest uppercase font-bold"
         >
-          <ArrowLeft size={13}/> Back
+          <ArrowLeft size={12}/> Back
         </button>
 
-        <div className="max-w-md w-full card text-center">
-          <div className="w-12 h-12 rounded-2xl bg-brand-green flex items-center justify-center mx-auto mb-4">
-            <Sparkles size={20} className="text-white"/>
-          </div>
-          <h2 className="text-lg font-bold text-gray-900 mb-2">Creative Direction</h2>
-          <p className="text-sm text-gray-500 leading-relaxed mb-6">
+        <div className="max-w-md w-full bg-white border border-grace-border rounded-3xl p-10 text-center">
+          <GraceMark size={44}/>
+          <p className="text-[10px] font-bold tracking-[0.2em] text-grace-stone uppercase mt-5 mb-1">Full Service</p>
+          <h2 className="text-xl font-black text-grace-ink uppercase tracking-tight mb-3">Creative Direction</h2>
+          <p className="text-sm text-grace-stone leading-relaxed mb-8">
             Create a free account or sign in to submit your project brief. Our team will review it and reach out within 2 business days.
           </p>
           <div className="flex flex-col gap-2">
@@ -86,7 +94,7 @@ export default function CreativeDirectionForm({ onBack }: Props) {
               onClick={() => setAuthOpen(true)}
               className="btn-primary w-full flex items-center justify-center gap-2"
             >
-              <Sparkles size={14}/> Create Account
+              Create Account
             </button>
             <button
               onClick={() => setAuthOpen(true)}
@@ -104,14 +112,15 @@ export default function CreativeDirectionForm({ onBack }: Props) {
 
   if (step === 'success') {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-        <div className="max-w-md w-full card text-center">
-          <div className="w-12 h-12 rounded-2xl bg-brand-green/10 flex items-center justify-center mx-auto mb-4">
-            <CheckCircle2 size={22} className="text-brand-green"/>
+      <div className="min-h-screen bg-white flex items-center justify-center px-4">
+        <div className="max-w-md w-full bg-white border border-grace-border rounded-3xl p-10 text-center">
+          <div className="w-12 h-12 rounded-full bg-grace-mist border border-grace-border flex items-center justify-center mx-auto mb-5">
+            <CheckCircle2 size={20} className="text-grace-ink"/>
           </div>
-          <h2 className="text-lg font-bold text-gray-900 mb-2">Brief received!</h2>
-          <p className="text-sm text-gray-500 leading-relaxed mb-6">
-            Thanks, <strong>{fullName}</strong>. Our team will review your project and reach out at <strong>{email}</strong> within 2 business days.
+          <p className="text-[10px] font-bold tracking-[0.2em] text-grace-stone uppercase mb-1">Brief Received</p>
+          <h2 className="text-xl font-black text-grace-ink uppercase tracking-tight mb-3">You&apos;re In</h2>
+          <p className="text-sm text-grace-stone leading-relaxed mb-8">
+            Thanks, <strong className="text-grace-ink">{fullName}</strong>. Our team will review your project and reach out at <strong className="text-grace-ink">{email}</strong> within 2 business days.
           </p>
           <button onClick={onBack} className="btn-secondary w-full">
             Back to Home
@@ -124,28 +133,27 @@ export default function CreativeDirectionForm({ onBack }: Props) {
   // ── Form ───────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-gray-50 px-4 py-12">
+    <div className="min-h-screen bg-white px-4 py-16">
       <div className="max-w-lg mx-auto">
         <button
           onClick={onBack}
-          className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-700 transition-colors mb-8"
+          className="flex items-center gap-1.5 text-[10px] text-grace-stone hover:text-grace-ink transition-colors mb-10 tracking-widest uppercase font-bold"
         >
-          <ArrowLeft size={13}/> Back
+          <ArrowLeft size={12}/> Back
         </button>
 
-        <div className="mb-8">
-          <div className="w-10 h-10 rounded-xl bg-brand-green flex items-center justify-center mb-4">
-            <Sparkles size={16} className="text-white"/>
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Creative Direction</h1>
-          <p className="text-sm text-gray-500 leading-relaxed">
+        <div className="mb-10">
+          <GraceMark size={40}/>
+          <p className="text-[10px] font-bold tracking-[0.2em] text-grace-stone uppercase mt-5 mb-1">Full Service</p>
+          <h1 className="text-3xl font-black text-grace-ink uppercase tracking-tight mb-3">Creative Direction</h1>
+          <p className="text-sm text-grace-stone leading-relaxed">
             Tell us about your project. GRACE Studios will handle the design and production direction for you.
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="card space-y-4">
+        <form onSubmit={handleSubmit} className="bg-white border border-grace-border rounded-2xl p-8 space-y-5">
           <div>
-            <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">
+            <label className="text-[10px] font-bold text-grace-stone uppercase tracking-widest mb-2 block">
               Full Name <span className="text-red-400">*</span>
             </label>
             <input
@@ -159,7 +167,7 @@ export default function CreativeDirectionForm({ onBack }: Props) {
           </div>
 
           <div>
-            <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">
+            <label className="text-[10px] font-bold text-grace-stone uppercase tracking-widest mb-2 block">
               Brand Name <span className="text-red-400">*</span>
             </label>
             <input
@@ -173,7 +181,7 @@ export default function CreativeDirectionForm({ onBack }: Props) {
           </div>
 
           <div>
-            <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">
+            <label className="text-[10px] font-bold text-grace-stone uppercase tracking-widest mb-2 block">
               Email <span className="text-red-400">*</span>
             </label>
             <input
@@ -187,7 +195,7 @@ export default function CreativeDirectionForm({ onBack }: Props) {
           </div>
 
           <div>
-            <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">
+            <label className="text-[10px] font-bold text-grace-stone uppercase tracking-widest mb-2 block">
               Describe Your Project <span className="text-red-400">*</span>
             </label>
             <textarea
@@ -201,7 +209,7 @@ export default function CreativeDirectionForm({ onBack }: Props) {
           </div>
 
           <div>
-            <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">
+            <label className="text-[10px] font-bold text-grace-stone uppercase tracking-widest mb-2 block">
               Estimated Quantity
             </label>
             <input
@@ -211,11 +219,11 @@ export default function CreativeDirectionForm({ onBack }: Props) {
               value={quantity}
               onChange={e => setQuantity(e.target.value)}
             />
-            <p className="text-[10px] text-gray-400 mt-1">Optional — helps us understand the scale of your project.</p>
+            <p className="text-[10px] text-grace-stone mt-1.5">Optional — helps us understand the scale of your project.</p>
           </div>
 
           {error && (
-            <p className="text-xs text-red-500 bg-red-50 rounded-lg px-3 py-2">{error}</p>
+            <p className="text-xs text-red-500 bg-red-50 rounded-xl px-3 py-2">{error}</p>
           )}
 
           <button
@@ -224,11 +232,11 @@ export default function CreativeDirectionForm({ onBack }: Props) {
             className="btn-primary w-full flex items-center justify-center gap-2 py-3"
           >
             {loading
-              ? <><Loader2 size={14} className="animate-spin"/> Sending…</>
-              : <><Send size={14}/> Submit Brief</>}
+              ? <><Loader2 size={13} className="animate-spin"/> Sending…</>
+              : <><Send size={13}/> Submit Brief</>}
           </button>
 
-          <p className="text-[11px] text-center text-gray-400">
+          <p className="text-[10px] text-center text-grace-stone tracking-wide">
             Our team typically responds within 2 business days.
           </p>
         </form>
