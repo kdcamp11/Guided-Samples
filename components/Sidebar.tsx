@@ -4,7 +4,7 @@ import { AppState } from '@/app/page'
 import { useAuth } from '@/lib/auth'
 import {
   LayoutDashboard, FolderOpen, Palette, Package,
-  ShoppingCart, Library, Settings, ChevronRight, CheckCircle2, X
+  ShoppingCart, Library, Settings, ChevronRight, CheckCircle2, X, ArrowRight
 } from 'lucide-react'
 
 interface Props {
@@ -15,6 +15,7 @@ interface Props {
   onSectionChange: (section: string) => void
   mobileOpen: boolean
   onMobileClose: () => void
+  onExpertHelp?: () => void
 }
 
 const phases = [
@@ -34,7 +35,7 @@ function GraceMark({ size = 24 }: { size?: number }) {
   )
 }
 
-export default function Sidebar({ currentPhase, onPhaseChange, state, section, onSectionChange, mobileOpen, onMobileClose }: Props) {
+export default function Sidebar({ currentPhase, onPhaseChange, state, section, onSectionChange, mobileOpen, onMobileClose, onExpertHelp }: Props) {
   const { user, signOut } = useAuth() ?? {}
 
   const isPhaseComplete = (phase: number) => {
@@ -115,6 +116,20 @@ export default function Sidebar({ currentPhase, onPhaseChange, state, section, o
           </div>
         </div>
       </nav>
+
+      {/* Expert help upsell */}
+      {onExpertHelp && (
+        <div className="mx-3 mb-3 p-3 rounded-xl border border-grace-border bg-grace-mist">
+          <p className="text-[9px] font-bold tracking-[0.18em] uppercase text-grace-stone mb-0.5">Need help?</p>
+          <p className="text-[11px] font-bold text-grace-ink leading-tight mb-2">Work with GRACE Studios</p>
+          <button
+            onClick={onExpertHelp}
+            className="w-full flex items-center justify-center gap-1 py-1.5 px-3 rounded-full bg-grace-ink text-white text-[9px] font-bold tracking-widest uppercase hover:bg-zinc-800 transition-colors"
+          >
+            Talk to an Expert <ArrowRight size={9}/>
+          </button>
+        </div>
+      )}
 
       {/* User */}
       <div className="p-3 border-t border-grace-border space-y-1">

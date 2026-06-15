@@ -189,6 +189,7 @@ function App() {
         onSectionChange={handleSectionChange}
         mobileOpen={sidebarOpen}
         onMobileClose={() => setSidebarOpen(false)}
+        onExpertHelp={() => setView('creative-direction')}
       />
 
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -265,6 +266,7 @@ function App() {
               onBack={() => goToPhase(5)}
               projectId={projectIdRef.current ?? null}
               onEnsureProject={ensureProject}
+              onExpertHelp={() => setView('creative-direction')}
             />
           )}
         </main>

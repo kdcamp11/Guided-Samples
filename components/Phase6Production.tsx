@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ArrowLeft, Download, CheckCircle2, Loader2, AlertCircle, Image as ImageIcon, CreditCard, ShieldCheck, Clock, Zap } from 'lucide-react'
+import { ArrowLeft, Download, CheckCircle2, Loader2, AlertCircle, Image as ImageIcon, CreditCard, ShieldCheck, Clock, Zap, ArrowRight } from 'lucide-react'
 import { AppState } from '@/app/page'
 import { createClient } from '@/lib/supabase'
 import AuthModal from '@/components/AuthModal'
@@ -31,6 +31,7 @@ interface Props {
   onBack: () => void
   projectId: string | null
   onEnsureProject: () => Promise<string | null>
+  onExpertHelp?: () => void
 }
 
 export interface TechPackData {
@@ -40,7 +41,7 @@ export interface TechPackData {
   placements: { location: string; description: string }[]
 }
 
-export default function Phase6Production({ state, techPack, onBack, projectId, onEnsureProject }: Props) {
+export default function Phase6Production({ state, techPack, onBack, projectId, onEnsureProject, onExpertHelp }: Props) {
   const [notes, setNotes] = useState('')
   const [sampleLoading, setSampleLoading] = useState(false)
   const [directLoading, setDirectLoading] = useState(false)
@@ -439,6 +440,22 @@ export default function Phase6Production({ state, techPack, onBack, projectId, o
               Logo, garment image, preview render,<br/>and full tech pack
             </p>
           </div>
+
+          {onExpertHelp && (
+            <div className="card border-grace-ink/10 bg-grace-mist">
+              <p className="text-[10px] font-bold tracking-widest uppercase text-grace-stone mb-1">Need Help?</p>
+              <p className="text-xs font-bold text-grace-ink mb-1">Work with GRACE Studios</p>
+              <p className="text-[11px] text-grace-stone leading-relaxed mb-3">
+                Stuck or want a professional to take it from here? Our team handles design, tech pack, and production direction end-to-end.
+              </p>
+              <button
+                onClick={onExpertHelp}
+                className="w-full flex items-center justify-center gap-1.5 py-2 px-4 rounded-full bg-grace-ink text-white text-[10px] font-bold tracking-widest uppercase hover:bg-zinc-800 transition-colors"
+              >
+                Talk to an Expert <ArrowRight size={11}/>
+              </button>
+            </div>
+          )}
 
           <div className="card">
             <p className="text-xs font-medium text-gray-600 mb-2">Package Contents</p>

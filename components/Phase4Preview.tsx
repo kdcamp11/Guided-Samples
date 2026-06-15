@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { ArrowLeft, ArrowRight, Loader2, RefreshCw, Sparkles, CheckCircle2, Download } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Loader2, RefreshCw, Sparkles, CheckCircle2, Download, Ruler } from 'lucide-react'
 import { AppState } from '@/app/page'
 import { streamGenerate } from '@/lib/streamGenerate'
 import { cacheGet, cacheSet, cacheKey } from '@/lib/generateCache'
@@ -22,12 +22,17 @@ function previewCacheKey(state: AppState, prompt = '') {
   return cacheKey('preview', designImageOf(state).slice(-40) + prompt.slice(0, 60))
 }
 
+const TECH_DRAWING_PROMPT = 'flat technical illustration, garment technical flat drawing, clean precise line art, front view, white background, no shading, fashion technical sketch, measurement callout lines, black and white'
+
 export default function Phase4Preview({ state, onComplete, onBack }: Props) {
+  const [drawMode, setDrawMode] = useState<'realistic' | 'technical'>('realistic')
   const [images, setImages] = useState<string[]>([])
+  const [techImages, setTechImages] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [statusMsg, setStatusMsg] = useState('')
   const [error, setError] = useState('')
   const [generated, setGenerated] = useState(false)
+  const [techGenerated, setTechGenerated] = useState(false)
   const [prompt, setPrompt] = useState('')
 
   // On mount: check if Phase 3 prefetched results into cache
@@ -41,15 +46,18 @@ export default function Phase4Preview({ state, onComplete, onBack }: Props) {
   }, [])
 
   const handleGenerate = async () => {
+    const isTech = drawMode === 'technical'
+    const effectivePrompt = isTech ? TECH_DRAWING_PROMPT : prompt
+
     setLoading(true)
     setError('')
     setStatusMsg('Starting...')
 
-    const key = previewCacheKey(state, prompt)
+    const key = previewCacheKey(state, effectivePrompt)
     const cached = cacheGet<{ images: string[] }>(key)
     if (cached?.images?.length) {
-      setImages(cached.images)
-      setGenerated(true)
+      if (isTech) { setTechImages(cached.images); setTechGenerated(true) }
+      else { setImages(cached.images); setGenerated(true) }
       setLoading(false)
       setStatusMsg('')
       return
@@ -60,19 +68,18 @@ export default function Phase4Preview({ state, onComplete, onBack }: Props) {
         '/api/generate-preview',
         {
           garmentImage: designImageOf(state) || null,
-          // Logo is already baked into the Phase 3 composite; only send separately as fallback
           logoImage: state.design?.previewDataUrl ? null : (state.logo?.dataUrl ?? null),
           placement: 'center chest',
-          extraPrompt: prompt.trim() || undefined,
+          extraPrompt: effectivePrompt || undefined,
         },
         msg => setStatusMsg(msg),
       )
-      cacheSet(previewCacheKey(state, prompt), data)
-      setImages(data.images ?? [])
-      setGenerated(true)
+      cacheSet(key, data)
+      if (isTech) { setTechImages(data.images ?? []); setTechGenerated(true) }
+      else { setImages(data.images ?? []); setGenerated(true) }
     } catch (e) {
       console.error(e)
-      setError('Preview generation failed. Please try again.')
+      setError('Generation failed. Please try again.')
     } finally {
       setLoading(false)
       setStatusMsg('')
@@ -80,11 +87,12 @@ export default function Phase4Preview({ state, onComplete, onBack }: Props) {
   }
 
   const handleRegenerate = async () => {
-    // Clear cache entry so we get fresh results
-    const key = previewCacheKey(state, prompt)
-    cacheSet(key, null, 0) // expire immediately
-    setGenerated(false)
-    setImages([])
+    const isTech = drawMode === 'technical'
+    const effectivePrompt = isTech ? TECH_DRAWING_PROMPT : prompt
+    const key = previewCacheKey(state, effectivePrompt)
+    cacheSet(key, null, 0)
+    if (isTech) { setTechGenerated(false); setTechImages([]) }
+    else { setGenerated(false); setImages([]) }
     await handleGenerate()
   }
 
@@ -179,8 +187,26 @@ export default function Phase4Preview({ state, onComplete, onBack }: Props) {
         {/* Center: Preview output */}
         <div className="card">
           <div className="flex items-center justify-between mb-4">
-            <span className="text-xs font-medium text-gray-600">Realistic Visualization</span>
-            {generated && !loading && (
+            {/* Mode toggle */}
+            <div className="flex bg-slate-100 rounded-lg p-0.5 gap-0.5">
+              <button
+                onClick={() => setDrawMode('realistic')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  drawMode === 'realistic' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <Sparkles size={12}/> Realistic
+              </button>
+              <button
+                onClick={() => setDrawMode('technical')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  drawMode === 'technical' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <Ruler size={12}/> Technical Drawing
+              </button>
+            </div>
+            {((drawMode === 'realistic' && generated) || (drawMode === 'technical' && techGenerated)) && !loading && (
               <button
                 onClick={handleRegenerate}
                 className="p-1.5 rounded-lg hover:bg-slate-100 text-gray-400 hover:text-gray-700 transition-colors"
@@ -191,7 +217,32 @@ export default function Phase4Preview({ state, onComplete, onBack }: Props) {
             )}
           </div>
 
-          {!generated && !loading && (
+          {drawMode === 'technical' && !techGenerated && !loading && (
+            <div className="flex flex-col items-center justify-center text-center py-16 mb-2 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+              <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center mb-3">
+                <Ruler size={22} className="text-gray-400"/>
+              </div>
+              <h3 className="text-sm font-semibold text-gray-900 mb-1">Technical Drawing</h3>
+              <p className="text-xs text-gray-400 max-w-xs mb-4">
+                Generate a flat technical illustration of your garment — clean line art suitable for spec sheets and supplier communication.
+              </p>
+              <button onClick={handleGenerate} className="btn-primary flex items-center gap-2">
+                <Ruler size={13}/> Generate Technical Drawing
+              </button>
+            </div>
+          )}
+
+          {drawMode === 'technical' && techGenerated && !loading && techImages.length > 0 && (
+            <div className="grid grid-cols-2 gap-3 mb-2">
+              {techImages.map((img, i) => (
+                <div key={i} className="bg-white border border-slate-100 rounded-xl overflow-hidden">
+                  <img src={img} alt={`Technical drawing ${i + 1}`} className="w-full object-contain p-3" style={{ minHeight: 320 }}/>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {!generated && !loading && drawMode === 'realistic' && (
             <div className="flex flex-col items-center justify-center text-center py-20">
               <div className="w-16 h-16 rounded-2xl bg-brand-green/10 flex items-center justify-center mb-4">
                 <Sparkles size={28} className="text-brand-green"/>
@@ -226,7 +277,7 @@ export default function Phase4Preview({ state, onComplete, onBack }: Props) {
             </div>
           )}
 
-          {generated && !loading && images.length > 0 && (
+          {drawMode === 'realistic' && generated && !loading && images.length > 0 && (
             <div className="grid grid-cols-2 gap-3">
               {images.map((img, i) => (
                 <div
@@ -256,7 +307,8 @@ export default function Phase4Preview({ state, onComplete, onBack }: Props) {
             <div className="space-y-2">
               {[
                 { label: 'Design confirmed', done: !!state.design },
-                { label: 'Preview generated', done: generated && images.length > 0 },
+                { label: 'Realistic preview', done: generated && images.length > 0 },
+                { label: 'Technical drawing', done: techGenerated && techImages.length > 0 },
               ].map(({ label, done }) => (
                 <div key={label} className="flex items-center gap-2 text-xs">
                   <CheckCircle2 size={13} className={done ? 'text-brand-green' : 'text-gray-300'}/>
@@ -266,7 +318,7 @@ export default function Phase4Preview({ state, onComplete, onBack }: Props) {
             </div>
           </div>
 
-          {!generated && (
+          {drawMode === 'realistic' && !generated && (
             <button
               onClick={handleGenerate}
               disabled={loading}
@@ -277,7 +329,18 @@ export default function Phase4Preview({ state, onComplete, onBack }: Props) {
             </button>
           )}
 
-          {generated && images.length > 0 && (
+          {drawMode === 'technical' && !techGenerated && (
+            <button
+              onClick={handleGenerate}
+              disabled={loading}
+              className="btn-primary w-full flex items-center justify-center gap-2"
+            >
+              {loading ? <Loader2 size={14} className="animate-spin"/> : <Ruler size={14}/>}
+              {loading ? (statusMsg || 'Generating…') : 'Generate Drawing'}
+            </button>
+          )}
+
+          {drawMode === 'realistic' && generated && images.length > 0 && (
             <button
               onClick={() => images.forEach((img, i) => {
                 const a = document.createElement('a')
@@ -291,7 +354,21 @@ export default function Phase4Preview({ state, onComplete, onBack }: Props) {
             </button>
           )}
 
-          {generated && (
+          {drawMode === 'technical' && techGenerated && techImages.length > 0 && (
+            <button
+              onClick={() => techImages.forEach((img, i) => {
+                const a = document.createElement('a')
+                a.href = img
+                a.download = `technical_drawing_${i + 1}.png`
+                a.click()
+              })}
+              className="btn-secondary w-full flex items-center justify-center gap-2"
+            >
+              <Download size={13}/> Download Drawing
+            </button>
+          )}
+
+          {((drawMode === 'realistic' && generated) || (drawMode === 'technical' && techGenerated)) && (
             <button
               onClick={handleRegenerate}
               disabled={loading}
