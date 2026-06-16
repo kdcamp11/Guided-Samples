@@ -23,6 +23,16 @@ async function prefetchPreview(state: AppState, compositeImage: string) {
   } catch { /* silent — Phase 4 will generate on demand if this fails */ }
 }
 
+// Read the pointer position from either a mouse or touch event so drag/resize
+// work the same with a finger as with a cursor.
+function getPoint(e: MouseEvent | TouchEvent): { x: number; y: number } {
+  if ('touches' in e) {
+    const t = e.touches[0] ?? e.changedTouches[0]
+    return { x: t?.clientX ?? 0, y: t?.clientY ?? 0 }
+  }
+  return { x: e.clientX, y: e.clientY }
+}
+
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image()
@@ -155,37 +165,85 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack }
     setLayers(ls => ls.map(l => l.id === selectedId ? { ...l, ...updates } : l))
   }
 
-  const handleMouseDown = (e: React.MouseEvent, id: string) => {
-    e.preventDefault()
+  const handlePointerDown = (e: React.MouseEvent | React.TouchEvent, id: string) => {
     e.stopPropagation()
     setSelectedId(id)
     const layer = layers.find(l => l.id === id)
     if (!layer) return
     snapshot()
-    setDragging({ id, startX: e.clientX, startY: e.clientY, origX: layer.x, origY: layer.y })
+    const p = 'touches' in e
+      ? { x: e.touches[0].clientX, y: e.touches[0].clientY }
+      : { x: e.clientX, y: e.clientY }
+    setDragging({ id, startX: p.x, startY: p.y, origX: layer.x, origY: layer.y })
   }
 
-  const handleMouseMove = useCallback((e: MouseEvent) => {
+  const handlePointerMove = useCallback((e: MouseEvent | TouchEvent) => {
     if (!dragging) return
-    const dx = e.clientX - dragging.startX
-    const dy = e.clientY - dragging.startY
+    if ('touches' in e) e.preventDefault() // keep the page from scrolling mid-drag
+    const p = getPoint(e)
+    const dx = p.x - dragging.startX
+    const dy = p.y - dragging.startY
     setLayers(ls => ls.map(l =>
       l.id === dragging.id ? { ...l, x: dragging.origX + dx, y: dragging.origY + dy } : l
     ))
   }, [dragging])
 
-  const handleMouseUp = useCallback(() => {
+  const handlePointerUp = useCallback(() => {
     setDragging(null)
   }, [])
 
   useEffect(() => {
-    window.addEventListener('mousemove', handleMouseMove)
-    window.addEventListener('mouseup', handleMouseUp)
+    window.addEventListener('mousemove', handlePointerMove)
+    window.addEventListener('mouseup', handlePointerUp)
+    window.addEventListener('touchmove', handlePointerMove, { passive: false })
+    window.addEventListener('touchend', handlePointerUp)
     return () => {
-      window.removeEventListener('mousemove', handleMouseMove)
-      window.removeEventListener('mouseup', handleMouseUp)
+      window.removeEventListener('mousemove', handlePointerMove)
+      window.removeEventListener('mouseup', handlePointerUp)
+      window.removeEventListener('touchmove', handlePointerMove)
+      window.removeEventListener('touchend', handlePointerUp)
     }
-  }, [handleMouseMove, handleMouseUp])
+  }, [handlePointerMove, handlePointerUp])
+
+  // Resize from a corner handle — shared by mouse and touch.
+  const startResize = (e: React.MouseEvent | React.TouchEvent, layer: LogoLayer, cursor: string) => {
+    e.stopPropagation()
+    snapshot()
+    const start = 'touches' in e
+      ? { x: e.touches[0].clientX, y: e.touches[0].clientY }
+      : { x: e.clientX, y: e.clientY }
+    const origW = layer.width, origH = layer.height, origX = layer.x, origY = layer.y
+    const aspectRatio = origW / origH
+    const onMove = (ev: MouseEvent | TouchEvent) => {
+      if ('touches' in ev) ev.preventDefault()
+      const p = getPoint(ev)
+      const dx = p.x - start.x
+      const dy = p.y - start.y
+      let newW = origW, newH = origH, newX = origX, newY = origY
+      if (cursor === 'se-resize') {
+        newW = Math.max(40, origW + dx); newH = newW / aspectRatio
+      } else if (cursor === 'sw-resize') {
+        newW = Math.max(40, origW - dx); newH = newW / aspectRatio; newX = origX + dx
+      } else if (cursor === 'ne-resize') {
+        newW = Math.max(40, origW + dx); newH = newW / aspectRatio; newY = origY - (newH - origH)
+      } else if (cursor === 'nw-resize') {
+        newW = Math.max(40, origW - dx); newH = newW / aspectRatio; newX = origX + dx; newY = origY - (newH - origH)
+      }
+      setLayers(ls => ls.map(l =>
+        l.id === layer.id ? { ...l, width: newW, height: newH, x: newX, y: newY } : l
+      ))
+    }
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+      window.removeEventListener('touchmove', onMove)
+      window.removeEventListener('touchend', onUp)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+    window.addEventListener('touchmove', onMove, { passive: false })
+    window.addEventListener('touchend', onUp)
+  }
 
   const handleUploadLogo = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -508,7 +566,8 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack }
               {layers.map(layer => (
                 <div
                   key={layer.id}
-                  onMouseDown={e => handleMouseDown(e, layer.id)}
+                  onMouseDown={e => handlePointerDown(e, layer.id)}
+                  onTouchStart={e => handlePointerDown(e, layer.id)}
                   style={{
                     position: 'absolute',
                     left: layer.x,
@@ -520,6 +579,7 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack }
                     outline: selectedId === layer.id ? '2px solid #0A0A0A' : 'none',
                     outlineOffset: 2,
                     userSelect: 'none',
+                    touchAction: 'none',
                   }}
                 >
                   <img src={layer.dataUrl} alt="logo" className="w-full h-full object-contain" draggable={false}/>
@@ -535,58 +595,16 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack }
                           key={i}
                           style={{
                             position: 'absolute',
-                            width: 10,
-                            height: 10,
+                            width: 18,
+                            height: 18,
                             background: 'white',
                             border: '2px solid #0A0A0A',
-                            borderRadius: 2,
+                            borderRadius: 3,
+                            touchAction: 'none',
                             ...handle,
                           }}
-                          onMouseDown={e => {
-                            e.stopPropagation()
-                            snapshot()
-                            const startX = e.clientX
-                            const startY = e.clientY
-                            const origW = layer.width
-                            const origH = layer.height
-                            const origX = layer.x
-                            const origY = layer.y
-                            const onMove = (ev: MouseEvent) => {
-                              const dx = ev.clientX - startX
-                              const dy = ev.clientY - startY
-                              const aspectRatio = origW / origH
-                              let newW = origW
-                              let newH = origH
-                              let newX = origX
-                              let newY = origY
-                              if (handle.cursor === 'se-resize') {
-                                newW = Math.max(40, origW + dx)
-                                newH = newW / aspectRatio
-                              } else if (handle.cursor === 'sw-resize') {
-                                newW = Math.max(40, origW - dx)
-                                newH = newW / aspectRatio
-                                newX = origX + dx
-                              } else if (handle.cursor === 'ne-resize') {
-                                newW = Math.max(40, origW + dx)
-                                newH = newW / aspectRatio
-                                newY = origY - (newH - origH)
-                              } else if (handle.cursor === 'nw-resize') {
-                                newW = Math.max(40, origW - dx)
-                                newH = newW / aspectRatio
-                                newX = origX + dx
-                                newY = origY - (newH - origH)
-                              }
-                              setLayers(ls => ls.map(l =>
-                                l.id === layer.id ? { ...l, width: newW, height: newH, x: newX, y: newY } : l
-                              ))
-                            }
-                            const onUp = () => {
-                              window.removeEventListener('mousemove', onMove)
-                              window.removeEventListener('mouseup', onUp)
-                            }
-                            window.addEventListener('mousemove', onMove)
-                            window.addEventListener('mouseup', onUp)
-                          }}
+                          onMouseDown={e => startResize(e, layer, handle.cursor)}
+                          onTouchStart={e => startResize(e, layer, handle.cursor)}
                         />
                       ))}
                     </>

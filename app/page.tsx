@@ -21,7 +21,7 @@ import LandingPage from '@/components/LandingPage'
 import CreativeDirectionForm from '@/components/CreativeDirectionForm'
 import AIPaywallModal from '@/components/AIPaywallModal'
 import { AICreditsProvider, useAICredits } from '@/lib/aiCreditsContext'
-import { Menu } from 'lucide-react'
+import { Menu, Sparkles } from 'lucide-react'
 
 export type AppState = {
   currentPhase: number
@@ -60,7 +60,8 @@ const EMPTY_STATE: AppState = {
 
 function App() {
   const { user, loading } = useAuth()
-  const { refreshCredits } = useAICredits()
+  const { refreshCredits, freeUsed, freeLimit, creditBalance } = useAICredits()
+  const generationsLeft = Math.max(0, freeLimit - freeUsed) + creditBalance
   // Allow deep-linking straight to the studio dashboard (e.g. the "home" link
   // from the /track orders page) via /?view=studio.
   const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null
@@ -259,8 +260,16 @@ function App() {
             <div className="w-6 h-6 bg-grace-ink rounded-md flex items-center justify-center text-xs font-bold text-white">G</div>
             <span className="text-sm font-bold text-gray-900">GRACE</span>
           </div>
+          <button
+            onClick={() => { setSection('settings'); setSidebarOpen(false) }}
+            className="ml-auto flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 hover:border-brand-green transition-colors"
+            title="Manage AI credits"
+          >
+            <Sparkles size={12} className="text-brand-green"/>
+            <span className={`text-xs font-bold ${generationsLeft > 0 ? 'text-gray-700' : 'text-red-500'}`}>{generationsLeft}</span>
+          </button>
           {user && (
-            <button onClick={() => setView('projects')} className="ml-auto text-xs text-gray-400 hover:text-grace-ink transition-colors">
+            <button onClick={() => setView('projects')} className="text-xs text-gray-400 hover:text-grace-ink transition-colors">
               My Projects
             </button>
           )}
