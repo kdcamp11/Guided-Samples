@@ -2,9 +2,11 @@
 
 import { useAuth } from '@/lib/auth'
 import { useAICredits } from '@/lib/aiCreditsContext'
+import type { AppState } from '@/app/page'
 import {
   LayoutDashboard, FolderOpen, Palette,
-  ShoppingCart, Library, Settings, ChevronRight, X, ArrowRight, Ruler, Sparkles
+  ShoppingCart, Library, Settings, ChevronRight, X, ArrowRight, Ruler, Sparkles,
+  Package, CheckCircle2
 } from 'lucide-react'
 
 interface Props {
@@ -13,7 +15,19 @@ interface Props {
   mobileOpen: boolean
   onMobileClose: () => void
   onExpertHelp?: () => void
+  currentPhase?: number
+  onPhaseChange?: (phase: number) => void
+  state?: AppState
 }
+
+const phases = [
+  { num: 1, label: 'Logo' },
+  { num: 2, label: 'Garment' },
+  { num: 3, label: 'Design' },
+  { num: 4, label: 'Preview' },
+  { num: 5, label: 'Tech Pack' },
+  { num: 6, label: 'Production' },
+]
 
 function GraceMark({ size = 24 }: { size?: number }) {
   return (
@@ -24,10 +38,19 @@ function GraceMark({ size = 24 }: { size?: number }) {
   )
 }
 
-export default function Sidebar({ section, onSectionChange, mobileOpen, onMobileClose, onExpertHelp }: Props) {
+export default function Sidebar({ section, onSectionChange, mobileOpen, onMobileClose, onExpertHelp, currentPhase, onPhaseChange, state }: Props) {
   const { user, signOut } = useAuth() ?? {}
   const { freeUsed, freeLimit, creditBalance } = useAICredits()
   const generationsLeft = Math.max(0, freeLimit - freeUsed) + creditBalance
+
+  const isPhaseComplete = (num: number): boolean => {
+    if (!state) return false
+    if (num === 1) return !!state.logo
+    if (num === 2) return !!state.garment
+    if (num === 3) return !!state.design
+    if (num === 4) return !!state.preview
+    return false
+  }
 
   const initials = user?.name
     ? user.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
@@ -78,6 +101,35 @@ export default function Sidebar({ section, onSectionChange, mobileOpen, onMobile
           <span className="text-[11px] text-grace-stone flex-1 text-left">AI credits</span>
           <span className={`text-[11px] font-bold ${generationsLeft > 0 ? 'text-grace-ink' : 'text-red-500'}`}>{generationsLeft}</span>
         </button>
+
+        {/* Workflow — jump between design phases; navigation autosaves progress */}
+        {onPhaseChange && (
+          <div className="mt-5">
+            <p className="px-2 mb-1.5 text-[9px] font-bold tracking-[0.18em] uppercase text-grace-stone flex items-center gap-1.5">
+              <Package size={11}/> Workflow
+            </p>
+            <div className="space-y-0.5">
+              {phases.map(p => {
+                const active = section === 'design' && currentPhase === p.num
+                const done = isPhaseComplete(p.num)
+                return (
+                  <button
+                    key={p.num}
+                    onClick={() => onPhaseChange(p.num)}
+                    className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-[11px] transition-colors ${
+                      active ? 'bg-grace-mist text-grace-ink font-semibold' : 'text-grace-stone hover:bg-grace-mist hover:text-grace-ink'
+                    }`}
+                  >
+                    {done
+                      ? <CheckCircle2 size={13} className="text-brand-green shrink-0"/>
+                      : <span className="w-[13px] h-[13px] rounded-full border border-grace-border shrink-0 flex items-center justify-center text-[8px] font-bold">{p.num}</span>}
+                    <span className="flex-1 text-left">{p.label}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Expert help — visible in nav, not buried at bottom */}
         {onExpertHelp && (

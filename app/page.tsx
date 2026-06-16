@@ -250,6 +250,9 @@ function App() {
         mobileOpen={sidebarOpen}
         onMobileClose={() => setSidebarOpen(false)}
         onExpertHelp={() => { prevViewRef.current = 'studio'; setView('creative-direction') }}
+        currentPhase={state.currentPhase}
+        onPhaseChange={goToPhase}
+        state={state}
       />
 
       <div className="flex-1 flex flex-col overflow-hidden">
