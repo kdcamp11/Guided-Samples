@@ -241,9 +241,6 @@ function App() {
       )}
 
       <Sidebar
-        currentPhase={state.currentPhase}
-        onPhaseChange={goToPhase}
-        state={state}
         section={section}
         onSectionChange={handleSectionChange}
         mobileOpen={sidebarOpen}

@@ -1,31 +1,19 @@
 'use client'
 
-import { AppState } from '@/app/page'
 import { useAuth } from '@/lib/auth'
 import { useAICredits } from '@/lib/aiCreditsContext'
 import {
-  LayoutDashboard, FolderOpen, Palette, Package,
-  ShoppingCart, Library, Settings, ChevronRight, CheckCircle2, X, ArrowRight, Ruler, Sparkles
+  LayoutDashboard, FolderOpen, Palette,
+  ShoppingCart, Library, Settings, ChevronRight, X, ArrowRight, Ruler, Sparkles
 } from 'lucide-react'
 
 interface Props {
-  currentPhase: number
-  onPhaseChange: (phase: number) => void
-  state: AppState
   section: string
   onSectionChange: (section: string) => void
   mobileOpen: boolean
   onMobileClose: () => void
   onExpertHelp?: () => void
 }
-
-const phases = [
-  { id: 1, label: 'Logo Generation', desc: 'AI-powered logo creation' },
-  { id: 2, label: 'Garment', desc: 'Upload or generate blank' },
-  { id: 3, label: 'Apply Design', desc: 'Position your logo' },
-  { id: 4, label: 'Preview in Reality', desc: 'Visualize finished product' },
-  { id: 5, label: 'Tech Pack', desc: 'Specs & measurements' },
-]
 
 function GraceMark({ size = 24 }: { size?: number }) {
   return (
@@ -36,18 +24,10 @@ function GraceMark({ size = 24 }: { size?: number }) {
   )
 }
 
-export default function Sidebar({ currentPhase, onPhaseChange, state, section, onSectionChange, mobileOpen, onMobileClose, onExpertHelp }: Props) {
+export default function Sidebar({ section, onSectionChange, mobileOpen, onMobileClose, onExpertHelp }: Props) {
   const { user, signOut } = useAuth() ?? {}
   const { freeUsed, freeLimit, creditBalance } = useAICredits()
   const generationsLeft = Math.max(0, freeLimit - freeUsed) + creditBalance
-
-  const isPhaseComplete = (phase: number) => {
-    if (phase === 1) return !!state.logo
-    if (phase === 2) return !!state.garment
-    if (phase === 3) return !!state.design
-    if (phase === 4) return !!state.preview
-    return false
-  }
 
   const initials = user?.name
     ? user.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
@@ -113,30 +93,6 @@ export default function Sidebar({ currentPhase, onPhaseChange, state, section, o
           </div>
         )}
 
-        {/* Phase progress */}
-        <div className="pt-5 pb-1">
-          <p className="text-[9px] font-bold text-grace-stone uppercase tracking-[0.2em] px-2 mb-2">Workflow</p>
-          <div className="space-y-0.5">
-            {phases.map(phase => {
-              const complete = isPhaseComplete(phase.id)
-              const active = currentPhase === phase.id
-              return (
-                <button
-                  key={phase.id}
-                  onClick={() => onPhaseChange(phase.id)}
-                  className={`w-full text-left px-2 py-2 rounded-lg transition-colors text-xs flex items-center gap-2 ${
-                    active
-                      ? 'bg-grace-ink text-white'
-                      : 'text-grace-stone hover:bg-grace-mist hover:text-grace-ink'
-                  }`}
-                >
-                  {complete && <CheckCircle2 size={11} className={active ? 'text-white shrink-0' : 'text-grace-ink shrink-0'}/>}
-                  <span className="truncate font-medium">{phase.label}</span>
-                </button>
-              )
-            })}
-          </div>
-        </div>
       </nav>
 
       {/* User */}
