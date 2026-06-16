@@ -2,7 +2,8 @@
 
 import { useState, useRef } from 'react'
 import { AuthProvider, useAuth } from '@/lib/auth'
-import { saveProject, saveTechPack } from '@/lib/projects'
+import { saveProject, saveTechPack, loadProject } from '@/lib/projects'
+import type { ProjectDetail } from '@/lib/projects'
 import { createClient } from '@/lib/supabase'
 import Sidebar from '@/components/Sidebar'
 import SignIn from '@/components/SignIn'
@@ -130,6 +131,39 @@ function App() {
     setSidebarOpen(false)
   }
 
+  // Rebuild the in-memory AppState from a saved project row. We persist rendered
+  // image URLs (not the original SVG source), so restored logo/garment objects
+  // carry the public URL in `dataUrl` — enough to view and continue the design.
+  const restoreState = (d: ProjectDetail): AppState => ({
+    currentPhase: d.phase_reached ?? 1,
+    logo: d.logo_url ? { svg: '', dataUrl: d.logo_url, style: '', color: '' } : null,
+    garment: d.garment_url ? {
+      svg: '', dataUrl: d.garment_url, views: {},
+      type: d.garment_type ?? '', color: d.garment_color ?? '',
+    } : null,
+    design: d.composite_url ? { confirmed: true, previewDataUrl: d.composite_url } : null,
+    preview: d.preview_urls?.length ? { images: d.preview_urls } : null,
+  })
+
+  const openProject = async (id: string) => {
+    projectIdRef.current = id
+    const detail = await loadProject(id)
+    if (detail) {
+      setState(restoreState(detail))
+      setTechPack(detail.tech_pack ? {
+        styleInfo: detail.tech_pack.style_info,
+        measurements: detail.tech_pack.measurements,
+        pantones: detail.tech_pack.pantones,
+        placements: detail.tech_pack.placements,
+      } : null)
+    } else {
+      setState(EMPTY_STATE)
+      setTechPack(null)
+    }
+    setSection('design')
+    setView('studio')
+  }
+
   const startNewProject = () => {
     projectIdRef.current = undefined
     setState(EMPTY_STATE)
@@ -177,12 +211,7 @@ function App() {
     return (
       <ProjectsDashboard
         onNewProject={startNewProject}
-        onOpenProject={(_id) => {
-          // TODO: restore project state from Supabase
-          projectIdRef.current = _id
-          setState(EMPTY_STATE)
-          setView('studio')
-        }}
+        onOpenProject={openProject}
       />
     )
   }
