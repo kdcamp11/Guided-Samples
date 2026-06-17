@@ -160,6 +160,52 @@ async function cropPadding(src: string, pad = 6): Promise<string> {
   })
 }
 
+// Extract hardware pixels (zippers, buttons, metal) from a garment PNG.
+// Returns a data URL that is transparent except where hardware is detected,
+// so it can be composited on top of the color fill to preserve original metal tones.
+// Detection: low saturation + mid luminance range (metallic neutral grays).
+async function extractHardwareMask(src: string): Promise<string | null> {
+  return new Promise(resolve => {
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => {
+      try {
+        const W = img.width, H = img.height
+        const c = document.createElement('canvas')
+        c.width = W; c.height = H
+        const ctx = c.getContext('2d')!
+        ctx.drawImage(img, 0, 0)
+        const src = ctx.getImageData(0, 0, W, H)
+        const d = src.data
+        const out = ctx.createImageData(W, H)
+
+        for (let i = 0; i < W * H; i++) {
+          const r = d[i*4], g = d[i*4+1], b = d[i*4+2], a = d[i*4+3]
+          if (a < 30) continue
+          const rf = r/255, gf = g/255, bf = b/255
+          const max = Math.max(rf, gf, bf), min = Math.min(rf, gf, bf)
+          const l = (max + min) / 2
+          const s = max === min ? 0 : l < 0.5
+            ? (max - min) / (max + min)
+            : (max - min) / (2 - max - min)
+          // Metallic hardware: low saturation, mid luminance (not bright fabric, not deep shadow)
+          if (s < 0.08 && l >= 0.08 && l <= 0.52) {
+            out.data[i*4] = r; out.data[i*4+1] = g; out.data[i*4+2] = b; out.data[i*4+3] = a
+          }
+        }
+        ctx.putImageData(out, 0, 0)
+        const dataUrl = c.toDataURL('image/png')
+        // Reject if almost no hardware was found (fabric-only garment)
+        let found = false
+        for (let i = 3; i < out.data.length; i += 4) { if (out.data[i] > 0) { found = true; break } }
+        resolve(found ? dataUrl : null)
+      } catch { resolve(null) }
+    }
+    img.onerror = () => resolve(null)
+    img.src = src
+  })
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function Phase3Editor({ state, onComplete, onSetGarment, onBack }: Props) {
@@ -184,6 +230,8 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack }
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const croppedCache = useRef<Record<string, string>>({})
   const [displaySrcs, setDisplaySrcs] = useState<Record<string, string>>({})
+  const hardwareCache = useRef<Record<string, string | null>>({})
+  const [hardwareSrcs, setHardwareSrcs] = useState<Record<string, string | null>>({})
 
   // Derived
   const layers: LogoLayer[] = layersByView[activeEditorView] ?? []
@@ -224,6 +272,21 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack }
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeEditorView, state.garment])
+
+  // Extract hardware mask per view (zippers, metal) so they stay original-colored over the fill
+  useEffect(() => {
+    const src = displaySrcs[activeEditorView] || garmentSrcForView(activeEditorView)
+    if (!src) return
+    if (hardwareCache.current[src] !== undefined) {
+      setHardwareSrcs(prev => ({ ...prev, [activeEditorView]: hardwareCache.current[src] ?? null }))
+      return
+    }
+    extractHardwareMask(src).then(hw => {
+      hardwareCache.current[src] = hw
+      setHardwareSrcs(prev => ({ ...prev, [activeEditorView]: hw }))
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeEditorView, displaySrcs[activeEditorView], state.garment])
 
   // Load Google Fonts once
   useEffect(() => {
@@ -448,6 +511,15 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack }
       gctx.globalCompositeOperation = 'source-over'
       // Composite the tinted garment onto the white main canvas
       ctx.drawImage(gc, 0, 0, gc.width, gc.height, gx, gy, gw, gh)
+
+      // Hardware overlay — draw original hardware pixels (zippers, buttons, metal) on top
+      const hwSrc = hardwareSrcs[activeEditorView]
+      if (hwSrc) {
+        try {
+          const hw = await loadImage(hwSrc)
+          ctx.drawImage(hw, gx, gy, gw, gh)
+        } catch { /* non-fatal */ }
+      }
     } else {
       ctx.drawImage(g, gx, gy, gw, gh)
     }
@@ -746,11 +818,7 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack }
                         mixBlendMode: garmentColor ? 'multiply' : 'normal',
                         pointerEvents: 'none',
                       } as React.CSSProperties}/>
-                    {/* Layer 3 — soft-light texture overlay: adds midtone depth, fabric
-                        wrinkle highlights, fold contrast, and stitch/seam detail above the
-                        color. Opacity ~0.5 keeps the selected color vibrant. Only rendered
-                        when a garment color is active; does not affect the artwork layers
-                        above (they live outside this isolated container). */}
+                    {/* Layer 3 — soft-light: wrinkle highlights, fold depth, fabric texture */}
                     {garmentColor && (
                       <img src={garmentDisplaySrc} alt="" aria-hidden draggable={false}
                         style={{
@@ -760,8 +828,20 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack }
                           pointerEvents: 'none',
                         } as React.CSSProperties}/>
                     )}
-                    {/* Invisible spacer keeps the container at the right height */}
-                    <div style={{ width: '100%', height: '100%' }}/>
+                    {/* Layer 4 — hardware overlay: zippers, buttons, metal hardware retain
+                        their original pixel colors and are composited over the color stack
+                        with normal blend (source-over). This layer only appears when a
+                        garment color is active so it never affects the uncolored display. */}
+                    {garmentColor && hardwareSrcs[activeEditorView] && (
+                      <img src={hardwareSrcs[activeEditorView]!} alt="" aria-hidden draggable={false}
+                        style={{
+                          position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain',
+                          mixBlendMode: 'normal',
+                          pointerEvents: 'none',
+                        }}/>
+                    )}
+                    {/* Spacer keeps the container at the right height */}
+                    <div style={{ width: '100%', height: '100%', visibility: 'hidden' }}/>
                   </div>
                 </div>
                 ) : null

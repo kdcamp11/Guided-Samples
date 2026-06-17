@@ -35,48 +35,47 @@ export default function Phase4Preview({ state, onComplete, onBack }: Props) {
   const [techGenerated, setTechGenerated] = useState(false)
   const [prompt, setPrompt] = useState('')
 
-  // On mount: check if Phase 3 prefetched results into cache
+  // On mount: restore from cache and kick off any missing generation
   useEffect(() => {
-    const cached = cacheGet<{ images: string[] }>(previewCacheKey(state))
-    if (cached?.images?.length) {
-      setImages(cached.images)
-      setGenerated(true)
-    }
+    const cachedReal = cacheGet<{ images: string[] }>(previewCacheKey(state))
+    const cachedTech = cacheGet<{ images: string[] }>(previewCacheKey(state, TECH_DRAWING_PROMPT))
+    if (cachedReal?.images?.length) { setImages(cachedReal.images); setGenerated(true) }
+    if (cachedTech?.images?.length) { setTechImages(cachedTech.images); setTechGenerated(true) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const handleGenerate = async () => {
-    const isTech = drawMode === 'technical'
-    const effectivePrompt = isTech ? TECH_DRAWING_PROMPT : prompt
-
-    setLoading(true)
-    setError('')
-    setStatusMsg('Starting...')
-
+  // Generate a single mode (realistic or technical) — returns the image list
+  const generateOne = async (isTech: boolean, extraPrompt?: string): Promise<string[]> => {
+    const effectivePrompt = isTech ? TECH_DRAWING_PROMPT : (extraPrompt ?? prompt)
     const key = previewCacheKey(state, effectivePrompt)
     const cached = cacheGet<{ images: string[] }>(key)
-    if (cached?.images?.length) {
-      if (isTech) { setTechImages(cached.images); setTechGenerated(true) }
-      else { setImages(cached.images); setGenerated(true) }
-      setLoading(false)
-      setStatusMsg('')
-      return
-    }
+    if (cached?.images?.length) return cached.images
+    const data = await streamGenerate<{ images: string[] }>(
+      '/api/generate-preview',
+      {
+        garmentImage: designImageOf(state) || null,
+        logoImage: state.design?.previewDataUrl ? null : (state.logo?.dataUrl ?? null),
+        placement: 'center chest',
+        extraPrompt: effectivePrompt || undefined,
+      },
+      msg => setStatusMsg(msg),
+    )
+    cacheSet(key, data)
+    return data.images ?? []
+  }
 
+  // Generate both realistic and technical in parallel
+  const handleGenerate = async () => {
+    setLoading(true)
+    setError('')
+    setStatusMsg('Starting…')
     try {
-      const data = await streamGenerate<{ images: string[] }>(
-        '/api/generate-preview',
-        {
-          garmentImage: designImageOf(state) || null,
-          logoImage: state.design?.previewDataUrl ? null : (state.logo?.dataUrl ?? null),
-          placement: 'center chest',
-          extraPrompt: effectivePrompt || undefined,
-        },
-        msg => setStatusMsg(msg),
-      )
-      cacheSet(key, data)
-      if (isTech) { setTechImages(data.images ?? []); setTechGenerated(true) }
-      else { setImages(data.images ?? []); setGenerated(true) }
+      const [realImgs, techImgs] = await Promise.all([
+        generateOne(false),
+        generateOne(true),
+      ])
+      if (realImgs.length) { setImages(realImgs); setGenerated(true) }
+      if (techImgs.length) { setTechImages(techImgs); setTechGenerated(true) }
     } catch (e) {
       console.error(e)
       setError('Generation failed. Please try again.')
@@ -87,12 +86,11 @@ export default function Phase4Preview({ state, onComplete, onBack }: Props) {
   }
 
   const handleRegenerate = async () => {
-    const isTech = drawMode === 'technical'
-    const effectivePrompt = isTech ? TECH_DRAWING_PROMPT : prompt
-    const key = previewCacheKey(state, effectivePrompt)
-    cacheSet(key, null, 0)
-    if (isTech) { setTechGenerated(false); setTechImages([]) }
-    else { setGenerated(false); setImages([]) }
+    // Clear both caches and regenerate
+    cacheSet(previewCacheKey(state, prompt), null, 0)
+    cacheSet(previewCacheKey(state, TECH_DRAWING_PROMPT), null, 0)
+    setGenerated(false); setImages([])
+    setTechGenerated(false); setTechImages([])
     await handleGenerate()
   }
 
@@ -224,10 +222,10 @@ export default function Phase4Preview({ state, onComplete, onBack }: Props) {
               </div>
               <h3 className="text-sm font-semibold text-gray-900 mb-1">Technical Drawing</h3>
               <p className="text-xs text-gray-400 max-w-xs mb-4">
-                Generate a flat technical illustration of your garment — clean line art suitable for spec sheets and supplier communication.
+                Generate both a photorealistic preview and a flat technical illustration of your garment.
               </p>
               <button onClick={handleGenerate} className="btn-primary flex items-center gap-2">
-                <Ruler size={13}/> Generate Technical Drawing
+                <Sparkles size={13}/> Generate Preview &amp; Drawing
               </button>
             </div>
           )}
@@ -249,11 +247,11 @@ export default function Phase4Preview({ state, onComplete, onBack }: Props) {
               </div>
               <h3 className="text-sm font-semibold text-gray-900 mb-1">Ready to visualize</h3>
               <p className="text-xs text-gray-400 max-w-xs mb-6">
-                Generate a photorealistic preview of your product using your exact design specifications.
+                Generates both a photorealistic preview and a flat technical drawing simultaneously.
               </p>
               <button onClick={handleGenerate} className="btn-primary flex items-center gap-2">
                 <Sparkles size={14}/>
-                Generate Preview
+                Generate Preview &amp; Drawing
               </button>
             </div>
           )}
