@@ -47,6 +47,11 @@ interface Props {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
+// Fixed logical display box — all garment views render at the same size
+// regardless of source image dimensions, keeping front/back/side consistent.
+const GARMENT_DISPLAY_W = 320
+const GARMENT_DISPLAY_H = 400
+
 const GOOGLE_FONTS_URL =
   'https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Anton&family=Oswald:wght@400;700&family=Barlow+Condensed:wght@400;700&family=Montserrat:wght@400;700&family=Raleway:wght@400;700&family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Pacifico&family=Racing+Sans+One&display=swap'
 
@@ -386,15 +391,29 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack }
     ctx.fillRect(0, 0, W, H)
 
     const g = await loadImage(garmentSrc)
-    const fit = Math.min(W / g.width, H / g.height) * (garmentScale / 100)
+    const fit = Math.min(GARMENT_DISPLAY_W / g.width, GARMENT_DISPLAY_H / g.height) * (garmentScale / 100)
     const gw = g.width * fit, gh = g.height * fit
-    ctx.drawImage(g, (W - gw) / 2, (H - gh) / 2, gw, gh)
+    const gx = (W - gw) / 2, gy = (H - gh) / 2
 
     if (garmentColor) {
-      ctx.globalCompositeOperation = 'multiply'
-      ctx.fillStyle = garmentColor
-      ctx.fillRect(0, 0, W, H)
-      ctx.globalCompositeOperation = 'source-over'
+      // Build colored garment on a transparent offscreen canvas so the color is
+      // clipped strictly to the garment's alpha channel — not the full artboard.
+      const gc = document.createElement('canvas')
+      gc.width = Math.ceil(gw * SCALE)
+      gc.height = Math.ceil(gh * SCALE)
+      const gctx = gc.getContext('2d')!
+      gctx.scale(SCALE, SCALE)
+      gctx.drawImage(g, 0, 0, gw, gh)              // establishes garment alpha mask
+      gctx.globalCompositeOperation = 'source-atop' // paint color only inside alpha
+      gctx.fillStyle = garmentColor
+      gctx.fillRect(0, 0, gw, gh)
+      gctx.globalCompositeOperation = 'multiply'    // restore texture shading over color
+      gctx.drawImage(g, 0, 0, gw, gh)
+      gctx.globalCompositeOperation = 'source-over'
+      // Composite the tinted garment onto the white main canvas
+      ctx.drawImage(gc, 0, 0, gc.width, gc.height, gx, gy, gw, gh)
+    } else {
+      ctx.drawImage(g, gx, gy, gw, gh)
     }
 
     for (const layer of layers) {
@@ -658,12 +677,30 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack }
 
               {/* Garment */}
               {garmentSrcForView(activeEditorView) ? (
-                <div className="absolute inset-0 pointer-events-none"
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none"
                   style={{ transform: `scale(${garmentScale / 100})`, transformOrigin: 'center center' }}>
-                  <img src={garmentSrcForView(activeEditorView)} alt="garment" className="w-full h-full object-contain"/>
-                  {garmentColor && (
-                    <div style={{ position: 'absolute', inset: 0, backgroundColor: garmentColor, mixBlendMode: 'multiply', borderRadius: 'inherit', pointerEvents: 'none' }}/>
-                  )}
+                  {/* Fixed display box — normalises all view sizes */}
+                  <div style={{ position: 'relative', width: GARMENT_DISPLAY_W, height: GARMENT_DISPLAY_H, flexShrink: 0 }}>
+                    {garmentColor && (
+                      // Color fill masked to garment silhouette via PNG alpha — never covers the canvas background
+                      <div style={{
+                        position: 'absolute', inset: 0,
+                        backgroundColor: garmentColor,
+                        WebkitMaskImage: `url("${garmentSrcForView(activeEditorView)}")`,
+                        WebkitMaskSize: 'contain',
+                        WebkitMaskRepeat: 'no-repeat',
+                        WebkitMaskPosition: 'center',
+                        maskImage: `url("${garmentSrcForView(activeEditorView)}")`,
+                        maskSize: 'contain',
+                        maskRepeat: 'no-repeat',
+                        maskPosition: 'center',
+                        pointerEvents: 'none',
+                      } as React.CSSProperties}/>
+                    )}
+                    {/* Garment texture sits above the color layer */}
+                    <img src={garmentSrcForView(activeEditorView)} alt="garment" draggable={false}
+                      style={{ position: 'relative', width: '100%', height: '100%', objectFit: 'contain' }}/>
+                  </div>
                 </div>
               ) : state.garment?.svg ? (
                 <div className="absolute inset-0 pointer-events-none"
