@@ -142,6 +142,11 @@ function App() {
   }
 
   const handleSectionChange = (s: string) => {
+    if (s === 'projects') {
+      setView('projects')
+      setSidebarOpen(false)
+      return
+    }
     setSection(s)
     setSidebarOpen(false)
   }

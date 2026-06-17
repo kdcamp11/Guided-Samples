@@ -25,6 +25,8 @@ export const GARMENT_LIBRARY: LibraryGarment[] = [
     name: 'Hoodie',
     views: {
       front: asset('Hoodie Front.png'),
+      back:  asset('Zip Up Hoodie Back.png'),
+      side:  asset('Zip Up Hoodie Side.png'),
     },
   },
   {
