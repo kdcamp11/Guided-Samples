@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Package } from 'lucide-react'
 import { useAuth } from '@/lib/auth'
 import SignIn from '@/components/SignIn'
@@ -10,6 +10,20 @@ import ClientOrderDetail from '@/components/client/ClientOrderDetail'
 export default function TrackPage() {
   const { user, loading, signOut } = useAuth()
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null)
+
+  // After a successful Stripe payment, the user lands here with ?payment=X&session_id=Y.
+  // Call the verify endpoint so the order is saved even if the webhook fired late.
+  useEffect(() => {
+    if (!user) return
+    const params = new URLSearchParams(window.location.search)
+    const sessionId = params.get('session_id')
+    const payment = params.get('payment')
+    if (!sessionId || !payment?.endsWith('_success')) return
+    fetch(`/api/checkout/verify?session_id=${sessionId}`)
+      .catch(() => {}) // silent — webhook is the primary path
+    // Clean up the URL so refreshing doesn't re-trigger
+    window.history.replaceState({}, '', '/track')
+  }, [user])
 
   if (loading) {
     return (

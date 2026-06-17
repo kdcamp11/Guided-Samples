@@ -28,16 +28,16 @@ export default function SizeBreakdownPicker({ value, onChange, minTotal = 0, dis
 
   return (
     <div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+      <div className="space-y-1.5">
         {SIZES.map(size => (
-          <div key={size} className="flex items-center justify-between border border-slate-200 rounded-lg px-2 py-1.5">
-            <span className="text-xs font-semibold text-gray-700 w-8">{size}</span>
-            <div className="flex items-center gap-1">
+          <div key={size} className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-gray-700 w-7 shrink-0">{size}</span>
+            <div className="flex items-center gap-1 flex-1">
               <button
                 type="button"
                 onClick={() => adjust(size, -1)}
                 disabled={disabled || (value[size] ?? 0) <= 0}
-                className="w-6 h-6 rounded-md border border-slate-200 flex items-center justify-center text-gray-600 hover:bg-slate-50 disabled:opacity-30"
+                className="w-6 h-6 rounded-md border border-slate-200 flex items-center justify-center text-gray-600 hover:bg-slate-50 disabled:opacity-30 shrink-0"
                 aria-label={`Decrease ${size}`}
               >
                 <Minus size={12} />
@@ -54,11 +54,14 @@ export default function SizeBreakdownPicker({ value, onChange, minTotal = 0, dis
                 type="button"
                 onClick={() => adjust(size, 1)}
                 disabled={disabled}
-                className="w-6 h-6 rounded-md border border-slate-200 flex items-center justify-center text-gray-600 hover:bg-slate-50 disabled:opacity-30"
+                className="w-6 h-6 rounded-md border border-slate-200 flex items-center justify-center text-gray-600 hover:bg-slate-50 disabled:opacity-30 shrink-0"
                 aria-label={`Increase ${size}`}
               >
                 <Plus size={12} />
               </button>
+              {(value[size] ?? 0) > 0 && (
+                <span className="text-[10px] text-gray-400 ml-1">{value[size]} pc{(value[size] ?? 0) > 1 ? 's' : ''}</span>
+              )}
             </div>
           </div>
         ))}

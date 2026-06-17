@@ -403,10 +403,17 @@ export default function Phase6Production({ state, techPack, onBack, projectId, o
 
                 {directQty > 0 && (
                   <div className="border border-slate-100 rounded-xl p-3 mb-4 space-y-1.5 text-xs">
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-1">What you pay today</p>
                     <div className="flex justify-between text-gray-600">
-                      <span>Subtotal ({directQty} pcs)</span>
+                      <span>Production ({directQty} pc{directQty > 1 ? 's' : ''} × ${garmentPrice + logoFeeTotal})</span>
                       <span>${productionTotal.toFixed(2)}</span>
                     </div>
+                    {extraLogos > 0 && (
+                      <div className="flex justify-between text-gray-600">
+                        <span>Extra Logos</span>
+                        <span>+${(logoFeeTotal * directQty).toFixed(2)}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between text-gray-600">
                       <span>50% Production Deposit</span>
                       <span>${depositAmount.toFixed(2)}</span>
