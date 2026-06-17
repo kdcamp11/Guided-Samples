@@ -215,86 +215,104 @@ export default function Phase4Preview({ state, onComplete, onBack }: Props) {
             )}
           </div>
 
-          {drawMode === 'technical' && !techGenerated && !loading && (
-            <div className="flex flex-col items-center justify-center text-center py-16 mb-2 bg-slate-50 rounded-xl border border-dashed border-slate-200">
-              <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center mb-3">
-                <Ruler size={22} className="text-gray-400"/>
-              </div>
-              <h3 className="text-sm font-semibold text-gray-900 mb-1">Technical Drawing</h3>
-              <p className="text-xs text-gray-400 max-w-xs mb-4">
-                Generate both a photorealistic preview and a flat technical illustration of your garment.
-              </p>
-              <button onClick={handleGenerate} className="btn-primary flex items-center gap-2">
-                <Sparkles size={13}/> Generate Preview &amp; Drawing
-              </button>
-            </div>
-          )}
-
-          {drawMode === 'technical' && techGenerated && !loading && techImages.length > 0 && (
-            <div className="grid grid-cols-2 gap-3 mb-2">
-              {techImages.map((img, i) => (
-                <div key={i} className="bg-white border border-slate-100 rounded-xl overflow-hidden">
-                  <img src={img} alt={`Technical drawing ${i + 1}`} className="w-full object-contain p-3" style={{ minHeight: 320 }}/>
+          {drawMode === 'realistic' && (
+            <>
+              {loading && (
+                <div className="flex flex-col items-center justify-center text-center py-20 gap-4">
+                  <Loader2 size={36} className="animate-spin text-brand-green"/>
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">{statusMsg || 'Creating your preview…'}</p>
+                    <p className="text-xs text-gray-400 mt-1">This can take 15–30 seconds</p>
+                  </div>
+                  <div className="flex gap-1 mt-2">
+                    {[0, 1, 2].map(i => (
+                      <div key={i} className="w-1.5 h-1.5 rounded-full bg-brand-green animate-bounce" style={{ animationDelay: `${i * 0.15}s` }}/>
+                    ))}
+                  </div>
                 </div>
-              ))}
-            </div>
-          )}
-
-          {!generated && !loading && drawMode === 'realistic' && (
-            <div className="flex flex-col items-center justify-center text-center py-20">
-              <div className="w-16 h-16 rounded-2xl bg-brand-green/10 flex items-center justify-center mb-4">
-                <Sparkles size={28} className="text-brand-green"/>
-              </div>
-              <h3 className="text-sm font-semibold text-gray-900 mb-1">Ready to visualize</h3>
-              <p className="text-xs text-gray-400 max-w-xs mb-6">
-                Generates both a photorealistic preview and a flat technical drawing simultaneously.
-              </p>
-              <button onClick={handleGenerate} className="btn-primary flex items-center gap-2">
-                <Sparkles size={14}/>
-                Generate Preview &amp; Drawing
-              </button>
-            </div>
-          )}
-
-          {loading && (
-            <div className="flex flex-col items-center justify-center text-center py-20 gap-4">
-              <Loader2 size={36} className="animate-spin text-brand-green"/>
-              <div>
-                <p className="text-sm font-medium text-gray-700">{statusMsg || 'Creating your preview…'}</p>
-                <p className="text-xs text-gray-400 mt-1">This can take 15–30 seconds</p>
-              </div>
-              <div className="flex gap-1 mt-2">
-                {[0, 1, 2].map(i => (
-                  <div
-                    key={i}
-                    className="w-1.5 h-1.5 rounded-full bg-brand-green animate-bounce"
-                    style={{ animationDelay: `${i * 0.15}s` }}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {drawMode === 'realistic' && generated && !loading && images.length > 0 && (
-            <div className="grid grid-cols-2 gap-3">
-              {images.map((img, i) => (
-                <div
-                  key={i}
-                  className="bg-white border border-slate-100 rounded-xl overflow-hidden"
-                >
-                  <img src={img} alt={`Preview ${i + 1}`} className="w-full object-contain p-3" style={{ minHeight: 320 }}/>
+              )}
+              {!loading && !generated && (
+                <div className="flex flex-col items-center justify-center text-center py-20">
+                  <div className="w-16 h-16 rounded-2xl bg-brand-green/10 flex items-center justify-center mb-4">
+                    <Sparkles size={28} className="text-brand-green"/>
+                  </div>
+                  <h3 className="text-sm font-semibold text-gray-900 mb-1">Ready to visualize</h3>
+                  <p className="text-xs text-gray-400 max-w-xs mb-6">
+                    Generates both a photorealistic preview and a flat technical drawing simultaneously.
+                  </p>
+                  <button onClick={handleGenerate} className="btn-primary flex items-center gap-2">
+                    <Sparkles size={14}/> Generate Preview &amp; Drawing
+                  </button>
                 </div>
-              ))}
-            </div>
+              )}
+              {!loading && generated && images.length > 0 && (
+                <div className="grid grid-cols-2 gap-3">
+                  {images.map((img, i) => (
+                    <div key={i} className="bg-white border border-slate-100 rounded-xl overflow-hidden">
+                      <img src={img} alt={`Preview ${i + 1}`} className="w-full object-contain p-3" style={{ minHeight: 320 }}/>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {!loading && error && (
+                <div className="flex flex-col items-center justify-center text-center py-12 gap-3">
+                  <p className="text-sm text-red-500">{error}</p>
+                  <button onClick={handleGenerate} className="btn-secondary flex items-center gap-2">
+                    <RefreshCw size={13}/> Try again
+                  </button>
+                </div>
+              )}
+            </>
           )}
 
-          {error && !loading && (
-            <div className="flex flex-col items-center justify-center text-center py-12 gap-3">
-              <p className="text-sm text-red-500">{error}</p>
-              <button onClick={handleGenerate} className="btn-secondary flex items-center gap-2">
-                <RefreshCw size={13}/> Try again
-              </button>
-            </div>
+          {drawMode === 'technical' && (
+            <>
+              {loading && (
+                <div className="flex flex-col items-center justify-center text-center py-20 gap-4">
+                  <Loader2 size={36} className="animate-spin text-brand-green"/>
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">{statusMsg || 'Creating your technical drawing…'}</p>
+                    <p className="text-xs text-gray-400 mt-1">This can take 15–30 seconds</p>
+                  </div>
+                  <div className="flex gap-1 mt-2">
+                    {[0, 1, 2].map(i => (
+                      <div key={i} className="w-1.5 h-1.5 rounded-full bg-brand-green animate-bounce" style={{ animationDelay: `${i * 0.15}s` }}/>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {!loading && !techGenerated && (
+                <div className="flex flex-col items-center justify-center text-center py-16 mb-2 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                  <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center mb-3">
+                    <Ruler size={22} className="text-gray-400"/>
+                  </div>
+                  <h3 className="text-sm font-semibold text-gray-900 mb-1">Technical Drawing</h3>
+                  <p className="text-xs text-gray-400 max-w-xs mb-4">
+                    Generate a flat technical illustration of your garment with logo placement callouts.
+                  </p>
+                  <button onClick={handleGenerate} className="btn-primary flex items-center gap-2">
+                    <Sparkles size={13}/> Generate Preview &amp; Drawing
+                  </button>
+                </div>
+              )}
+              {!loading && techGenerated && techImages.length > 0 && (
+                <div className="grid grid-cols-2 gap-3 mb-2">
+                  {techImages.map((img, i) => (
+                    <div key={i} className="bg-white border border-slate-100 rounded-xl overflow-hidden">
+                      <img src={img} alt={`Technical drawing ${i + 1}`} className="w-full object-contain p-3" style={{ minHeight: 320 }}/>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {!loading && error && (
+                <div className="flex flex-col items-center justify-center text-center py-12 gap-3">
+                  <p className="text-sm text-red-500">{error}</p>
+                  <button onClick={handleGenerate} className="btn-secondary flex items-center gap-2">
+                    <RefreshCw size={13}/> Try again
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
 
