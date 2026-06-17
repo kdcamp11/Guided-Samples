@@ -23,8 +23,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const { session_id } = await req.json()
-  if (!session_id) return NextResponse.json({ error: 'Missing session_id' }, { status: 400 })
+  const body = await req.json()
+  // Accept either a session ID (cs_...) or an event ID (evt_...)
+  const raw: string = body.session_id ?? ''
+  if (!raw) return NextResponse.json({ error: 'Missing session_id' }, { status: 400 })
 
   const secretKey = process.env.STRIPE_SECRET_KEY
   if (!secretKey) return NextResponse.json({ error: 'Stripe not configured' }, { status: 500 })
@@ -38,9 +40,19 @@ export async function POST(req: NextRequest) {
 
   let session: Stripe.Checkout.Session
   try {
-    session = await stripe.checkout.sessions.retrieve(session_id)
+    if (raw.startsWith('evt_')) {
+      // Resolve event → session
+      const event = await stripe.events.retrieve(raw)
+      if (event.type !== 'checkout.session.completed') {
+        return NextResponse.json({ error: `Event type is "${event.type}", expected checkout.session.completed` }, { status: 422 })
+      }
+      const sessionId = (event.data.object as Stripe.Checkout.Session).id
+      session = await stripe.checkout.sessions.retrieve(sessionId)
+    } else {
+      session = await stripe.checkout.sessions.retrieve(raw)
+    }
   } catch {
-    return NextResponse.json({ error: 'Session not found in Stripe' }, { status: 404 })
+    return NextResponse.json({ error: 'Not found in Stripe — check the ID and that you are using the correct live/test mode key' }, { status: 404 })
   }
 
   if (session.payment_status !== 'paid') {

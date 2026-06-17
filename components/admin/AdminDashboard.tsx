@@ -111,13 +111,13 @@ export default function AdminDashboard({ onSelectOrder }: Props) {
         {recoverOpen && (
           <div className="px-4 pb-4 space-y-3">
             <p className="text-xs text-amber-700 leading-relaxed">
-              Paste one or more Stripe session IDs (cs_live_…) — one per line or comma-separated.
-              The API will re-fetch each session from Stripe and create the missing order.
+              Paste Stripe <strong>session IDs</strong> (cs_live_…) <strong>or event IDs</strong> (evt_…) — one per line or comma-separated.
+              Find them in your Stripe dashboard under Events → click a <code>checkout.session.completed</code> event → copy the Event ID or Session ID.
             </p>
             <textarea
               className="w-full text-xs font-mono rounded-lg border border-amber-200 bg-white px-3 py-2 focus:outline-none focus:border-amber-400 resize-none"
               rows={4}
-              placeholder={"cs_live_abc123\ncs_live_def456"}
+              placeholder={"evt_1TjONZGgztsco1z3KRMXAyef\ncs_live_abc123"}
               value={sessionIds}
               onChange={e => setSessionIds(e.target.value)}
             />
