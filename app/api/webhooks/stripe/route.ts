@@ -57,8 +57,17 @@ export async function POST(req: NextRequest) {
   }
 
   const session = event.data.object as Stripe.Checkout.Session
-  const meta = session.metadata ?? {}
+  // Always re-fetch the session from Stripe so we get the fully-expanded
+  // metadata — webhook payloads occasionally omit or truncate it.
+  let fullSession = session
+  try {
+    fullSession = await stripe.checkout.sessions.retrieve(session.id)
+  } catch (e) {
+    console.error('[stripe-webhook] session re-fetch failed, using payload:', e)
+  }
+  const meta = fullSession.metadata ?? {}
   const { payment_type } = meta
+  console.log('[stripe-webhook] session', fullSession.id, 'payment_type:', payment_type, 'metadata keys:', Object.keys(meta))
 
   if (payment_type === 'credit_purchase') {
     await handleCreditPurchase(session, meta)
