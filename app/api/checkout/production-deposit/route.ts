@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
   }
   await sb
     .from('production_orders')
-    .update({ production_quantity: qty, size_breakdown: breakdown })
+    .update({ production_quantity: qty })
     .eq('id', order_id)
 
   const subtotal = bulkSubtotalCents(
