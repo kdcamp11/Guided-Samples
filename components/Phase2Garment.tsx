@@ -9,6 +9,7 @@ import { cacheGet, cacheSet, cacheKey } from '@/lib/generateCache'
 import { useAICredits } from '@/lib/aiCreditsContext'
 import GenerationCounter from '@/components/GenerationCounter'
 import { GARMENT_LIBRARY, type LibraryGarment } from '@/lib/garmentLibrary'
+import { removeWhiteBackground } from '@/lib/removeWhiteBg'
 
 type View = 'front' | 'back' | 'side'
 
@@ -198,14 +199,23 @@ function ApparelFlow({ state, onComplete, onBack }: Props) {
 
   const currentModeHasResults = anyDone
 
-  const handleProceed = () => {
-    const views: { front?: string; back?: string; side?: string } = {}
+  const handleProceed = async () => {
+    const rawViews: { front?: string; back?: string; side?: string } = {}
     for (const v of selectedViews) {
       const img = getActiveImage(v)
-      if (img) views[v] = img
+      if (img) rawViews[v] = img
+    }
+    // Remove solid backgrounds from generated garment images (AI output often
+    // includes a studio background color that blocks the canvas background)
+    const libGarment = mode === 'library' ? GARMENT_LIBRARY.find(g => g.id === selectedGarmentId) : null
+    const isGenerated = !libGarment
+    let views = rawViews
+    if (isGenerated) {
+      const keys = Object.keys(rawViews) as (keyof typeof rawViews)[]
+      const cleaned = await Promise.all(keys.map(k => removeWhiteBackground(rawViews[k]!).catch(() => rawViews[k]!)))
+      views = Object.fromEntries(keys.map((k, i) => [k, cleaned[i]])) as typeof rawViews
     }
     const primary = views.front ?? views.back ?? views.side ?? ''
-    const libGarment = mode === 'library' ? GARMENT_LIBRARY.find(g => g.id === selectedGarmentId) : null
     onComplete({ svg: '', dataUrl: primary, views, type: libGarment ? libGarment.name : 'generated', color: 'custom' })
   }
 
@@ -651,9 +661,12 @@ function UniformFlow({ onComplete, onBack }: { onComplete: (garment: AppState['g
   const allSelectedDone = selectedViews.every(v => !!getActiveImage(v))
   const isLoading = !!loadingView
 
-  const handleProceed = () => {
-    const views: { front?: string; back?: string; side?: string } = {}
-    for (const v of selectedViews) { const img = getActiveImage(v); if (img) views[v] = img }
+  const handleProceed = async () => {
+    const rawViews: { front?: string; back?: string; side?: string } = {}
+    for (const v of selectedViews) { const img = getActiveImage(v); if (img) rawViews[v] = img }
+    const keys = Object.keys(rawViews) as (keyof typeof rawViews)[]
+    const cleaned = await Promise.all(keys.map(k => removeWhiteBackground(rawViews[k]!).catch(() => rawViews[k]!)))
+    const views = Object.fromEntries(keys.map((k, i) => [k, cleaned[i]])) as typeof rawViews
     const primary = views.front ?? views.back ?? views.side ?? ''
     onComplete({ svg: '', dataUrl: primary, views, type: sport ? `${sport} ${uniformType}` : 'uniform', color: 'custom', mode: 'uniform', sport: sport ?? undefined, uniformType: uniformType ?? undefined })
   }

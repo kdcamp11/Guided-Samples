@@ -237,7 +237,9 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack }
     document.head.appendChild(link)
   }, [])
 
-  // Compute tinted data URLs for image layers with tintColor using canvas source-atop
+  // Compute tinted data URLs for image layers with tintColor.
+  // Two-pass approach: (1) source-atop fill clips tint to image alpha,
+  // (2) multiply the original back on top to restore dark outlines/detail.
   useEffect(() => {
     layers.forEach(layer => {
       if (layer.type !== 'image' || !layer.tintColor) return
@@ -248,10 +250,16 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack }
         const off = document.createElement('canvas')
         off.width = img.width; off.height = img.height
         const offCtx = off.getContext('2d')!
+        // Pass 1: fill tint color clipped to image's alpha channel
         offCtx.drawImage(img, 0, 0)
         offCtx.globalCompositeOperation = 'source-atop'
         offCtx.fillStyle = (layer as ImageLayer).tintColor!
         offCtx.fillRect(0, 0, off.width, off.height)
+        // Pass 2: multiply original back on top — dark pixels (outlines/detail)
+        // darken the tint, transparent pixels remain transparent
+        offCtx.globalCompositeOperation = 'multiply'
+        offCtx.drawImage(img, 0, 0)
+        offCtx.globalCompositeOperation = 'source-over'
         setTintedDataUrls(prev => ({ ...prev, [key]: off.toDataURL('image/png') }))
       })()
     })
@@ -502,15 +510,19 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack }
         const lf = Math.min(layer.width / img.width, layer.height / img.height)
         const iw = img.width * lf, ih = img.height * lf
         if (layer.tintColor) {
-          // Composite tint in isolation so it only affects the logo pixels,
-          // not the white canvas background behind transparent areas.
+          // Two-pass tint: preserve dark outlines/detail while applying color.
           const off = document.createElement('canvas')
           off.width = Math.ceil(iw); off.height = Math.ceil(ih)
           const offCtx = off.getContext('2d')!
           offCtx.drawImage(img, 0, 0, off.width, off.height)
+          // Pass 1: fill tint clipped to image alpha
           offCtx.globalCompositeOperation = 'source-atop'
           offCtx.fillStyle = layer.tintColor
           offCtx.fillRect(0, 0, off.width, off.height)
+          // Pass 2: multiply original back to restore dark details
+          offCtx.globalCompositeOperation = 'multiply'
+          offCtx.drawImage(img, 0, 0, off.width, off.height)
+          offCtx.globalCompositeOperation = 'source-over'
           ctx.drawImage(off, -iw / 2, -ih / 2, iw, ih)
         } else {
           ctx.drawImage(img, -iw / 2, -ih / 2, iw, ih)
