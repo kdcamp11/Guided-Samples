@@ -134,7 +134,7 @@ export default function Phase4Preview({ state, onSavePreview, onComplete, onBack
           <div className="card">
             <p className="text-xs font-medium text-gray-600 mb-3">Your Design</p>
 
-            <div className="bg-white border border-slate-100 rounded-lg flex items-center justify-center mb-3" style={{ height: 140 }}>
+            <div className="bg-white border border-slate-100 rounded-lg flex items-center justify-center mb-3" style={{ height: 200 }}>
               {designImageOf(state) ? (
                 <img src={designImageOf(state)} alt="garment" className="w-full h-full object-contain p-2"/>
               ) : (
@@ -297,12 +297,12 @@ export default function Phase4Preview({ state, onSavePreview, onComplete, onBack
                 </div>
               )}
               {!loading && !techGenerated && (
-                <div className="flex flex-col items-center justify-center text-center py-16 mb-2 bg-slate-50 rounded-xl border border-dashed border-slate-200">
-                  <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center mb-3">
-                    <Ruler size={22} className="text-gray-400"/>
+                <div className="flex flex-col items-center justify-center text-center py-20">
+                  <div className="w-16 h-16 rounded-2xl bg-brand-green/10 flex items-center justify-center mb-4">
+                    <Ruler size={28} className="text-brand-green"/>
                   </div>
                   <h3 className="text-sm font-semibold text-gray-900 mb-1">Technical Drawing</h3>
-                  <p className="text-xs text-gray-400 max-w-xs mb-4">
+                  <p className="text-xs text-gray-400 max-w-xs mb-6">
                     Generate a flat technical illustration of your garment with logo placement callouts.
                   </p>
                   <button onClick={handleGenerate} className="btn-primary flex items-center gap-2">
