@@ -898,7 +898,11 @@ function UniformFlow({ onComplete, onBack }: { onComplete: (garment: AppState['g
 // ─── Shell: top-level toggle between Custom Apparel and Team Uniforms ──────────
 
 export default function Phase2Garment({ state, onComplete, onBack }: Props) {
-  const [productMode, setProductMode] = useState<'apparel' | 'uniform' | null>(null)
+  // If the project already has a garment (existing project being edited), skip
+  // the product type selector and go straight to the relevant flow.
+  const [productMode, setProductMode] = useState<'apparel' | 'uniform' | null>(
+    state.garment?.mode ?? null
+  )
 
   if (productMode === 'apparel') {
     return <ApparelFlow state={state} onComplete={(g) => onComplete(g ? { ...g, mode: 'apparel' } : g)} onBack={() => setProductMode(null)} />

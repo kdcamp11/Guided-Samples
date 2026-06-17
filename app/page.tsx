@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { AuthProvider, useAuth } from '@/lib/auth'
 import { saveProject, saveTechPack, loadProject } from '@/lib/projects'
 import type { ProjectDetail } from '@/lib/projects'
@@ -21,7 +21,7 @@ import LandingPage from '@/components/LandingPage'
 import CreativeDirectionForm from '@/components/CreativeDirectionForm'
 import AIPaywallModal from '@/components/AIPaywallModal'
 import { AICreditsProvider, useAICredits } from '@/lib/aiCreditsContext'
-import { Menu, Sparkles } from 'lucide-react'
+import { Menu, Sparkles, Loader2, Check, AlertCircle } from 'lucide-react'
 
 export type AppState = {
   currentPhase: number
@@ -80,26 +80,36 @@ function App() {
   const [authOpen, setAuthOpen] = useState(false)
   const [authInitialMode, setAuthInitialMode] = useState<'signin' | 'signup'>('signin')
   const projectIdRef = useRef<string | undefined>(undefined)
+  const [saveToast, setSaveToast] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Resolve the user id from the live Supabase session, falling back to the
   // context user. Both save paths use this so a project can never be written
   // under a different user_id than the one listProjects() later queries with.
-  const resolveUid = async (): Promise<string | null> => {
+  const resolveUid = useCallback(async (): Promise<string | null> => {
     const sb = createClient()
     if (sb) {
       const { data: { session } } = await sb.auth.getSession()
       if (session?.user?.id) return session.user.id
     }
     return user?.id ?? null
-  }
+  }, [user?.id])
 
-  // Auto-save to Supabase whenever phase advances
-  const autoSave = async (newState: AppState) => {
+  // Auto-save to Supabase on every phase transition
+  const autoSave = useCallback(async (newState: AppState) => {
+    setSaveToast('saving')
+    if (toastTimer.current) clearTimeout(toastTimer.current)
     const uid = await resolveUid()
-    if (!uid) return
+    if (!uid) { setSaveToast('idle'); return }
     const id = await saveProject(uid, newState, projectIdRef.current)
-    if (id) projectIdRef.current = id
-  }
+    if (id) {
+      projectIdRef.current = id
+      setSaveToast('saved')
+    } else {
+      setSaveToast('error')
+    }
+    toastTimer.current = setTimeout(() => setSaveToast('idle'), 2500)
+  }, [resolveUid])
 
   const advancePhase = (updates: Partial<AppState>) => {
     setState(s => {
@@ -261,6 +271,19 @@ function App() {
       />
 
       <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Global save toast — shown on desktop above main content */}
+        {saveToast !== 'idle' && (
+          <div className={`hidden lg:flex fixed top-3 right-4 z-50 items-center gap-2 px-3 py-2 rounded-lg shadow-md text-xs font-medium transition-all ${
+            saveToast === 'saving' ? 'bg-white border border-slate-200 text-gray-500' :
+            saveToast === 'saved'  ? 'bg-white border border-brand-green/30 text-brand-green' :
+            'bg-white border border-red-200 text-red-500'
+          }`}>
+            {saveToast === 'saving' && <Loader2 size={12} className="animate-spin"/>}
+            {saveToast === 'saved'  && <Check size={12}/>}
+            {saveToast === 'error'  && <AlertCircle size={12}/>}
+            {saveToast === 'saving' ? 'Saving…' : saveToast === 'saved' ? 'Project saved' : 'Save failed'}
+          </div>
+        )}
         <header className="lg:hidden flex items-center gap-3 px-4 py-3 bg-white border-b border-slate-200 shrink-0">
           <button onClick={() => setSidebarOpen(true)} className="p-2 rounded-lg hover:bg-slate-100 text-gray-600">
             <Menu size={20}/>
@@ -269,9 +292,19 @@ function App() {
             <div className="w-6 h-6 bg-grace-ink rounded-md flex items-center justify-center text-xs font-bold text-white">G</div>
             <span className="text-sm font-bold text-gray-900">GRACE</span>
           </div>
+          {saveToast !== 'idle' && (
+            <span className={`ml-auto flex items-center gap-1 text-xs font-medium ${
+              saveToast === 'saving' ? 'text-gray-400' : saveToast === 'saved' ? 'text-brand-green' : 'text-red-500'
+            }`}>
+              {saveToast === 'saving' && <Loader2 size={11} className="animate-spin"/>}
+              {saveToast === 'saved'  && <Check size={11}/>}
+              {saveToast === 'error'  && <AlertCircle size={11}/>}
+              {saveToast === 'saving' ? 'Saving…' : saveToast === 'saved' ? 'Saved' : 'Save failed'}
+            </span>
+          )}
           <button
             onClick={() => { setSection('settings'); setSidebarOpen(false) }}
-            className="ml-auto flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 hover:border-brand-green transition-colors"
+            className={`${saveToast !== 'idle' ? '' : 'ml-auto'} flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 hover:border-brand-green transition-colors`}
             title="Manage AI credits"
           >
             <Sparkles size={12} className="text-brand-green"/>
