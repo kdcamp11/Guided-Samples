@@ -47,6 +47,7 @@ export type AppState = {
   } | null
   preview: {
     images: string[]
+    techImages?: string[]
   } | null
 }
 
@@ -348,6 +349,7 @@ function App() {
           {section === 'design' && state.currentPhase === 4 && (
             <Phase4Preview
               state={state}
+              onSavePreview={(preview) => setState(s => { const next = { ...s, preview }; autoSave(next); return next })}
               onComplete={(preview) => advancePhase({ preview, currentPhase: 5 })}
               onBack={() => goToPhase(3)}
             />

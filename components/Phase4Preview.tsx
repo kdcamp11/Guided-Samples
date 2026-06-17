@@ -8,6 +8,7 @@ import { cacheGet, cacheSet, cacheKey } from '@/lib/generateCache'
 
 interface Props {
   state: AppState
+  onSavePreview: (preview: AppState['preview']) => void
   onComplete: (preview: AppState['preview']) => void
   onBack: () => void
 }
@@ -24,7 +25,7 @@ function previewCacheKey(state: AppState, prompt = '') {
 
 const TECH_DRAWING_PROMPT = 'flat technical illustration, garment technical flat drawing, clean precise line art, front and back view, white background, no shading, fashion technical sketch, black and white. Show only logo placement callout lines with approximate logo dimensions (width x height in inches). Do NOT include a size chart or body measurement table.'
 
-export default function Phase4Preview({ state, onComplete, onBack }: Props) {
+export default function Phase4Preview({ state, onSavePreview, onComplete, onBack }: Props) {
   const [drawMode, setDrawMode] = useState<'realistic' | 'technical'>('realistic')
   const [images, setImages] = useState<string[]>([])
   const [techImages, setTechImages] = useState<string[]>([])
@@ -35,12 +36,16 @@ export default function Phase4Preview({ state, onComplete, onBack }: Props) {
   const [techGenerated, setTechGenerated] = useState(false)
   const [prompt, setPrompt] = useState('')
 
-  // On mount: restore from cache and kick off any missing generation
+  // On mount: restore from AppState first (survives refresh), then in-memory cache
   useEffect(() => {
+    const savedReal = state.preview?.images
+    const savedTech = state.preview?.techImages
     const cachedReal = cacheGet<{ images: string[] }>(previewCacheKey(state))
     const cachedTech = cacheGet<{ images: string[] }>(previewCacheKey(state, TECH_DRAWING_PROMPT))
-    if (cachedReal?.images?.length) { setImages(cachedReal.images); setGenerated(true) }
-    if (cachedTech?.images?.length) { setTechImages(cachedTech.images); setTechGenerated(true) }
+    const realImgs = (savedReal?.length ? savedReal : cachedReal?.images) ?? []
+    const techImgs = (savedTech?.length ? savedTech : cachedTech?.images) ?? []
+    if (realImgs.length) { setImages(realImgs); setGenerated(true) }
+    if (techImgs.length) { setTechImages(techImgs); setTechGenerated(true) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -76,6 +81,9 @@ export default function Phase4Preview({ state, onComplete, onBack }: Props) {
       ])
       if (realImgs.length) { setImages(realImgs); setGenerated(true) }
       if (techImgs.length) { setTechImages(techImgs); setTechGenerated(true) }
+      if (realImgs.length || techImgs.length) {
+        onSavePreview({ images: realImgs, techImages: techImgs })
+      }
     } catch (e) {
       console.error(e)
       setError('Generation failed. Please try again.')
@@ -95,7 +103,7 @@ export default function Phase4Preview({ state, onComplete, onBack }: Props) {
   }
 
   const handleProceed = () => {
-    onComplete({ images })
+    onComplete({ images, techImages })
   }
 
   return (
