@@ -26,7 +26,6 @@ const phases = [
   { num: 3, label: 'Design' },
   { num: 4, label: 'Preview' },
   { num: 5, label: 'Tech Pack' },
-  { num: 6, label: 'Production' },
 ]
 
 function GraceMark({ size = 24 }: { size?: number }) {
