@@ -1,11 +1,13 @@
 'use client'
 
-import { useState } from 'react'
-import { ChevronLeft, Shirt, Sparkles } from 'lucide-react'
+import { useState, useRef } from 'react'
+import { ChevronLeft, Shirt, Sparkles, Upload, ImagePlus } from 'lucide-react'
 import { AppState } from '@/app/page'
 import Phase3Editor from './Phase3Editor'
 import GarmentAssetPanel from './GarmentAssetPanel'
 import LogoAssetPanel from './LogoAssetPanel'
+import { fileToDataUrl } from '@/lib/fileToDataUrl'
+import { removeWhiteBackground } from '@/lib/removeWhiteBg'
 
 interface Props {
   state: AppState
@@ -18,14 +20,23 @@ interface Props {
 export default function PhaseDesignStudio({ state, onComplete, onBack, onLogoUpdate, onSetGarment }: Props) {
   const [panelOpen, setPanelOpen] = useState(true)
   const [localLogo, setLocalLogo] = useState<AppState['logo']>(state.logo)
+  const [pendingArtwork, setPendingArtwork] = useState<string | null>(null)
+  const artworkInputRef = useRef<HTMLInputElement>(null)
 
   const handleLogoUpdate = (logo: AppState['logo']) => {
     setLocalLogo(logo)
     onLogoUpdate(logo)
   }
 
-  const handleSetGarment = (garment: AppState['garment']) => {
-    onSetGarment(garment)
+  const handleArtworkUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''
+    try {
+      let dataUrl = await fileToDataUrl(file)
+      try { dataUrl = await removeWhiteBackground(dataUrl) } catch {}
+      setPendingArtwork(dataUrl)
+    } catch (err) { console.error('Artwork upload failed', err) }
   }
 
   return (
@@ -49,12 +60,12 @@ export default function PhaseDesignStudio({ state, onComplete, onBack, onLogoUpd
             <GarmentAssetPanel
               route={state.route ?? 'apparel'}
               state={state}
-              onSetGarment={handleSetGarment}
+              onSetGarment={onSetGarment}
             />
           </div>
 
           {/* Logo section */}
-          <div>
+          <div className="border-b border-slate-200">
             <div className="px-3 py-2 border-b border-slate-200">
               <p className="text-[10px] font-bold tracking-[0.15em] text-gray-400 uppercase">Logo</p>
             </div>
@@ -62,6 +73,27 @@ export default function PhaseDesignStudio({ state, onComplete, onBack, onLogoUpd
               state={{ ...state, logo: localLogo }}
               onLogoUpdate={handleLogoUpdate}
             />
+          </div>
+
+          {/* Artwork section */}
+          <div>
+            <div className="px-3 py-2 border-b border-slate-200">
+              <p className="text-[10px] font-bold tracking-[0.15em] text-gray-400 uppercase">Artwork</p>
+            </div>
+            <div className="px-3 py-3">
+              <p className="text-[11px] text-gray-400 mb-2.5 leading-relaxed">Upload any PNG, SVG, or image to add as a layer on the canvas.</p>
+              <label className="flex items-center gap-2 w-full px-3 py-2.5 rounded-lg border border-dashed border-slate-300 hover:border-brand-green cursor-pointer transition-colors text-xs text-gray-500 hover:text-gray-700">
+                <ImagePlus size={13}/>
+                Upload Artwork
+                <input
+                  ref={artworkInputRef}
+                  type="file"
+                  className="hidden"
+                  accept="image/png,image/svg+xml,image/jpeg,image/webp,.png,.svg,.jpg,.jpeg,.webp"
+                  onChange={handleArtworkUpload}
+                />
+              </label>
+            </div>
           </div>
         </div>
       ) : (
@@ -76,6 +108,9 @@ export default function PhaseDesignStudio({ state, onComplete, onBack, onLogoUpd
           <button onClick={() => setPanelOpen(true)} className="p-2 rounded-lg hover:bg-slate-100 text-gray-500 transition-colors" title="Logo">
             <Sparkles size={16}/>
           </button>
+          <button onClick={() => setPanelOpen(true)} className="p-2 rounded-lg hover:bg-slate-100 text-gray-500 transition-colors" title="Artwork">
+            <Upload size={16}/>
+          </button>
         </div>
       )}
 
@@ -87,6 +122,8 @@ export default function PhaseDesignStudio({ state, onComplete, onBack, onLogoUpd
           onComplete={(design) => onComplete({ logo: localLogo, design })}
           onSetGarment={onSetGarment}
           onBack={onBack}
+          pendingArtwork={pendingArtwork}
+          onArtworkConsumed={() => setPendingArtwork(null)}
         />
       </div>
     </div>

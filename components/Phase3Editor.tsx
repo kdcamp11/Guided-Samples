@@ -48,6 +48,8 @@ interface Props {
   onSetGarment: (garment: AppState['garment']) => void
   onBack: () => void
   hideHeader?: boolean
+  pendingArtwork?: string | null
+  onArtworkConsumed?: () => void
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -170,7 +172,7 @@ async function cropPadding(src: string, pad = 6): Promise<string> {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function Phase3Editor({ state, onComplete, onSetGarment, onBack, hideHeader }: Props) {
+export default function Phase3Editor({ state, onComplete, onSetGarment, onBack, hideHeader, pendingArtwork, onArtworkConsumed }: Props) {
   const canvasRef = useRef<HTMLDivElement>(null)
   const [zoom, setZoom] = useState(100)
   const [garmentScale, setGarmentScale] = useState(100)
@@ -307,6 +309,17 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack, 
 
   // Keep garment color in sync with the cache
   useEffect(() => { _cachedGarmentColor = garmentColor }, [garmentColor])
+
+  // Add artwork layer when parent passes a new image (from the asset panel upload)
+  useEffect(() => {
+    if (!pendingArtwork) return
+    const id = crypto.randomUUID()
+    snapshot()
+    setLayers(ls => [...ls, { id, type: 'image', dataUrl: pendingArtwork, x: 60, y: 80, width: 160, height: 80, rotation: 0 }])
+    setSelectedId(id)
+    onArtworkConsumed?.()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingArtwork])
 
   const snapshot = useCallback(() => {
     setPast(p => [...p.slice(-49), layersByView])
@@ -619,10 +632,6 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack, 
           {leftTab === 'assets' && (
             <div className="card space-y-3">
               <p className="text-xs font-medium text-gray-600">Artwork</p>
-              <label className="btn-secondary w-full flex items-center justify-center gap-2 cursor-pointer">
-                <Upload size={13}/> Upload Image
-                <input type="file" className="hidden" accept="image/png,image/svg+xml,application/pdf,.png,.svg,.pdf" onChange={handleUploadLogo}/>
-              </label>
               {state.logo && (
                 <button
                   onClick={() => {
@@ -1081,10 +1090,6 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack, 
             </button>
           )}
 
-          <button onClick={handleConfirm}
-            className="w-full flex items-center justify-center gap-2 font-medium py-3 px-4 rounded-xl transition-colors text-sm bg-brand-green hover:bg-brand-green-light text-white">
-            Confirm Design <ArrowRight size={15}/>
-          </button>
         </div>
 
       </div>
