@@ -1,12 +1,11 @@
 // Remove a solid-color background from a logo image.
-// Samples the four corners to detect the background color, then BFS flood-fills
+// Averages all four corners to detect the background color, then BFS flood-fills
 // from the image borders — only the outer connected background region becomes
-// transparent. Interior pixels of the same color (e.g. white text on white bg)
-// are preserved because they aren't reachable from the border.
-export async function removeWhiteBackground(dataUrl: string, tolerance = 30): Promise<string> {
+// transparent. Interior pixels of the same color are preserved because they
+// aren't reachable from the border.
+export async function removeWhiteBackground(dataUrl: string, tolerance = 40): Promise<string> {
   const img = await new Promise<HTMLImageElement>((resolve, reject) => {
     const i = new Image()
-    i.crossOrigin = 'anonymous'
     i.onload = () => resolve(i)
     i.onerror = reject
     i.src = dataUrl
@@ -23,20 +22,24 @@ export async function removeWhiteBackground(dataUrl: string, tolerance = 30): Pr
   const imageData = ctx.getImageData(0, 0, w, h)
   const px = imageData.data
 
-  // Detect background color by sampling four corners; pick the most common one
-  const corners = [
-    [0, 0], [w - 1, 0], [0, h - 1], [w - 1, h - 1],
-  ].map(([x, y]) => {
-    const i = (y * w + x) * 4
-    return { r: px[i], g: px[i + 1], b: px[i + 2] }
-  })
-  // Use the top-left corner as the reference background color
-  const bg = corners[0]
+  // Sample all four corners and average to get a robust background color estimate.
+  // Corners that are fully transparent are skipped.
+  const cornerCoords = [[0, 0], [w - 1, 0], [0, h - 1], [w - 1, h - 1]] as const
+  let rSum = 0, gSum = 0, bSum = 0, count = 0
+  for (const [x, y] of cornerCoords) {
+    const idx = (y * w + x) * 4
+    if (px[idx + 3] < 10) continue // skip transparent corners
+    rSum += px[idx]; gSum += px[idx + 1]; bSum += px[idx + 2]
+    count++
+  }
+  if (count === 0) return dataUrl // all corners transparent — nothing to remove
+  const bg = { r: Math.round(rSum / count), g: Math.round(gSum / count), b: Math.round(bSum / count) }
 
-  const isBg = (i: number) =>
-    Math.abs(px[i]     - bg.r) <= tolerance &&
-    Math.abs(px[i + 1] - bg.g) <= tolerance &&
-    Math.abs(px[i + 2] - bg.b) <= tolerance
+  const isBg = (idx: number) =>
+    px[idx + 3] > 10 && // only remove opaque pixels
+    Math.abs(px[idx]     - bg.r) <= tolerance &&
+    Math.abs(px[idx + 1] - bg.g) <= tolerance &&
+    Math.abs(px[idx + 2] - bg.b) <= tolerance
 
   // BFS flood fill from all border pixels
   const visited = new Uint8Array(w * h)

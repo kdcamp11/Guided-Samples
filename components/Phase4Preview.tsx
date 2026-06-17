@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react'
 import { ArrowLeft, ArrowRight, Loader2, RefreshCw, Sparkles, CheckCircle2, Download, Ruler } from 'lucide-react'
 import { AppState } from '@/app/page'
-import { streamGenerate } from '@/lib/streamGenerate'
+import { streamGenerate, PaywallError } from '@/lib/streamGenerate'
 import { cacheGet, cacheSet, cacheKey } from '@/lib/generateCache'
+import { useAICredits } from '@/lib/aiCreditsContext'
 
 interface Props {
   state: AppState
@@ -26,6 +27,7 @@ function previewCacheKey(state: AppState, prompt = '') {
 const TECH_DRAWING_PROMPT = 'flat technical illustration, garment technical flat drawing, clean precise line art, front and back view, white background, no shading, fashion technical sketch, black and white. Show only logo placement callout lines with approximate logo dimensions (width x height in inches). Do NOT include a size chart or body measurement table.'
 
 export default function Phase4Preview({ state, onSavePreview, onComplete, onBack }: Props) {
+  const credits = useAICredits()
   const [drawMode, setDrawMode] = useState<'realistic' | 'technical'>('realistic')
   const [images, setImages] = useState<string[]>([])
   const [techImages, setTechImages] = useState<string[]>([])
@@ -55,6 +57,7 @@ export default function Phase4Preview({ state, onSavePreview, onComplete, onBack
     const key = previewCacheKey(state, effectivePrompt)
     const cached = cacheGet<{ images: string[] }>(key)
     if (cached?.images?.length) return cached.images
+    const headers = await credits.getGenerationHeaders()
     const data = await streamGenerate<{ images: string[] }>(
       '/api/generate-preview',
       {
@@ -65,7 +68,9 @@ export default function Phase4Preview({ state, onSavePreview, onComplete, onBack
         isTech,
       },
       msg => setStatusMsg(msg),
+      headers,
     )
+    credits.onGenerationComplete()
     cacheSet(key, data)
     return data.images ?? []
   }
@@ -86,6 +91,7 @@ export default function Phase4Preview({ state, onSavePreview, onComplete, onBack
         onSavePreview({ images: realImgs, techImages: techImgs })
       }
     } catch (e) {
+      if (e instanceof PaywallError) { credits.openPaywall(); return }
       console.error(e)
       setError('Generation failed. Please try again.')
     } finally {
