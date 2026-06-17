@@ -25,16 +25,28 @@ export async function POST(req: NextRequest) {
       let res: Response
 
       if (isTech) {
-        // Technical drawing: pure text-to-image generation — style transforms via
-        // image editing never reliably produce line art, so we describe the garment.
-        const garmentType = 'garment'
-        const techPrompt = `Flat technical fashion illustration. Clean precise black line art on a pure white background. Front view and back view side by side of a ${garmentType}. No shading, no color fills, no gradients, no shadows. Show logo placement on the front with a callout line and label indicating approximate dimensions (width x height in inches). Fashion tech pack style sketch. Minimalist, professional, black outlines only.`
-        const finalTechPrompt = extraPrompt ? `${techPrompt} Additional notes: ${extraPrompt}` : techPrompt
+        const techPrompt = `Convert this garment photo into a flat technical fashion illustration. Clean black line art on pure white background. Front view and back view. No shading, no color fills, no gradients, no photography — pure line art only. Show logo placement with a callout line and label indicating approximate dimensions. Fashion tech pack style.`
+        const finalTechPrompt = extraPrompt ? `${techPrompt} ${extraPrompt}` : techPrompt
 
-        res = await fetch('https://api.openai.com/v1/images/generations', {
+        const form = new FormData()
+        form.append('model', 'gpt-image-2')
+        form.append('prompt', finalTechPrompt)
+        form.append('n', '2')
+        form.append('size', '1024x1024')
+        form.append('quality', 'medium')
+
+        // Pass the garment composite as reference
+        if (garmentImage) {
+          const garmentBuffer = Buffer.from(garmentImage.split(',')[1], 'base64')
+          const garmentMime = garmentImage.match(/^data:(image\/\w+);/)?.[1] ?? 'image/png'
+          form.append('image[]', new Blob([garmentBuffer], { type: garmentMime }), `garment.${garmentMime.split('/')[1]}`)
+        }
+
+        const endpoint = garmentImage ? 'https://api.openai.com/v1/images/edits' : 'https://api.openai.com/v1/images/generations'
+        res = await fetch(endpoint, {
           method: 'POST',
-          headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ model: 'gpt-image-2', prompt: finalTechPrompt, n: 2, size: '1024x1024', quality: 'medium' }),
+          headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
+          body: garmentImage ? form : JSON.stringify({ model: 'gpt-image-2', prompt: finalTechPrompt, n: 2, size: '1024x1024', quality: 'medium' }),
         })
       } else {
         // Realistic preview: image editing with the garment composite as input

@@ -26,6 +26,7 @@ interface ImageLayer extends BaseLayer {
   type: 'image'
   dataUrl: string
   tintColor?: string
+  isLogo?: boolean
 }
 
 interface TextLayer extends BaseLayer {
@@ -184,6 +185,7 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack }
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const croppedCache = useRef<Record<string, string>>({})
   const [displaySrcs, setDisplaySrcs] = useState<Record<string, string>>({})
+  const [tintedDataUrls, setTintedDataUrls] = useState<Record<string, string>>({})
 
   // Derived
   const layers: LogoLayer[] = layersByView[activeEditorView] ?? []
@@ -235,11 +237,46 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack }
     document.head.appendChild(link)
   }, [])
 
+  // Compute tinted data URLs for image layers with tintColor using canvas source-atop
+  useEffect(() => {
+    layers.forEach(layer => {
+      if (layer.type !== 'image' || !layer.tintColor) return
+      const key = `${layer.id}_${layer.tintColor}`
+      if (tintedDataUrls[key]) return
+      ;(async () => {
+        const img = await loadImage(layer.dataUrl)
+        const off = document.createElement('canvas')
+        off.width = img.width; off.height = img.height
+        const offCtx = off.getContext('2d')!
+        offCtx.drawImage(img, 0, 0)
+        offCtx.globalCompositeOperation = 'source-atop'
+        offCtx.fillStyle = (layer as ImageLayer).tintColor!
+        offCtx.fillRect(0, 0, off.width, off.height)
+        setTintedDataUrls(prev => ({ ...prev, [key]: off.toDataURL('image/png') }))
+      })()
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [layers])
+
   // Init: restore active view from available garment views. Don't reset layers —
   // they are already initialised from the module-level cache above.
   useEffect(() => {
     if (availableViews.length > 0) setActiveEditorView(availableViews[0])
     hydrated.current = true
+    // Update any logo layers to use the current logo dataUrl (handles logo updates in Phase 1)
+    if (state.logo?.dataUrl) {
+      setLayersByView(prev => {
+        const updated: ViewLayers = {}
+        for (const view in prev) {
+          updated[view] = prev[view].map(l =>
+            l.type === 'image' && (l as ImageLayer).isLogo
+              ? { ...l, dataUrl: state.logo!.dataUrl }
+              : l
+          )
+        }
+        return updated
+      })
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -568,7 +605,7 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack }
                   onClick={() => {
                     const id = crypto.randomUUID()
                     snapshot()
-                    const newLayer: ImageLayer = { id, type: 'image', dataUrl: state.logo!.dataUrl, x: 60, y: 80, width: 160, height: 80, rotation: 0 }
+                    const newLayer: ImageLayer = { id, type: 'image', isLogo: true, dataUrl: state.logo!.dataUrl, x: 60, y: 80, width: 160, height: 80, rotation: 0 }
                     setLayers(ls => [...ls, newLayer])
                     setSelectedId(id)
                   }}
@@ -817,12 +854,13 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack }
                       {layer.text || 'Your Text'}
                     </div>
                   ) : (
-                    <div style={{ position: 'relative', width: '100%', height: '100%', isolation: 'isolate' }}>
-                      <img src={layer.dataUrl} alt="artwork" className="w-full h-full object-contain" draggable={false}/>
-                      {layer.tintColor && (
-                        <div style={{ position: 'absolute', inset: 0, backgroundColor: layer.tintColor, mixBlendMode: 'multiply', pointerEvents: 'none' }}/>
-                      )}
-                    </div>
+                    <img
+                      src={(layer.tintColor ? tintedDataUrls[`${layer.id}_${layer.tintColor}`] : undefined) ?? layer.dataUrl}
+                      alt="artwork"
+                      className="w-full h-full object-contain"
+                      draggable={false}
+                      style={{ pointerEvents: 'none' }}
+                    />
                   )}
 
                   {selectedId === layer.id && (

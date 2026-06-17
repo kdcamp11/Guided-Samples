@@ -61,7 +61,7 @@ export default function Phase4Preview({ state, onSavePreview, onComplete, onBack
     const data = await streamGenerate<{ images: string[] }>(
       '/api/generate-preview',
       {
-        garmentImage: isTech ? null : (designImageOf(state) || null),
+        garmentImage: designImageOf(state) || null,
         logoImage: isTech ? null : (state.design?.previewDataUrl ? null : (state.logo?.dataUrl ?? null)),
         placement: 'center chest',
         extraPrompt: effectivePrompt || undefined,
