@@ -113,8 +113,12 @@ function App() {
     return user?.id ?? null
   }, [user?.id])
 
-  // Auto-save to Supabase on every phase transition
+  // Auto-save to Supabase on every phase transition.
+  // Never persist while still on Phase 1 (the route/garment picker) — opening a
+  // project or starting one and not moving past the picker should not write a
+  // row or generate a thumbnail.
   const autoSave = useCallback(async (newState: AppState) => {
+    if (newState.currentPhase < 2) return
     setSaveToast('saving')
     if (toastTimer.current) clearTimeout(toastTimer.current)
     const uid = await resolveUid()

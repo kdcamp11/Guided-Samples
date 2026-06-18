@@ -180,6 +180,28 @@ async function cropPadding(src: string, pad = 6): Promise<string> {
 
 // ─── Arch/curve text helpers ──────────────────────────────────────────────────
 
+// Shared arch geometry so the on-screen preview (SVG) and the rasterized export
+// (canvas) agree exactly. The sagitta (lift) scales up to nearly a full
+// semicircle of the text's width at archAmount ±100 for an aggressive curve, and
+// the render box grows vertically (RH) so deep arches are never clipped. The box
+// is centered on the layer's center in both the DOM and the composite.
+function archGeometry(layer: TextLayer) {
+  const w = layer.width
+  const h = layer.height
+  const arch = layer.archAmount ?? 0
+  const cap = layer.fontSize * 0.78
+  const desc = layer.fontSize * 0.24
+  // Aggressive: allow the sagitta to reach ~92% of the half-chord (near-semicircle).
+  const maxLift = (w / 2) * 0.92
+  const lift = Math.min(maxLift, Math.max(0, (Math.abs(arch) / 100) * maxLift))
+  const r = lift > 0 ? (w * w / 4 + lift * lift) / (2 * lift) : 0
+  // Expand the render height to fit the full curve plus glyph asc/descent.
+  const RH = Math.max(h, lift + cap + desc + 4)
+  const baseY = arch > 0 ? RH - desc - 2 : cap + 2
+  const cy = arch > 0 ? baseY - r : baseY + r
+  return { w, h, cap, desc, arch, lift, r, RH, baseY, cy }
+}
+
 // Rasterize arched text to a PNG using canvas arc-path drawing so page fonts apply.
 async function archTextToDataUrl(layer: TextLayer, w: number, h: number): Promise<string> {
   const SCALE = 2
@@ -189,12 +211,11 @@ async function archTextToDataUrl(layer: TextLayer, w: number, h: number): Promis
   const fontStr = `${fi} ${fw} ${layer.fontSize}px "${layer.fontFamily}"`
   try { await document.fonts.load(fontStr) } catch {}
 
-  const canvas = document.createElement('canvas')
-  canvas.width = w * SCALE; canvas.height = h * SCALE
-  const ctx = canvas.getContext('2d')!
-  ctx.scale(SCALE, SCALE)
-
   if (!arch) {
+    const canvas = document.createElement('canvas')
+    canvas.width = w * SCALE; canvas.height = h * SCALE
+    const ctx = canvas.getContext('2d')!
+    ctx.scale(SCALE, SCALE)
     ctx.font = fontStr
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
@@ -204,23 +225,18 @@ async function archTextToDataUrl(layer: TextLayer, w: number, h: number): Promis
     return canvas.toDataURL('image/png')
   }
 
-  // Draw text character-by-character along the arc
-  const cap = layer.fontSize * 0.78
-  const desc = layer.fontSize * 0.24
-  const maxLift = Math.max(2, h - cap - desc)
-  const lift = Math.min(maxLift, Math.max(2, (Math.abs(arch) / 100) * maxLift))
-  const r = (w * w / 4 + lift * lift) / (2 * lift)
-  const baseY = arch > 0 ? h - desc : cap
-  // Centre of the arc circle
-  const cy = arch > 0 ? baseY - r : baseY + r
+  const { RH, r, baseY, cy } = archGeometry(layer)
+  const canvas = document.createElement('canvas')
+  canvas.width = w * SCALE; canvas.height = RH * SCALE
+  const ctx = canvas.getContext('2d')!
+  ctx.scale(SCALE, SCALE)
 
   ctx.font = fontStr
   ctx.textAlign = 'center'
-  ctx.textBaseline = arch > 0 ? 'alphabetic' : 'alphabetic'
+  ctx.textBaseline = 'alphabetic'
   const sw = layer.strokeWidth ?? 0
 
   const text = layer.text || 'Your Text'
-  // Measure total width to centre the string
   const totalWidth = ctx.measureText(text).width
   let cursor = -totalWidth / 2
 
@@ -238,7 +254,7 @@ async function archTextToDataUrl(layer: TextLayer, w: number, h: number): Promis
     ctx.translate(cx2, cy2)
     ctx.rotate(rotate)
     ctx.textAlign = 'center'
-    ctx.textBaseline = arch > 0 ? 'alphabetic' : 'alphabetic'
+    ctx.textBaseline = 'alphabetic'
     if (sw > 0) { ctx.lineWidth = sw * 2; ctx.strokeStyle = layer.strokeColor ?? '#000000'; ctx.lineJoin = 'round'; ctx.strokeText(char, 0, 0) }
     ctx.fillStyle = layer.color; ctx.fillText(char, 0, 0)
     ctx.restore()
@@ -270,22 +286,23 @@ function ArchTextPreview({ layer }: { layer: TextLayer }) {
     )
   }
 
-  const cap = layer.fontSize * 0.78
-  const desc = layer.fontSize * 0.24
-  const maxLift = Math.max(2, h - cap - desc)
-  const lift = Math.min(maxLift, Math.max(2, (Math.abs(arch) / 100) * maxLift))
-  const r = (w * w / 4 + lift * lift) / (2 * lift)
-  const baseY = arch > 0 ? h - desc : cap
+  const { RH, r, baseY } = archGeometry(layer)
   const sweep = arch > 0 ? 1 : 0
   const pathD = `M 0,${baseY} A ${r},${r} 0 0,${sweep} ${w},${baseY}`
+  // Unique id per layer so multiple arched layers don't collide on "#ap".
+  const pathId = `ap-${layer.id}`
 
+  // Render the curve in a vertically-expanded box centered on the layer box so
+  // deep arches aren't clipped and the preview matches the rasterized export.
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" width={w} height={h} overflow="visible" style={{ width: '100%', height: '100%', pointerEvents: 'none' }}>
-      <defs><path id="ap" d={pathD}/></defs>
-      <text {...textProps} textAnchor="middle">
-        <textPath href="#ap" startOffset="50%">{layer.text || 'Your Text'}</textPath>
-      </text>
-    </svg>
+    <div style={{ position: 'absolute', left: 0, top: (h - RH) / 2, width: w, height: RH, pointerEvents: 'none' }}>
+      <svg xmlns="http://www.w3.org/2000/svg" width={w} height={RH} viewBox={`0 0 ${w} ${RH}`} overflow="visible" style={{ width: '100%', height: '100%', pointerEvents: 'none' }}>
+        <defs><path id={pathId} d={pathD}/></defs>
+        <text {...textProps} textAnchor="middle">
+          <textPath href={`#${pathId}`} startOffset="50%">{layer.text || 'Your Text'}</textPath>
+        </text>
+      </svg>
+    </div>
   )
 }
 
@@ -790,7 +807,8 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onLogoUp
         if (tl.archAmount) {
           const pngUrl = await archTextToDataUrl(tl, layer.width, layer.height)
           const img = await loadImage(pngUrl)
-          ctx.drawImage(img, -layer.width / 2, -layer.height / 2, layer.width, layer.height)
+          const { RH } = archGeometry(tl)
+          ctx.drawImage(img, -layer.width / 2, -RH / 2, layer.width, RH)
         } else {
           const fw = tl.fontWeight ?? 'bold'
           const fi = tl.fontStyle ?? 'normal'
@@ -836,8 +854,12 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onLogoUp
   // Render a single layer to a tightly-cropped transparent PNG
   const renderLayerPng = async (layer: LogoLayer): Promise<string> => {
     const pad = 6
+    // Arched text needs the expanded render height so the curve isn't clipped.
+    const layerH = (layer.type === 'text' && layer.archAmount)
+      ? archGeometry(layer).RH
+      : layer.height
     const W = Math.ceil(layer.width) + pad * 2
-    const H = Math.ceil(layer.height) + pad * 2
+    const H = Math.ceil(layerH) + pad * 2
     const SCALE = 2
     const canvas = document.createElement('canvas')
     canvas.width = W * SCALE; canvas.height = H * SCALE
@@ -850,7 +872,8 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onLogoUp
       if (layer.archAmount) {
         const pngUrl = await archTextToDataUrl(layer, layer.width, layer.height)
         const img = await loadImage(pngUrl)
-        ctx.drawImage(img, -layer.width / 2, -layer.height / 2, layer.width, layer.height)
+        const { RH } = archGeometry(layer)
+        ctx.drawImage(img, -layer.width / 2, -RH / 2, layer.width, RH)
       } else {
         const fw = layer.fontWeight ?? 'bold'
         const fi = layer.fontStyle ?? 'normal'
