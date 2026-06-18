@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, Loader2, FolderOpen, LogOut, Sparkles, ArrowLeft } from 'lucide-react'
+import { Plus, Trash2, Loader2, FolderOpen, LogOut, Sparkles, ArrowLeft, Search, Pencil, Check, X } from 'lucide-react'
 import { useAuth } from '@/lib/auth'
-import { listProjects, deleteProject } from '@/lib/projects'
+import { listProjects, deleteProject, renameProject } from '@/lib/projects'
 import type { Project } from '@/lib/projects'
 
 interface Props {
@@ -16,6 +16,9 @@ export default function ProjectsDashboard({ onNewProject, onOpenProject, onBack 
   const { user, signOut } = useAuth()
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
+  const [query, setQuery] = useState('')
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editName, setEditName] = useState('')
 
   useEffect(() => {
     if (!user) return
@@ -28,6 +31,24 @@ export default function ProjectsDashboard({ onNewProject, onOpenProject, onBack 
     await deleteProject(id)
     setProjects(ps => ps.filter(p => p.id !== id))
   }
+
+  const startRename = (p: Project, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setEditingId(p.id)
+    setEditName(p.name)
+  }
+
+  const commitRename = async (id: string, e?: React.MouseEvent) => {
+    e?.stopPropagation()
+    const name = editName.trim()
+    setEditingId(null)
+    if (!name) return
+    setProjects(ps => ps.map(p => (p.id === id ? { ...p, name } : p)))
+    await renameProject(id, name)
+  }
+
+  const filtered = projects.filter(p =>
+    p.name.toLowerCase().includes(query.trim().toLowerCase()))
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -65,6 +86,26 @@ export default function ProjectsDashboard({ onNewProject, onOpenProject, onBack 
           </button>
         </div>
 
+        {/* Search */}
+        {!loading && projects.length > 0 && (
+          <div className="relative mb-6 max-w-sm">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/>
+            <input
+              type="text"
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="Search projects by name…"
+              className="input-field w-full pl-9"
+            />
+            {query && (
+              <button onClick={() => setQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-600">
+                <X size={14}/>
+              </button>
+            )}
+          </div>
+        )}
+
         {loading ? (
           <div className="flex items-center justify-center py-20 gap-3 text-gray-400">
             <Loader2 size={20} className="animate-spin text-brand-green"/>
@@ -92,7 +133,13 @@ export default function ProjectsDashboard({ onNewProject, onOpenProject, onBack 
               <span className="text-xs font-medium">New Project</span>
             </button>
 
-            {projects.map(project => (
+            {filtered.length === 0 && query && (
+              <div className="col-span-full text-center py-12 text-sm text-gray-400">
+                No projects match “{query}”.
+              </div>
+            )}
+
+            {filtered.map(project => (
               <div key={project.id} onClick={() => onOpenProject(project.id)}
                 className="card hover:border-brand-green/30 cursor-pointer transition-colors group relative overflow-hidden">
                 {/* Thumbnail */}
@@ -109,16 +156,47 @@ export default function ProjectsDashboard({ onNewProject, onOpenProject, onBack 
                 </div>
 
                 <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-gray-900 truncate">{project.name}</p>
+                  <div className="min-w-0 flex-1">
+                    {editingId === project.id ? (
+                      <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                        <input
+                          autoFocus
+                          value={editName}
+                          onChange={e => setEditName(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') commitRename(project.id)
+                            if (e.key === 'Escape') setEditingId(null)
+                          }}
+                          className="input-field text-sm py-1 px-2 min-w-0 flex-1"
+                        />
+                        <button onClick={e => commitRename(project.id, e)}
+                          className="text-brand-green hover:text-brand-green/70 shrink-0">
+                          <Check size={14}/>
+                        </button>
+                        <button onClick={e => { e.stopPropagation(); setEditingId(null) }}
+                          className="text-gray-300 hover:text-gray-600 shrink-0">
+                          <X size={14}/>
+                        </button>
+                      </div>
+                    ) : (
+                      <p className="text-sm font-semibold text-gray-900 truncate">{project.name}</p>
+                    )}
                     <p className="text-[11px] text-gray-400 mt-0.5">
                       Phase {project.phase_reached} · {new Date(project.updated_at).toLocaleDateString()}
                     </p>
                   </div>
-                  <button onClick={e => handleDelete(project.id, e)}
-                    className="text-gray-200 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all shrink-0 mt-0.5">
-                    <Trash2 size={13}/>
-                  </button>
+                  {editingId !== project.id && (
+                    <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
+                      <button onClick={e => startRename(project, e)}
+                        className="text-gray-200 hover:text-brand-green opacity-0 group-hover:opacity-100 transition-all">
+                        <Pencil size={13}/>
+                      </button>
+                      <button onClick={e => handleDelete(project.id, e)}
+                        className="text-gray-200 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all">
+                        <Trash2 size={13}/>
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {/* Phase progress bar */}

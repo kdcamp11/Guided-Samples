@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import {
   Undo2, Redo2, Minus, Plus, Upload, Layers, ArrowLeft, ArrowRight,
-  Trash2, Copy, ChevronUp, ChevronDown, Check, Loader2, Download, Type, Palette, X,
+  Trash2, Copy, ChevronUp, ChevronDown, Check, Loader2, Download, Type, Palette, X, Save,
 } from 'lucide-react'
 import { AppState } from '@/app/page'
 import { streamGenerate } from '@/lib/streamGenerate'
@@ -923,6 +923,16 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onLogoUp
     }
   }
 
+  // Explicit save — flushes the debounce and pushes the full studio snapshot to
+  // the parent (which writes it to Supabase). Complements the 800ms autosave.
+  const handleManualSave = () => {
+    if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = null }
+    setSaveStatus('saving')
+    emitStudioState()
+    if (garmentColor && state.garment) onSetGarment({ ...state.garment, color: garmentColor })
+    setTimeout(() => setSaveStatus('saved'), 300)
+  }
+
   const handleConfirm = async () => {
     // Flush any pending debounced save so layers are persisted before phase advance
     if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = null }
@@ -1442,6 +1452,9 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onLogoUp
                 {saveStatus === 'saving' && <><Loader2 size={11} className="animate-spin"/> Saving…</>}
                 {saveStatus === 'saved'  && <><Check   size={11} className="text-brand-green"/> Saved</>}
               </span>
+              <button onClick={handleManualSave} className="btn-secondary flex items-center gap-1.5">
+                <Save size={13}/> Save
+              </button>
               <button onClick={handleConfirm} className="btn-primary flex items-center gap-1.5">
                 Confirm Design <ArrowRight size={13}/>
               </button>

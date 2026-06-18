@@ -76,15 +76,19 @@ export async function saveProject(
   const supabase = createClient()
   if (!supabase) return null
 
-  // Upsert project row
+  // Upsert project row. Only set `name` when an explicit name is given or when
+  // creating a new project — otherwise an autosave would clobber a custom name
+  // that the user set via rename.
   const id = projectId ?? crypto.randomUUID()
-  const { error: projErr } = await supabase.from('projects').upsert({
+  const row: Record<string, unknown> = {
     id,
     user_id: userId,
-    name: projectName ?? `Design ${new Date().toLocaleDateString()}`,
     phase_reached: state.currentPhase,
     updated_at: new Date().toISOString(),
-  }, { onConflict: 'id' })
+  }
+  if (projectName) row.name = projectName
+  else if (!projectId) row.name = `Design ${new Date().toLocaleDateString()}`
+  const { error: projErr } = await supabase.from('projects').upsert(row, { onConflict: 'id' })
   if (projErr) { console.error('Project upsert error', projErr); return null }
 
   // Upload images in parallel
@@ -123,6 +127,10 @@ export async function saveProject(
     } : null,
     design: state.design ? { confirmed: state.design.confirmed, previewDataUrl: compositeUrl ?? '' } : null,
     preview: (previews.length || techPreviews.length) ? { images: previews, techImages: techPreviews.length ? techPreviews : undefined } : null,
+    // Design Studio snapshot — layer positions/transforms per view, garment color,
+    // text layers, and the logo/artwork galleries. Persisted verbatim so reopening
+    // a project restores the canvas exactly as the user left it.
+    studioState: state.studioState,
   }
 
   // Update project with urls
@@ -151,6 +159,14 @@ export async function saveTechPack(
     ...techPack,
     updated_at: new Date().toISOString(),
   }, { onConflict: 'project_id' })
+}
+
+export async function renameProject(projectId: string, name: string): Promise<void> {
+  const supabase = createClient()
+  if (!supabase) return
+  await supabase.from('projects')
+    .update({ name, updated_at: new Date().toISOString() })
+    .eq('id', projectId)
 }
 
 export async function listProjects(userId: string): Promise<Project[]> {
