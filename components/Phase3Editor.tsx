@@ -201,9 +201,16 @@ function archTextSvg(layer: TextLayer, w: number, h: number): string {
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><text x="${w/2}" y="${h/2}" text-anchor="middle" dominant-baseline="middle" ${fontAttr} ${strokeAttr}>${text}</text></svg>`
   }
 
-  const lift = Math.abs(arch / 100) * h * 0.75
+  // Approximate glyph extents above/below the baseline so the whole arched
+  // word stays inside the [0,h] box (otherwise the peak gets clipped).
+  const cap = layer.fontSize * 0.78   // ascent above baseline
+  const desc = layer.fontSize * 0.24  // descent below baseline
+  const maxLift = Math.max(2, h - cap - desc)
+  const lift = Math.min(maxLift, Math.max(2, (Math.abs(arch) / 100) * maxLift))
   const r = (w * w / 4 + lift * lift) / (2 * lift)
-  const baseY = arch > 0 ? h * 0.7 : h * 0.3
+  // Arch up: baseline sits near the bottom, arc bulges upward.
+  // Arch down: baseline sits near the top, arc bulges downward.
+  const baseY = arch > 0 ? h - desc : cap
   const sweep = arch > 0 ? 1 : 0
 
   const pathD = `M 0,${baseY} A ${r},${r} 0 0,${sweep} ${w},${baseY}`
@@ -1352,7 +1359,7 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onLogoUp
           {/* Canvas area */}
           <div ref={canvasRef}
             className="relative bg-white overflow-hidden flex items-center justify-center"
-            style={{ minHeight: 480 }}
+            style={{ minHeight: 'calc(100vh - 200px)' }}
             onClick={e => { if (e.target === e.currentTarget) setSelectedId(null) }}>
             <div style={{ transform: `scale(${zoom / 100})`, transformOrigin: 'center center', position: 'relative', width: 380, height: 460 }}>
 
