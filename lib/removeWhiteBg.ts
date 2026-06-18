@@ -18,6 +18,26 @@ export async function cleanupBackground(dataUrl: string): Promise<string> {
   return dataUrl
 }
 
+// Opt-in deep background removal. Sends the image to the server's Replicate
+// (rembg/U²-Net) pipeline for a true alpha-channel cutout. This is more
+// aggressive than the flood-fill and may trim fine outline strokes, so it's
+// only ever run when the user explicitly asks for a cleaner background.
+// Falls back to the original image if the service is unavailable.
+export async function cleanBackgroundRemote(dataUrl: string): Promise<string> {
+  try {
+    const res = await fetch('/api/remove-bg', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: dataUrl }),
+    })
+    if (!res.ok) return dataUrl
+    const data = await res.json()
+    return typeof data.image === 'string' ? data.image : dataUrl
+  } catch {
+    return dataUrl
+  }
+}
+
 // Remove a solid-color background from a logo image.
 // Averages all four corners to detect the background color, then BFS flood-fills
 // from the image borders — only the outer connected background region becomes

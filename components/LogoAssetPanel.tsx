@@ -1,13 +1,14 @@
 'use client'
 import { useState } from 'react'
-import { Loader2, Sparkles, Upload, X, ImagePlus, RefreshCw, ArrowRight } from 'lucide-react'
+import { Loader2, Sparkles, Upload, X, ImagePlus, RefreshCw, ArrowRight, Wand2 } from 'lucide-react'
 import { AppState } from '@/app/page'
 import { streamGenerate, PaywallError } from '@/lib/streamGenerate'
 import { cacheGet, cacheSet, cacheKey } from '@/lib/generateCache'
-import { removeWhiteBackground, cleanupBackground } from '@/lib/removeWhiteBg'
+import { removeWhiteBackground, cleanupBackground, cleanBackgroundRemote } from '@/lib/removeWhiteBg'
 import { fileToDataUrl } from '@/lib/fileToDataUrl'
 import { useAICredits } from '@/lib/aiCreditsContext'
 import GenerationCounter from '@/components/GenerationCounter'
+import AIUsageHint from '@/components/AIUsageHint'
 
 interface Props {
   state: AppState
@@ -32,6 +33,20 @@ export default function LogoAssetPanel({ state, onLogoUpdate }: Props) {
   const [result, setResult] = useState<LogoResult | null>(null)
   const [selectedVariant, setSelectedVariant] = useState(0)
   const [referenceImage, setReferenceImage] = useState<string | null>(null)
+  const [cleaning, setCleaning] = useState(false)
+
+  // Opt-in deeper background removal via the server-side Replicate pipeline.
+  // Only runs when the user clicks — preserves the as-uploaded image otherwise.
+  const handleCleanBackground = async () => {
+    if (!state.logo || cleaning) return
+    setCleaning(true)
+    try {
+      const cleaned = await cleanBackgroundRemote(state.logo.dataUrl)
+      onLogoUpdate({ ...state.logo, dataUrl: cleaned })
+    } finally {
+      setCleaning(false)
+    }
+  }
 
   const currentImage = result ? result.images[selectedVariant] : null
   const currentSvg = result ? result.svgs[selectedVariant] : null
@@ -117,6 +132,19 @@ export default function LogoAssetPanel({ state, onLogoUpdate }: Props) {
               <img src={state.logo.dataUrl} alt="Current logo" className="max-h-full max-w-full object-contain p-2"/>
             </div>
             <p className="text-[10px] text-gray-400 text-center py-1">Current logo</p>
+            <div className="border-t border-slate-100 p-2">
+              <button
+                onClick={handleCleanBackground}
+                disabled={cleaning}
+                className="w-full flex items-center justify-center gap-1.5 text-[11px] text-gray-600 hover:text-grace-ink disabled:opacity-50 transition-colors"
+                title="Uses AI to remove the background for a cleaner cutout (counts as one AI generation)"
+              >
+                {cleaning ? <Loader2 size={12} className="animate-spin"/> : <Wand2 size={12}/>}
+                {cleaning ? 'Cleaning…' : 'Clean background (AI)'}
+                <AIUsageHint />
+              </button>
+              <p className="text-[9px] text-gray-400 text-center mt-1">Removes the background for an even cleaner cutout.</p>
+            </div>
           </div>
         )}
         <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-3">Logo Source</p>
@@ -212,7 +240,10 @@ export default function LogoAssetPanel({ state, onLogoUpdate }: Props) {
         className="btn-primary w-full flex items-center justify-center gap-2 text-xs">
         {loading ? <><Loader2 size={13} className="animate-spin"/> {statusMsg || 'Generating…'}</> : <><Sparkles size={13}/> Generate Logo</>}
       </button>
-      <GenerationCounter className="w-full justify-center" />
+      <div className="flex items-center justify-center gap-1.5">
+        <GenerationCounter />
+        <AIUsageHint />
+      </div>
       {error && <p className="text-[10px] text-red-500">{error}</p>}
 
       {currentImage && !loading && (

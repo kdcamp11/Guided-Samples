@@ -10,6 +10,7 @@ import { cacheGet, cacheSet, cacheKey } from '@/lib/generateCache'
 import { removeWhiteBackground } from '@/lib/removeWhiteBg'
 import { useAICredits } from '@/lib/aiCreditsContext'
 import GenerationCounter from '@/components/GenerationCounter'
+import AIUsageHint from '@/components/AIUsageHint'
 
 interface Props {
   state: AppState
@@ -185,7 +186,10 @@ export default function Phase1Logo({ state, onComplete, onSkip, onBack, onLogoUp
               {loading ? <Loader2 size={15} className="animate-spin"/> : <Sparkles size={15}/>}
               {loading ? (statusMsg || 'Generating…') : 'Generate Logo'}
             </button>
-            <GenerationCounter className="mt-2 w-full justify-center" />
+            <div className="mt-2 flex items-center justify-center gap-1.5">
+              <GenerationCounter />
+              <AIUsageHint />
+            </div>
             {error && <p className="text-[11px] text-red-500 mt-2">{error}</p>}
 
             {/* Reference image */}

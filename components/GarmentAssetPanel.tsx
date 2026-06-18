@@ -7,6 +7,7 @@ import { streamGenerate, PaywallError } from '@/lib/streamGenerate'
 import { cacheGet, cacheSet, cacheKey } from '@/lib/generateCache'
 import { useAICredits } from '@/lib/aiCreditsContext'
 import GenerationCounter from '@/components/GenerationCounter'
+import AIUsageHint from '@/components/AIUsageHint'
 import { GARMENT_LIBRARY, type LibraryGarment } from '@/lib/garmentLibrary'
 import { removeWhiteBackground } from '@/lib/removeWhiteBg'
 
@@ -363,7 +364,10 @@ export default function GarmentAssetPanel({ route, state, onSetGarment }: Props)
           className="btn-primary w-full flex items-center justify-center gap-2 text-xs">
           {isLoading ? <><Loader2 size={13} className="animate-spin"/> {statusMsg || 'Generating…'}</> : <><Sparkles size={13}/> Generate</>}
         </button>
-        <GenerationCounter className="w-full justify-center" />
+        <div className="flex items-center justify-center gap-1.5">
+          <GenerationCounter />
+          <AIUsageHint />
+        </div>
         {route === 'uniform' && (!sport || !uniformType) && (
           <p className="text-[10px] text-gray-400 text-center">Select sport and type first</p>
         )}
