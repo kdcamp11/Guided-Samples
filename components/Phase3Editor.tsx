@@ -178,9 +178,14 @@ async function cropPadding(src: string, pad = 6): Promise<string> {
 
 // ─── Arch/curve text helpers ──────────────────────────────────────────────────
 
+// Escape text for safe embedding inside an SVG node (handles &, <, > in user input)
+function escapeXml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
 function archTextSvg(layer: TextLayer, w: number, h: number): string {
   const arch = layer.archAmount ?? 0
-  const text = layer.text || 'Your Text'
+  const text = escapeXml(layer.text || 'Your Text')
   const fw = layer.fontWeight ?? 'bold'
   const fi = layer.fontStyle ?? 'normal'
   const sw = layer.strokeWidth ?? 0
