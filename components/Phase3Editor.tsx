@@ -10,6 +10,7 @@ import { streamGenerate } from '@/lib/streamGenerate'
 import { cacheGet, cacheSet, cacheKey } from '@/lib/generateCache'
 import { removeWhiteBackground } from '@/lib/removeWhiteBg'
 import { fileToDataUrl } from '@/lib/fileToDataUrl'
+import { downloadDataUrl, downloadAssetsZip } from '@/lib/downloadAssets'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -176,6 +177,8 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack, 
   const canvasRef = useRef<HTMLDivElement>(null)
   const [zoom, setZoom] = useState(100)
   const [garmentScale, setGarmentScale] = useState(100)
+  const [garmentOffset, setGarmentOffset] = useState({ x: 0, y: 0 })
+  const [garmentDragging, setGarmentDragging] = useState(false)
   // Restore garment color and layers from the module-level cache so back-navigation
   // returns the canvas exactly as the user left it.
   const [garmentColor, setGarmentColor] = useState(_cachedGarmentColor)
@@ -431,6 +434,34 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack, 
     window.addEventListener('touchend', onUp)
   }
 
+  // Drag the garment itself around the canvas (offset in artboard units)
+  const startGarmentDrag = (e: React.MouseEvent | React.TouchEvent) => {
+    e.stopPropagation()
+    setSelectedId(null)
+    setGarmentDragging(true)
+    const start = 'touches' in e
+      ? { x: e.touches[0].clientX, y: e.touches[0].clientY }
+      : { x: e.clientX, y: e.clientY }
+    const orig = { ...garmentOffset }
+    const z = zoom / 100
+    const onMove = (ev: MouseEvent | TouchEvent) => {
+      if ('touches' in ev) ev.preventDefault()
+      const p = getPoint(ev)
+      setGarmentOffset({ x: orig.x + (p.x - start.x) / z, y: orig.y + (p.y - start.y) / z })
+    }
+    const onUp = () => {
+      setGarmentDragging(false)
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+      window.removeEventListener('touchmove', onMove)
+      window.removeEventListener('touchend', onUp)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+    window.addEventListener('touchmove', onMove, { passive: false })
+    window.addEventListener('touchend', onUp)
+  }
+
   const addTextLayer = () => {
     const id = crypto.randomUUID()
     snapshot()
@@ -464,9 +495,19 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack, 
     e.target.value = ''
   }
 
-  // Composite all layers + garment (current view) to a single PNG
-  const compositeDesign = async (): Promise<string> => {
-    const garmentSrc = garmentSrcForView(activeEditorView)
+  // Render the design (current view) to a PNG.
+  //  - includeLayers: draw artwork/text layers on top of the garment
+  //  - includeGarment: draw the garment itself
+  //  - transparent: skip the white background fill (exports a cut-out PNG)
+  const renderDesign = async (opts: {
+    includeLayers?: boolean
+    includeGarment?: boolean
+    transparent?: boolean
+  } = {}): Promise<string> => {
+    const { includeLayers = true, includeGarment = true, transparent = false } = opts
+    // Use the same cropped (padding-removed) source the canvas displays so the
+    // download matches exactly what the user sees on screen.
+    const garmentSrc = displaySrcs[activeEditorView] || garmentSrcForView(activeEditorView)
     if (!garmentSrc) return ''
     // Ensure custom fonts are loaded before rendering text
     for (const layer of layers) {
@@ -482,15 +523,17 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack, 
     const ctx = canvas.getContext('2d')
     if (!ctx) return ''
     ctx.scale(SCALE, SCALE)
-    ctx.fillStyle = '#ffffff'
-    ctx.fillRect(0, 0, W, H)
+    if (!transparent) {
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(0, 0, W, H)
+    }
 
     const g = await loadImage(garmentSrc)
     const fit = Math.min(GARMENT_DISPLAY_W / g.width, GARMENT_DISPLAY_H / g.height) * (garmentScale / 100)
     const gw = g.width * fit, gh = g.height * fit
-    const gx = (W - gw) / 2, gy = (H - gh) / 2
+    const gx = (W - gw) / 2 + garmentOffset.x, gy = (H - gh) / 2 + garmentOffset.y
 
-    if (garmentColor) {
+    if (includeGarment && garmentColor) {
       // Build colored garment on a transparent offscreen canvas so the color is
       // clipped strictly to the garment's alpha channel — not the full artboard.
       const gc = document.createElement('canvas')
@@ -511,13 +554,13 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack, 
       gctx.drawImage(g, 0, 0, gw, gh)
       gctx.globalAlpha = 1.0
       gctx.globalCompositeOperation = 'source-over'
-      // Composite the tinted garment onto the white main canvas
+      // Composite the tinted garment onto the main canvas
       ctx.drawImage(gc, 0, 0, gc.width, gc.height, gx, gy, gw, gh)
-    } else {
+    } else if (includeGarment) {
       ctx.drawImage(g, gx, gy, gw, gh)
     }
 
-    for (const layer of layers) {
+    if (includeLayers) for (const layer of layers) {
       ctx.save()
       ctx.translate(layer.x + layer.width / 2, layer.y + layer.height / 2)
       ctx.rotate((layer.rotation * Math.PI) / 180)
@@ -555,12 +598,112 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack, 
     return canvas.toDataURL('image/png')
   }
 
+  // White-background composite used for the AI preview pipeline
+  const compositeDesign = () => renderDesign({})
+
+  // Render a single layer to a tightly-cropped transparent PNG
+  const renderLayerPng = async (layer: LogoLayer): Promise<string> => {
+    const pad = 6
+    const W = Math.ceil(layer.width) + pad * 2
+    const H = Math.ceil(layer.height) + pad * 2
+    const SCALE = 2
+    const canvas = document.createElement('canvas')
+    canvas.width = W * SCALE; canvas.height = H * SCALE
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return ''
+    ctx.scale(SCALE, SCALE)
+    ctx.translate(W / 2, H / 2)
+    ctx.rotate((layer.rotation * Math.PI) / 180)
+    if (layer.type === 'text') {
+      const fw = layer.fontWeight ?? 'bold'
+      const fi = layer.fontStyle ?? 'normal'
+      try { await document.fonts.load(`${fi} ${fw} ${layer.fontSize}px "${layer.fontFamily}"`) } catch {}
+      ctx.font = `${fi} ${fw} ${layer.fontSize}px "${layer.fontFamily}"`
+      ctx.fillStyle = layer.color
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillText(layer.text, 0, 0)
+    } else {
+      const img = await loadImage(layer.dataUrl)
+      const lf = Math.min(layer.width / img.width, layer.height / img.height)
+      const iw = img.width * lf, ih = img.height * lf
+      if (layer.tintColor) {
+        const off = document.createElement('canvas')
+        off.width = Math.ceil(iw); off.height = Math.ceil(ih)
+        const offCtx = off.getContext('2d')!
+        offCtx.drawImage(img, 0, 0, off.width, off.height)
+        offCtx.globalCompositeOperation = 'color'
+        offCtx.fillStyle = layer.tintColor
+        offCtx.fillRect(0, 0, off.width, off.height)
+        offCtx.globalCompositeOperation = 'destination-in'
+        offCtx.drawImage(img, 0, 0, off.width, off.height)
+        ctx.drawImage(off, -iw / 2, -ih / 2, iw, ih)
+      } else {
+        ctx.drawImage(img, -iw / 2, -ih / 2, iw, ih)
+      }
+    }
+    return cropPadding(canvas.toDataURL('image/png'))
+  }
+
+  // Collect every individual design asset as a transparent, cropped PNG
+  const collectAssets = async (): Promise<{ name: string; dataUrl: string }[]> => {
+    const assets: { name: string; dataUrl: string }[] = []
+    // Full design (transparent cut-out)
+    const full = await renderDesign({ transparent: true })
+    if (full) assets.push({ name: `full-design-${activeEditorView}.png`, dataUrl: full })
+    // Garment only (transparent, background stripped)
+    let garment = await renderDesign({ includeLayers: false, transparent: true })
+    if (garment) {
+      try { garment = await removeWhiteBackground(garment) } catch {}
+      garment = await cropPadding(garment)
+      assets.push({ name: `garment-${activeEditorView}.png`, dataUrl: garment })
+    }
+    // Each layer — logos and artwork separately
+    let artIdx = 0
+    for (const layer of layers) {
+      const png = await renderLayerPng(layer)
+      if (!png) continue
+      if (layer.type === 'image' && (layer as ImageLayer).isLogo) {
+        assets.push({ name: 'logo.png', dataUrl: png })
+      } else if (layer.type === 'text') {
+        artIdx++
+        assets.push({ name: `text-${artIdx}.png`, dataUrl: png })
+      } else {
+        artIdx++
+        assets.push({ name: `artwork-${artIdx}.png`, dataUrl: png })
+      }
+    }
+    // Fall back to the source logo if it isn't on the canvas as a layer
+    if (!assets.some(a => a.name === 'logo.png') && state.logo?.dataUrl) {
+      assets.push({ name: 'logo.png', dataUrl: state.logo.dataUrl })
+    }
+    return assets
+  }
+
+  const buildDesignAssets = async () => {
+    const list = await collectAssets()
+    const find = (pred: (n: string) => boolean) => list.find(a => pred(a.name))?.dataUrl
+    return {
+      full: find(n => n.startsWith('full-design')),
+      garment: find(n => n.startsWith('garment')),
+      logo: find(n => n === 'logo.png'),
+      artworks: list.filter(a => a.name.startsWith('artwork') || a.name.startsWith('text')).map(a => a.dataUrl),
+    }
+  }
+
   const handleConfirm = async () => {
     let composite = ''
     try { composite = await compositeDesign() } catch (e) { console.error(e) }
+    let assets
+    try { assets = await buildDesignAssets() } catch (e) { console.error(e) }
     if (garmentColor && state.garment) onSetGarment({ ...state.garment, color: garmentColor })
     prefetchPreview(state, composite)
-    onComplete({ confirmed: true, previewDataUrl: composite })
+    onComplete({ confirmed: true, previewDataUrl: composite, assets })
+  }
+
+  const downloadAll = async () => {
+    const assets = await collectAssets()
+    if (assets.length) await downloadAssetsZip(assets, `grace-design-${activeEditorView}.zip`)
   }
 
   const moveLayer = (direction: 'up' | 'down') => {
@@ -747,8 +890,8 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack, 
               <input type="range" min={25} max={200} value={garmentScale}
                 onChange={e => setGarmentScale(parseInt(e.target.value))}
                 className="w-full accent-brand-green"/>
-              <button onClick={() => setGarmentScale(100)} className="mt-1.5 text-[11px] text-gray-400 hover:text-gray-700 transition-colors">
-                Reset
+              <button onClick={() => { setGarmentScale(100); setGarmentOffset({ x: 0, y: 0 }) }} className="mt-1.5 text-[11px] text-gray-400 hover:text-gray-700 transition-colors">
+                Reset size &amp; position
               </button>
             </div>
           )}
@@ -892,15 +1035,40 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack, 
           )}
 
           {garmentSrcForView(activeEditorView) && (
-            <button onClick={async () => {
-              const composite = await compositeDesign()
-              const a = document.createElement('a')
-              a.href = composite || garmentSrcForView(activeEditorView)
-              a.download = `design_${activeEditorView}.png`
-              a.click()
-            }} className="btn-secondary w-full flex items-center justify-center gap-2">
-              <Download size={13}/> Download Design
-            </button>
+            <div className="card space-y-2">
+              <p className="text-xs font-medium text-gray-600">Downloads</p>
+              <p className="text-[11px] text-gray-400 leading-relaxed">Each file exports as a transparent PNG with the background removed.</p>
+              <button onClick={async () => {
+                const png = await renderDesign({ transparent: true })
+                if (png) downloadDataUrl(png, `full-design-${activeEditorView}.png`)
+              }} className="btn-secondary w-full flex items-center justify-center gap-2 text-xs">
+                <Download size={13}/> Full Design
+              </button>
+              <button onClick={async () => {
+                let png = await renderDesign({ includeLayers: false, transparent: true })
+                if (!png) return
+                try { png = await removeWhiteBackground(png) } catch {}
+                png = await cropPadding(png)
+                downloadDataUrl(png, `garment-${activeEditorView}.png`)
+              }} className="btn-secondary w-full flex items-center justify-center gap-2 text-xs">
+                <Download size={13}/> Garment Only
+              </button>
+              {layers.map((layer, i) => {
+                const isLogo = layer.type === 'image' && (layer as ImageLayer).isLogo
+                const label = isLogo ? 'Logo' : layer.type === 'text' ? `Text ${i + 1}` : `Artwork ${i + 1}`
+                return (
+                  <button key={layer.id} onClick={async () => {
+                    const png = await renderLayerPng(layer)
+                    if (png) downloadDataUrl(png, `${label.toLowerCase().replace(/\s+/g, '-')}.png`)
+                  }} className="btn-secondary w-full flex items-center justify-center gap-2 text-xs">
+                    <Download size={13}/> {label}
+                  </button>
+                )
+              })}
+              <button onClick={downloadAll} className="btn-primary w-full flex items-center justify-center gap-2 text-xs">
+                <Download size={13}/> Download All (.zip)
+              </button>
+            </div>
           )}
         </div>
 
@@ -966,11 +1134,16 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack, 
                 const garmentDisplaySrc = displaySrcs[activeEditorView] || garmentSrcForView(activeEditorView)
                 return garmentSrcForView(activeEditorView) ? (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none"
-                  style={{ transform: `scale(${garmentScale / 100})`, transformOrigin: 'center center' }}>
+                  style={{ transform: `translate(${garmentOffset.x}px, ${garmentOffset.y}px) scale(${garmentScale / 100})`, transformOrigin: 'center center' }}>
                   {/* isolation:isolate scopes mix-blend-mode to this container only */}
-                  <div style={{
+                  <div
+                    onMouseDown={startGarmentDrag}
+                    onTouchStart={startGarmentDrag}
+                    style={{
                     position: 'relative', width: GARMENT_DISPLAY_W, height: GARMENT_DISPLAY_H, flexShrink: 0,
                     isolation: garmentColor ? 'isolate' : undefined,
+                    pointerEvents: 'auto',
+                    cursor: garmentDragging ? 'grabbing' : 'grab',
                   }}>
                     {garmentColor && (
                       // Layer 1 — color fill clipped to garment alpha silhouette

@@ -18,6 +18,7 @@ import { getFitLibrary, resolveGarmentType } from '@/lib/fitBlocks'
 import { ALL_SIZES } from '@/lib/fitBlocks/types'
 import type { GarmentType, FitVariant, SizeKey } from '@/lib/fitBlocks/types'
 import { TechFlat, FLAT_FOR_GARMENT } from '@/components/TechFlats'
+import { downloadAssetsZip } from '@/lib/downloadAssets'
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -242,6 +243,20 @@ export default function Phase5TechPack({ state, onBack, onSendToProduction }: Pr
     handleDownload()
     setSaved(true)
     setTimeout(() => setSaved(false), 2500)
+  }
+
+  // Production-ready transparent PNGs captured when the design was confirmed
+  const designAssets = state.design?.assets
+  const hasDesignAssets = !!(designAssets && (designAssets.full || designAssets.garment || designAssets.logo || designAssets.artworks?.length))
+
+  async function handleDownloadAssets() {
+    if (!designAssets) return
+    const files: { name: string; dataUrl: string }[] = []
+    if (designAssets.full) files.push({ name: 'full-design.png', dataUrl: designAssets.full })
+    if (designAssets.garment) files.push({ name: 'garment.png', dataUrl: designAssets.garment })
+    if (designAssets.logo) files.push({ name: 'logo.png', dataUrl: designAssets.logo })
+    designAssets.artworks?.forEach((a, i) => files.push({ name: `artwork-${i + 1}.png`, dataUrl: a }))
+    if (files.length) await downloadAssetsZip(files, 'grace-production-assets.zip')
   }
 
   const artworkUrl = state.logo?.dataUrl ?? null
@@ -767,6 +782,27 @@ export default function Phase5TechPack({ state, onBack, onSendToProduction }: Pr
           </button>
         </div>
       </div>
+
+      {/* ── Production assets ─────────────────────────────────────────────── */}
+      {hasDesignAssets && (
+        <div className="mb-3 card flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-lg border border-grace-border bg-grace-mist p-1 shrink-0 flex items-center justify-center overflow-hidden">
+              <img src={designAssets!.full || designAssets!.garment} alt="design" className="max-h-full max-w-full object-contain"/>
+            </div>
+            <div>
+              <p className="text-[12px] font-bold text-grace-ink">Production Assets</p>
+              <p className="text-[11px] text-grace-stone">Transparent PNGs — full design, garment, logo &amp; artwork</p>
+            </div>
+          </div>
+          <button
+            onClick={handleDownloadAssets}
+            className="shrink-0 flex items-center gap-2 py-2.5 px-4 rounded-xl border border-grace-border bg-white text-grace-ink text-[11px] font-bold tracking-widest uppercase hover:bg-grace-mist transition-colors"
+          >
+            <Download size={13}/> Download Assets (.zip)
+          </button>
+        </div>
+      )}
 
       {/* ── Production actions ────────────────────────────────────────────── */}
       <div className="grid grid-cols-3 gap-3 mb-3">

@@ -40,7 +40,7 @@ export default function PhaseDesignStudio({ state, onComplete, onBack, onLogoUpd
   }
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex flex-col min-h-full">
       {/* Header */}
       <div className="px-6 pt-5 pb-4 border-b border-slate-200 bg-white shrink-0 flex items-start justify-between">
         <div>
@@ -53,10 +53,10 @@ export default function PhaseDesignStudio({ state, onComplete, onBack, onLogoUpd
         </button>
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 items-stretch">
       {/* Asset panel */}
       {panelOpen ? (
-        <div className="flex flex-col border-r border-slate-200 bg-white overflow-y-auto shrink-0" style={{ width: 280 }}>
+        <div className="flex flex-col border-r border-slate-200 bg-white shrink-0 self-start sticky top-0 max-h-screen overflow-y-auto" style={{ width: 280 }}>
           {/* Header */}
           <div className="flex items-center justify-between px-3 py-3 border-b border-slate-200 shrink-0">
             <span className="text-xs font-semibold text-gray-700">Studio Assets</span>
@@ -128,7 +128,7 @@ export default function PhaseDesignStudio({ state, onComplete, onBack, onLogoUpd
       )}
 
       {/* Editor */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 min-w-0">
         <Phase3Editor
           state={{ ...state, logo: localLogo }}
           hideHeader={true}

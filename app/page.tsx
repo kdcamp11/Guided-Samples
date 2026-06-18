@@ -45,6 +45,12 @@ export type AppState = {
   design: {
     confirmed: boolean
     previewDataUrl: string
+    assets?: {
+      full?: string
+      garment?: string
+      logo?: string
+      artworks?: string[]
+    }
   } | null
   preview: {
     images: string[]
