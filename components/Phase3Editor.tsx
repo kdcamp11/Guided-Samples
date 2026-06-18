@@ -43,7 +43,7 @@ interface TextLayer extends BaseLayer {
 }
 
 type LogoLayer = ImageLayer | TextLayer
-type ViewLayers = Record<string, LogoLayer[]>
+export type ViewLayers = Record<string, LogoLayer[]>
 
 interface Props {
   state: AppState
@@ -51,8 +51,10 @@ interface Props {
   onSetGarment: (garment: AppState['garment']) => void
   onBack: () => void
   hideHeader?: boolean
+  hideSidebar?: boolean
   pendingArtwork?: string | null
   onArtworkConsumed?: () => void
+  onStudioStateChange?: (s: { layersByView: ViewLayers; garmentColor: string }) => void
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -175,19 +177,23 @@ async function cropPadding(src: string, pad = 6): Promise<string> {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function Phase3Editor({ state, onComplete, onSetGarment, onBack, hideHeader, pendingArtwork, onArtworkConsumed }: Props) {
+export default function Phase3Editor({ state, onComplete, onSetGarment, onBack, hideHeader, hideSidebar, pendingArtwork, onArtworkConsumed, onStudioStateChange }: Props) {
   const canvasRef = useRef<HTMLDivElement>(null)
   const [zoom, setZoom] = useState(100)
   const [garmentScale, setGarmentScale] = useState(100)
   const [garmentOffset, setGarmentOffset] = useState({ x: 0, y: 0 })
   const [garmentDragging, setGarmentDragging] = useState(false)
-  // Restore garment color and layers from the module-level cache so back-navigation
-  // returns the canvas exactly as the user left it.
-  const [garmentColor, setGarmentColor] = useState(_cachedGarmentColor)
+  // Restore garment color and layers — prefer persisted studioState (for project loads),
+  // then fall back to the module-level SPA cache (for back-navigation within a session).
+  const [garmentColor, setGarmentColor] = useState(
+    state.studioState?.garmentColor ?? _cachedGarmentColor
+  )
   const [leftTab, setLeftTab] = useState<'logoart' | 'garment' | 'text'>('logoart')
 
-  // Per-view layer state — restore from SPA cache on mount
-  const [layersByView, setLayersByView] = useState<ViewLayers>(_cachedLayersByView)
+  // Per-view layer state — prefer persisted studioState, fall back to SPA cache
+  const [layersByView, setLayersByView] = useState<ViewLayers>(
+    (state.studioState?.layersByView as ViewLayers | undefined) ?? _cachedLayersByView
+  )
   const [activeEditorView, setActiveEditorView] = useState('front')
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -302,18 +308,27 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Write to module-level SPA cache on every layer change so back-navigation restores state
+  // Write to module-level SPA cache on every layer change so back-navigation restores state.
+  // Also propagate to parent so layers survive project save/load.
   useEffect(() => {
     if (!hydrated.current) return
     _cachedLayersByView = layersByView
     setSaveStatus('saving')
     if (saveTimer.current) clearTimeout(saveTimer.current)
-    saveTimer.current = setTimeout(() => setSaveStatus('saved'), 400)
+    saveTimer.current = setTimeout(() => {
+      setSaveStatus('saved')
+      onStudioStateChange?.({ layersByView, garmentColor })
+    }, 800)
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layersByView])
 
-  // Keep garment color in sync with the cache
-  useEffect(() => { _cachedGarmentColor = garmentColor }, [garmentColor])
+  // Keep garment color in sync with the cache and parent
+  useEffect(() => {
+    _cachedGarmentColor = garmentColor
+    if (hydrated.current) onStudioStateChange?.({ layersByView, garmentColor })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [garmentColor])
 
   // Add artwork layer when parent passes a new image (from the asset panel upload)
   useEffect(() => {
@@ -816,7 +831,7 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack, 
   // ─── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <div className={hideHeader ? 'px-6 pb-6 w-full' : 'p-6 w-full'}>
+    <div className={hideHeader ? (hideSidebar ? 'w-full' : 'px-6 pb-6 w-full') : 'p-6 w-full'}>
       {!hideHeader && (
         <div className="mb-5 flex items-start justify-between">
           <div>
@@ -830,10 +845,10 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack, 
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-4">
+      <div className={hideSidebar ? '' : 'grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-4'}>
 
         {/* ── Left panel ── */}
-        <div className="space-y-3">
+        {!hideSidebar && <div className="space-y-3">
           {/* Tab bar */}
           <div className="flex rounded-lg border border-slate-200 overflow-hidden">
             {([
@@ -1140,10 +1155,10 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack, 
               </button>
             </div>
           )}
-        </div>
+        </div>}
 
         {/* ── Canvas ── */}
-        <div className="card p-0 overflow-hidden">
+        <div className={`card p-0 overflow-hidden${hideSidebar ? ' h-full' : ''}`}>
           {/* Toolbar */}
           <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-200 gap-2">
             <div className="flex items-center gap-1">

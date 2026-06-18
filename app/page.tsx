@@ -23,6 +23,8 @@ import AIPaywallModal from '@/components/AIPaywallModal'
 import { AICreditsProvider, useAICredits } from '@/lib/aiCreditsContext'
 import { Menu, Sparkles, Loader2, Check, AlertCircle } from 'lucide-react'
 
+export type StudioLayersByView = Record<string, unknown[]>
+
 export type AppState = {
   currentPhase: number
   route?: 'apparel' | 'uniform'
@@ -56,6 +58,10 @@ export type AppState = {
     images: string[]
     techImages?: string[]
   } | null
+  studioState?: {
+    layersByView: StudioLayersByView
+    garmentColor: string
+  }
 }
 
 const EMPTY_STATE: AppState = {
@@ -347,6 +353,7 @@ function App() {
               onBack={() => goToPhase(1)}
               onLogoUpdate={(logo) => setState(s => ({ ...s, logo }))}
               onSetGarment={(garment) => setState(s => ({ ...s, garment }))}
+              onStudioStateChange={(studioState) => setState(s => ({ ...s, studioState }))}
             />
           )}
           {section === 'design' && state.currentPhase === 3 && (

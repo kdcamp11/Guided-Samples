@@ -15,9 +15,10 @@ interface Props {
   onBack: () => void
   onLogoUpdate: (logo: AppState['logo']) => void
   onSetGarment: (garment: AppState['garment']) => void
+  onStudioStateChange: (s: AppState['studioState']) => void
 }
 
-export default function PhaseDesignStudio({ state, onComplete, onBack, onLogoUpdate, onSetGarment }: Props) {
+export default function PhaseDesignStudio({ state, onComplete, onBack, onLogoUpdate, onSetGarment, onStudioStateChange }: Props) {
   const [panelOpen, setPanelOpen] = useState(true)
   const [localLogo, setLocalLogo] = useState<AppState['logo']>(state.logo)
   const [pendingArtwork, setPendingArtwork] = useState<string | null>(null)
@@ -132,11 +133,13 @@ export default function PhaseDesignStudio({ state, onComplete, onBack, onLogoUpd
         <Phase3Editor
           state={{ ...state, logo: localLogo }}
           hideHeader={true}
+          hideSidebar={true}
           onComplete={(design) => onComplete({ logo: localLogo, design })}
           onSetGarment={onSetGarment}
           onBack={onBack}
           pendingArtwork={pendingArtwork}
           onArtworkConsumed={() => setPendingArtwork(null)}
+          onStudioStateChange={onStudioStateChange}
         />
       </div>
     </div>
