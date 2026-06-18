@@ -127,25 +127,16 @@ export default function LogoAssetPanel({ state, onLogoUpdate }: Props) {
     return (
       <div className="space-y-2 p-3">
         {state.logo && (
-          <div className="mb-3 rounded-lg border border-slate-200 overflow-hidden">
-            <div className="bg-white flex items-center justify-center" style={{ height: 64 }}>
-              <img src={state.logo.dataUrl} alt="Current logo" className="max-h-full max-w-full object-contain p-2"/>
-            </div>
-            <p className="text-[10px] text-gray-400 text-center py-1">Current logo</p>
-            <div className="border-t border-slate-100 p-2">
-              <button
-                onClick={handleCleanBackground}
-                disabled={cleaning}
-                className="w-full flex items-center justify-center gap-1.5 text-[11px] text-gray-600 hover:text-grace-ink disabled:opacity-50 transition-colors"
-                title="Uses AI to remove the background for a cleaner cutout (counts as one AI generation)"
-              >
-                {cleaning ? <Loader2 size={12} className="animate-spin"/> : <Wand2 size={12}/>}
-                {cleaning ? 'Cleaning…' : 'Clean background (AI)'}
-                <AIUsageHint />
-              </button>
-              <p className="text-[9px] text-gray-400 text-center mt-1">Removes the background for an even cleaner cutout.</p>
-            </div>
-          </div>
+          <button
+            onClick={handleCleanBackground}
+            disabled={cleaning}
+            className="mb-3 w-full flex items-center justify-center gap-1.5 p-2.5 rounded-lg border border-slate-200 text-[11px] text-gray-600 hover:text-grace-ink hover:border-grace-ink disabled:opacity-50 transition-colors"
+            title="Uses AI to remove the background for a cleaner cutout (counts as one AI generation)"
+          >
+            {cleaning ? <Loader2 size={12} className="animate-spin"/> : <Wand2 size={12}/>}
+            {cleaning ? 'Cleaning…' : 'Clean background (AI)'}
+            <AIUsageHint />
+          </button>
         )}
         <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-3">Logo Source</p>
         <button
