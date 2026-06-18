@@ -283,10 +283,14 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onLogoUp
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
   const hydrated = useRef(false)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Refs for fresh values in async callbacks / debounced effects
+  const layersByViewRef = useRef(layersByView)
+  const garmentColorRef = useRef(garmentColor)
+  useEffect(() => { layersByViewRef.current = layersByView }, [layersByView])
+  useEffect(() => { garmentColorRef.current = garmentColor }, [garmentColor])
   const croppedCache = useRef<Record<string, string>>({})
   const [displaySrcs, setDisplaySrcs] = useState<Record<string, string>>({})
   const [tintedDataUrls, setTintedDataUrls] = useState<Record<string, string>>({})
-
   // Derived
   const layers: LogoLayer[] = layersByView[activeEditorView] ?? []
   const selected = layers.find(l => l.id === selectedId) ?? null
@@ -388,7 +392,8 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onLogoUp
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Write to module-level SPA cache on every layer change so back-navigation restores state
+  // Write to module-level SPA cache on every layer change so back-navigation restores state.
+  // Uses refs so the debounced callback always captures the latest values.
   useEffect(() => {
     if (!hydrated.current) return
     _cachedLayersByView = layersByView
@@ -396,7 +401,7 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onLogoUp
     if (saveTimer.current) clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(() => {
       setSaveStatus('saved')
-      onStudioStateChange?.({ layersByView, garmentColor })
+      onStudioStateChange?.({ layersByView: layersByViewRef.current, garmentColor: garmentColorRef.current })
     }, 800)
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current) }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -405,7 +410,7 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onLogoUp
   // Keep garment color in sync with the cache and parent
   useEffect(() => {
     _cachedGarmentColor = garmentColor
-    if (hydrated.current) onStudioStateChange?.({ layersByView, garmentColor })
+    if (hydrated.current) onStudioStateChange?.({ layersByView: layersByViewRef.current, garmentColor: garmentColorRef.current })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [garmentColor])
 
@@ -837,6 +842,9 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onLogoUp
   }
 
   const handleConfirm = async () => {
+    // Flush any pending debounced save so layers are persisted before phase advance
+    if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = null }
+    onStudioStateChange?.({ layersByView: layersByViewRef.current, garmentColor: garmentColorRef.current })
     let composite = ''
     try { composite = await compositeDesign() } catch (e) { console.error(e) }
     let assets
@@ -1133,7 +1141,7 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onLogoUp
 
                     <div>
                       <p className="text-[11px] text-gray-500 mb-1.5">Font Library</p>
-                      <div className="grid grid-cols-2 gap-1 max-h-44 overflow-y-auto pr-0.5">
+                      <div className="grid grid-cols-2 gap-1">
                         {FONT_LIBRARY.map(f => (
                           <button key={f.name} onClick={() => updateSelected({ fontFamily: f.name })}
                             style={{ fontFamily: `"${f.name}", sans-serif` }}
