@@ -10,8 +10,12 @@
 // strips them, which is exactly the border-loss the user reported. Flood-fill is
 // deterministic, so the same upload also produces identical bytes every time,
 // which lets the Library deduplicate repeats of the same logo.
+// Intentionally skips background removal so uploaded logos/artwork are
+// preserved exactly as the user provided them (borders, multi-stroke outlines,
+// colored backgrounds all intact). Users who want a transparent background
+// should upload a pre-cut PNG.
 export async function cleanupBackground(dataUrl: string): Promise<string> {
-  try { return await removeWhiteBackground(dataUrl) } catch { return dataUrl }
+  return dataUrl
 }
 
 // Remove a solid-color background from a logo image.
