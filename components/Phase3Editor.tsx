@@ -300,7 +300,7 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onLogoUp
   const [garmentColor, setGarmentColor] = useState(
     state.studioState?.garmentColor ?? _cachedGarmentColor
   )
-  const [leftTab, setLeftTab] = useState<'logoart' | 'garment' | 'text'>('logoart')
+  const [leftTab, setLeftTab] = useState<'logoart' | 'garment' | 'text'>('garment')
   const [localLogo, setLocalLogo] = useState<AppState['logo']>(state.logo)
   const artworkFileRef = useRef<HTMLInputElement>(null)
 
@@ -1048,8 +1048,8 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onLogoUp
           {/* Tab bar */}
           <div className="flex rounded-lg border border-slate-200 overflow-hidden">
             {([
-              { id: 'logoart', label: 'Logo/Art', icon: <Upload  size={11}/> },
               { id: 'garment', label: 'Garment',  icon: <Palette size={11}/> },
+              { id: 'logoart', label: 'Logo/Art', icon: <Upload  size={11}/> },
               { id: 'text',    label: 'Text',     icon: <Type    size={11}/> },
             ] as const).map(tab => (
               <button key={tab.id} onClick={() => setLeftTab(tab.id)}
