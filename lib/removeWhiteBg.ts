@@ -1,3 +1,21 @@
+// Server-backed background removal: tries the rembg (U²-Net) cleanup pipeline via
+// /api/remove-bg first for proper edge/shadow-preserving alpha, then falls back to
+// the local flood-fill remover below if the service is unavailable or errors.
+export async function cleanupBackground(dataUrl: string): Promise<string> {
+  try {
+    const res = await fetch('/api/remove-bg', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: dataUrl }),
+    })
+    if (res.ok) {
+      const data = await res.json()
+      if (data?.image && data.removed) return data.image as string
+    }
+  } catch { /* fall through to local remover */ }
+  try { return await removeWhiteBackground(dataUrl) } catch { return dataUrl }
+}
+
 // Remove a solid-color background from a logo image.
 // Averages all four corners to detect the background color, then BFS flood-fills
 // from the image borders — only the outer connected background region becomes

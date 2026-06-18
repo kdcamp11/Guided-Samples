@@ -8,7 +8,7 @@ import {
 import { AppState } from '@/app/page'
 import { streamGenerate } from '@/lib/streamGenerate'
 import { cacheGet, cacheSet, cacheKey } from '@/lib/generateCache'
-import { removeWhiteBackground } from '@/lib/removeWhiteBg'
+import { removeWhiteBackground, cleanupBackground } from '@/lib/removeWhiteBg'
 import { fileToDataUrl } from '@/lib/fileToDataUrl'
 import { downloadDataUrl, downloadAssetsZip } from '@/lib/downloadAssets'
 import GarmentAssetPanel from './GarmentAssetPanel'
@@ -536,7 +536,7 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onLogoUp
     for (const file of files) {
       try {
         let dataUrl = await fileToDataUrl(file)
-        try { dataUrl = await removeWhiteBackground(dataUrl) } catch {}
+        try { dataUrl = await cleanupBackground(dataUrl) } catch {}
         setArtworkGallery(g => g.includes(dataUrl) ? g : [...g, dataUrl])
       } catch (err) { console.error('Artwork upload failed', err) }
     }

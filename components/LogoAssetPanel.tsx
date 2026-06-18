@@ -4,7 +4,7 @@ import { Loader2, Sparkles, Upload, X, ImagePlus, RefreshCw, ArrowRight } from '
 import { AppState } from '@/app/page'
 import { streamGenerate, PaywallError } from '@/lib/streamGenerate'
 import { cacheGet, cacheSet, cacheKey } from '@/lib/generateCache'
-import { removeWhiteBackground } from '@/lib/removeWhiteBg'
+import { removeWhiteBackground, cleanupBackground } from '@/lib/removeWhiteBg'
 import { fileToDataUrl } from '@/lib/fileToDataUrl'
 import { useAICredits } from '@/lib/aiCreditsContext'
 import GenerationCounter from '@/components/GenerationCounter'
@@ -99,7 +99,7 @@ export default function LogoAssetPanel({ state, onLogoUpdate }: Props) {
     e.target.value = ''
     try {
       let dataUrl = await fileToDataUrl(file)
-      try { dataUrl = await removeWhiteBackground(dataUrl) } catch {}
+      try { dataUrl = await cleanupBackground(dataUrl) } catch {}
       const logo = { svg: '', dataUrl, style: 'Uploaded', color: '#0A0A0A' }
       onLogoUpdate(logo)
     } catch (err) {

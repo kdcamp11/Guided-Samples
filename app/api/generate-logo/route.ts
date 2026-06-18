@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { logoPrompt } from '@/lib/prompts'
 import { getRouteUser } from '@/lib/supabase-server'
 import { checkAndConsume } from '@/lib/aiCredits'
+import { removeBackgroundBatch } from '@/lib/removeBackground'
 
 export const runtime = 'nodejs'
 export const maxDuration = 120
@@ -35,12 +36,18 @@ export async function POST(req: NextRequest) {
       await send({ type: 'status', message: 'Connecting to AI...' })
       if (process.env.OPENAI_API_KEY) {
         await send({ type: 'status', message: 'Generating your logo...' })
-        const images = await generateWithOpenAI(
+        // 1-2. Generate with GPT Image 2 and keep the originals.
+        const originals = await generateWithOpenAI(
           logoPrompt({ userPrompt: prompt, hasReference: !!referenceImage }),
           referenceImage,
         )
+        // 3-5. Run each through the rembg cleanup pipeline → transparent PNGs.
+        await send({ type: 'status', message: 'Removing background...' })
+        const images = await removeBackgroundBatch(originals)
+        // 6. Hand the transparent versions to the Design Studio; keep originals
+        //    available for reference/fallback.
         await send({ type: 'status', message: 'Processing result...' })
-        await send({ type: 'complete', source: 'openai', images, svgs: images.map(() => null), style, color })
+        await send({ type: 'complete', source: 'openai', images, originals, svgs: images.map(() => null), style, color })
       } else {
         await send({ type: 'status', message: 'Building logo...' })
         const svgs = [
