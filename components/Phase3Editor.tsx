@@ -416,8 +416,9 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onLogoUp
   }, [])
 
   // Compute tinted data URLs for image layers with tintColor.
-  // Uses 'color' blend mode (applies hue+saturation of tint, keeps luminosity of original),
-  // then 'destination-in' to restore the original's alpha channel exactly.
+  // Uses source-atop to paint the tint color over all visible (non-transparent) pixels —
+  // reliable on white, black, and colorful artwork unlike the 'color' blend mode which
+  // fails on luminosity extremes (white stays white, black stays black).
   useEffect(() => {
     layers.forEach(layer => {
       if (layer.type !== 'image' || !layer.tintColor) return
@@ -428,15 +429,12 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onLogoUp
         const off = document.createElement('canvas')
         off.width = img.width; off.height = img.height
         const offCtx = off.getContext('2d')!
-        // Step 1: draw original
+        // Draw original (establishes the alpha mask)
         offCtx.drawImage(img, 0, 0)
-        // Step 2: apply tint hue+saturation while keeping original luminosity
-        offCtx.globalCompositeOperation = 'color'
+        // Paint tint color over every visible pixel (source-atop respects existing alpha)
+        offCtx.globalCompositeOperation = 'source-atop'
         offCtx.fillStyle = (layer as ImageLayer).tintColor!
         offCtx.fillRect(0, 0, off.width, off.height)
-        // Step 3: restore original alpha channel (transparent pixels stay transparent)
-        offCtx.globalCompositeOperation = 'destination-in'
-        offCtx.drawImage(img, 0, 0)
         offCtx.globalCompositeOperation = 'source-over'
         setTintedDataUrls(prev => ({ ...prev, [key]: off.toDataURL('image/png') }))
       })()
@@ -806,12 +804,9 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onLogoUp
           off.width = Math.ceil(iw); off.height = Math.ceil(ih)
           const offCtx = off.getContext('2d')!
           offCtx.drawImage(img, 0, 0, off.width, off.height)
-          // Apply tint hue+saturation, keep luminosity, then restore alpha
-          offCtx.globalCompositeOperation = 'color'
+          offCtx.globalCompositeOperation = 'source-atop'
           offCtx.fillStyle = layer.tintColor
           offCtx.fillRect(0, 0, off.width, off.height)
-          offCtx.globalCompositeOperation = 'destination-in'
-          offCtx.drawImage(img, 0, 0, off.width, off.height)
           offCtx.globalCompositeOperation = 'source-over'
           ctx.drawImage(off, -iw / 2, -ih / 2, iw, ih)
         } else {
@@ -870,11 +865,10 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onLogoUp
         off.width = Math.ceil(iw); off.height = Math.ceil(ih)
         const offCtx = off.getContext('2d')!
         offCtx.drawImage(img, 0, 0, off.width, off.height)
-        offCtx.globalCompositeOperation = 'color'
+        offCtx.globalCompositeOperation = 'source-atop'
         offCtx.fillStyle = layer.tintColor
         offCtx.fillRect(0, 0, off.width, off.height)
-        offCtx.globalCompositeOperation = 'destination-in'
-        offCtx.drawImage(img, 0, 0, off.width, off.height)
+        offCtx.globalCompositeOperation = 'source-over'
         ctx.drawImage(off, -iw / 2, -ih / 2, iw, ih)
       } else {
         ctx.drawImage(img, -iw / 2, -ih / 2, iw, ih)

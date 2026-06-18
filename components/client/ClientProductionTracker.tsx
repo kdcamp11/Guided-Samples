@@ -186,6 +186,7 @@ export default function ClientProductionTracker({ userEmail, onSelectOrder, onSi
     'AWAITING_PRODUCTION_DEPOSIT',
     'BULK_PRODUCTION',
     'QUALITY_CHECK',
+    'PACKING',
     'AWAITING_FINAL_PAYMENT',
     'READY_TO_SHIP',
     'SHIPPED',
