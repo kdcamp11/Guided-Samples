@@ -40,7 +40,7 @@ interface TextLayer extends BaseLayer {
   fontStyle?: 'normal' | 'italic'
   strokeColor?: string
   strokeWidth?: number
-  archAmount?: number  // -100 to 100, 0 = flat, positive = arch up, negative = arch down
+  archAmount?: number
 }
 
 type LogoLayer = ImageLayer | TextLayer
@@ -176,65 +176,65 @@ async function cropPadding(src: string, pad = 6): Promise<string> {
   })
 }
 
-// Escape text for safe embedding inside an SVG node
-function escapeXml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-}
+// ─── Arch/curve text helpers ──────────────────────────────────────────────────
 
-// Build an SVG string that renders the text layer, optionally arched along an arc.
-// archAmount: -100..100 (0 = flat). Positive curves the text upward, negative downward.
 function archTextSvg(layer: TextLayer, w: number, h: number): string {
   const arch = layer.archAmount ?? 0
-  const text = escapeXml(layer.text || 'Your Text')
+  const text = layer.text || 'Your Text'
   const fw = layer.fontWeight ?? 'bold'
   const fi = layer.fontStyle ?? 'normal'
   const sw = layer.strokeWidth ?? 0
   const strokeAttr = sw > 0
-    ? `stroke="${layer.strokeColor ?? '#000000'}" stroke-width="${sw}" paint-order="stroke" stroke-linejoin="round"`
+    ? `stroke="${layer.strokeColor ?? '#000000'}" stroke-width="${sw * 2}" paint-order="stroke fill" stroke-linejoin="round"`
     : ''
+
   const fontAttr = `font-family="${layer.fontFamily}, sans-serif" font-size="${layer.fontSize}" fill="${layer.color}" font-weight="${fw}" font-style="${fi}"`
 
   if (!arch) {
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><text x="${w / 2}" y="${h / 2}" text-anchor="middle" dominant-baseline="middle" ${fontAttr} ${strokeAttr}>${text}</text></svg>`
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><text x="${w/2}" y="${h/2}" text-anchor="middle" dominant-baseline="middle" ${fontAttr} ${strokeAttr}>${text}</text></svg>`
   }
 
-  // Chord = width; sagitta (arc height) scales with arch magnitude.
-  const lift = Math.max(1, (Math.abs(arch) / 100) * h * 0.7)
+  const lift = Math.abs(arch / 100) * h * 0.75
   const r = (w * w / 4 + lift * lift) / (2 * lift)
-  const baseY = arch > 0 ? h * 0.72 : h * 0.28
-  const sweep = arch > 0 ? 1 : 0  // 1 = arc bulges up, 0 = bulges down
+  const baseY = arch > 0 ? h * 0.7 : h * 0.3
+  const sweep = arch > 0 ? 1 : 0
+
   const pathD = `M 0,${baseY} A ${r},${r} 0 0,${sweep} ${w},${baseY}`
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><defs><path id="archpath" d="${pathD}"/></defs><text ${fontAttr} ${strokeAttr} text-anchor="middle"><textPath href="#archpath" startOffset="50%">${text}</textPath></text></svg>`
+  const pid = 'ap'
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" overflow="visible"><defs><path id="${pid}" d="${pathD}"/></defs><text ${fontAttr} ${strokeAttr} text-anchor="middle"><textPath href="#${pid}" startOffset="50%">${text}</textPath></text></svg>`
 }
 
-// Rasterize an arched text layer to a transparent PNG data URL (for canvas export).
 async function archTextToDataUrl(layer: TextLayer, w: number, h: number): Promise<string> {
   const svg = archTextSvg(layer, w, h)
-  const url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
-  const img = await loadImage(url)
-  const canvas = document.createElement('canvas')
-  canvas.width = Math.max(1, Math.ceil(w * 2))
-  canvas.height = Math.max(1, Math.ceil(h * 2))
-  const ctx = canvas.getContext('2d')!
-  ctx.scale(2, 2)
-  ctx.drawImage(img, 0, 0, w, h)
-  return canvas.toDataURL('image/png')
+  const blob = new Blob([svg], { type: 'image/svg+xml' })
+  const url = URL.createObjectURL(blob)
+  try {
+    const img = await loadImage(url)
+    const canvas = document.createElement('canvas')
+    canvas.width = w * 2; canvas.height = h * 2
+    const ctx = canvas.getContext('2d')!
+    ctx.scale(2, 2)
+    ctx.drawImage(img, 0, 0, w, h)
+    return canvas.toDataURL('image/png')
+  } finally {
+    URL.revokeObjectURL(url)
+  }
 }
 
-// Live canvas preview of an arched text layer (renders the SVG as an <img>).
+// ─── Component ────────────────────────────────────────────────────────────────
+
 function ArchTextPreview({ layer }: { layer: TextLayer }) {
   const [src, setSrc] = useState('')
   useEffect(() => {
     const svg = archTextSvg(layer, layer.width, layer.height)
-    setSrc(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`)
-  }, [layer.text, layer.fontFamily, layer.fontSize, layer.color, layer.fontWeight,
-      layer.fontStyle, layer.strokeWidth, layer.strokeColor, layer.archAmount,
-      layer.width, layer.height])
+    const blob = new Blob([svg], { type: 'image/svg+xml' })
+    const url = URL.createObjectURL(blob)
+    setSrc(url)
+    return () => URL.revokeObjectURL(url)
+  }, [layer.text, layer.fontFamily, layer.fontSize, layer.color, layer.fontWeight, layer.fontStyle, layer.strokeWidth, layer.strokeColor, layer.archAmount, layer.width, layer.height])
   if (!src) return null
   return <img src={src} alt={layer.text} className="w-full h-full object-contain" draggable={false} style={{ pointerEvents: 'none' }}/>
 }
-
-// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function Phase3Editor({ state, onComplete, onSetGarment, onBack, hideHeader, hideSidebar, pendingArtwork, onArtworkConsumed, onStudioStateChange }: Props) {
   const canvasRef = useRef<HTMLDivElement>(null)
@@ -367,8 +367,7 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Write to module-level SPA cache on every layer change so back-navigation restores state.
-  // Also propagate to parent so layers survive project save/load.
+  // Write to module-level SPA cache on every layer change so back-navigation restores state
   useEffect(() => {
     if (!hydrated.current) return
     _cachedLayersByView = layersByView
@@ -652,23 +651,23 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack, 
         const tl = layer as TextLayer
         if (tl.archAmount) {
           const pngUrl = await archTextToDataUrl(tl, layer.width, layer.height)
-          const aimg = await loadImage(pngUrl)
-          ctx.drawImage(aimg, -layer.width / 2, -layer.height / 2, layer.width, layer.height)
+          const img = await loadImage(pngUrl)
+          ctx.drawImage(img, -layer.width / 2, -layer.height / 2, layer.width, layer.height)
         } else {
-        const fw = tl.fontWeight ?? 'bold'
-        const fi = tl.fontStyle ?? 'normal'
-        ctx.font = `${fi} ${fw} ${layer.fontSize}px "${layer.fontFamily}"`
-        ctx.textAlign = 'center'
-        ctx.textBaseline = 'middle'
-        const sw = tl.strokeWidth ?? 0
-        if (sw > 0) {
-          ctx.lineWidth = sw
-          ctx.strokeStyle = tl.strokeColor ?? '#000000'
-          ctx.lineJoin = 'round'
-          ctx.strokeText(layer.text, 0, 0)
-        }
-        ctx.fillStyle = layer.color
-        ctx.fillText(layer.text, 0, 0)
+          const fw = tl.fontWeight ?? 'bold'
+          const fi = tl.fontStyle ?? 'normal'
+          ctx.font = `${fi} ${fw} ${layer.fontSize}px "${layer.fontFamily}"`
+          ctx.textAlign = 'center'
+          ctx.textBaseline = 'middle'
+          const sw = tl.strokeWidth ?? 0
+          if (sw > 0) {
+            ctx.lineWidth = sw
+            ctx.strokeStyle = tl.strokeColor ?? '#000000'
+            ctx.lineJoin = 'round'
+            ctx.strokeText(layer.text, 0, 0)
+          }
+          ctx.fillStyle = layer.color
+          ctx.fillText(layer.text, 0, 0)
         }
       } else {
         const img = await loadImage(layer.dataUrl)
@@ -713,26 +712,26 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack, 
     ctx.translate(W / 2, H / 2)
     ctx.rotate((layer.rotation * Math.PI) / 180)
     if (layer.type === 'text') {
-      const fw = layer.fontWeight ?? 'bold'
-      const fi = layer.fontStyle ?? 'normal'
-      try { await document.fonts.load(`${fi} ${fw} ${layer.fontSize}px "${layer.fontFamily}"`) } catch {}
       if (layer.archAmount) {
         const pngUrl = await archTextToDataUrl(layer, layer.width, layer.height)
-        const aimg = await loadImage(pngUrl)
-        ctx.drawImage(aimg, -layer.width / 2, -layer.height / 2, layer.width, layer.height)
+        const img = await loadImage(pngUrl)
+        ctx.drawImage(img, -layer.width / 2, -layer.height / 2, layer.width, layer.height)
       } else {
-      ctx.font = `${fi} ${fw} ${layer.fontSize}px "${layer.fontFamily}"`
-      ctx.textAlign = 'center'
-      ctx.textBaseline = 'middle'
-      const sw = layer.strokeWidth ?? 0
-      if (sw > 0) {
-        ctx.lineWidth = sw
-        ctx.strokeStyle = layer.strokeColor ?? '#000000'
-        ctx.lineJoin = 'round'
-        ctx.strokeText(layer.text, 0, 0)
-      }
-      ctx.fillStyle = layer.color
-      ctx.fillText(layer.text, 0, 0)
+        const fw = layer.fontWeight ?? 'bold'
+        const fi = layer.fontStyle ?? 'normal'
+        try { await document.fonts.load(`${fi} ${fw} ${layer.fontSize}px "${layer.fontFamily}"`) } catch {}
+        ctx.font = `${fi} ${fw} ${layer.fontSize}px "${layer.fontFamily}"`
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        const sw = layer.strokeWidth ?? 0
+        if (sw > 0) {
+          ctx.lineWidth = sw
+          ctx.strokeStyle = layer.strokeColor ?? '#000000'
+          ctx.lineJoin = 'round'
+          ctx.strokeText(layer.text, 0, 0)
+        }
+        ctx.fillStyle = layer.color
+        ctx.fillText(layer.text, 0, 0)
       }
     } else {
       const img = await loadImage(layer.dataUrl)
@@ -1156,7 +1155,7 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onBack, 
                       )}
                     </div>
 
-                    {/* Arch / curve */}
+                    {/* Arch */}
                     <div>
                       <div className="flex justify-between items-center mb-1.5">
                         <span className="text-xs text-gray-500">Arch</span>
