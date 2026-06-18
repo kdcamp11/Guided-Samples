@@ -151,26 +151,86 @@ function Orders() {
 }
 
 function LibraryView({ state }: { state: AppState }) {
-  const assets = [
-    state.logo && { label: 'GRACE_logo', src: state.logo.dataUrl },
-    state.garment && { label: 'GRACE_garment', src: state.garment.dataUrl },
-  ].filter(Boolean) as { label: string; src: string }[]
+  const [tab, setTab] = useState<'logos' | 'artwork' | 'garments' | 'previews'>('logos')
+
+  const logos: string[] = [
+    ...(state.studioState?.logoGallery ?? []),
+    ...(state.logo?.dataUrl && !(state.studioState?.logoGallery ?? []).includes(state.logo.dataUrl) ? [state.logo.dataUrl] : []),
+  ]
+  const artworks: string[] = state.studioState?.artworkGallery ?? []
+  const garments: string[] = state.garment?.dataUrl ? [state.garment.dataUrl] : []
+  const previews: string[] = state.preview?.images ?? []
+
+  const tabs = [
+    { key: 'logos' as const, label: 'Logos', count: logos.length },
+    { key: 'artwork' as const, label: 'Artwork', count: artworks.length },
+    { key: 'garments' as const, label: 'Garments', count: garments.length },
+    { key: 'previews' as const, label: 'Previews', count: previews.length },
+  ]
+
+  const currentAssets =
+    tab === 'logos' ? logos :
+    tab === 'artwork' ? artworks :
+    tab === 'garments' ? garments :
+    previews
+
+  const handleDownload = (src: string, index: number) => {
+    const a = document.createElement('a')
+    a.href = src
+    a.download = `${tab}-${index + 1}.png`
+    a.click()
+  }
+
   return (
     <div className="p-4 md:p-6 max-w-[1100px] mx-auto">
-      <Header icon={<Library size={20} />} title="Library" subtitle="Your reusable logos and garments" />
-      {assets.length > 0 ? (
+      <Header icon={<Library size={20} />} title="Library" subtitle="Your AI-generated and uploaded assets" />
+
+      {/* Tabs */}
+      <div className="flex gap-1 mb-5 border-b border-grace-border">
+        {tabs.map(t => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`px-4 py-2 text-xs font-medium transition-colors border-b-2 -mb-px ${
+              tab === t.key
+                ? 'border-brand-green text-brand-green'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            {t.label}
+            {t.count > 0 && (
+              <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-grace-mist text-gray-500 text-[10px]">{t.count}</span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {currentAssets.length > 0 ? (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {assets.map(a => (
-            <div key={a.label} className="card">
-              <div className="checkerboard rounded-lg h-28 flex items-center justify-center mb-2">
-                <img src={a.src} alt={a.label} className="w-full h-full object-contain p-2" />
+          {currentAssets.map((src, i) => (
+            <div key={i} className="card group relative">
+              <div className="checkerboard rounded-lg h-28 flex items-center justify-center mb-2 overflow-hidden">
+                <img src={src} alt={`${tab} ${i + 1}`} className="w-full h-full object-contain p-2" />
               </div>
-              <p className="text-xs text-gray-600">{a.label}</p>
+              <p className="text-[11px] text-gray-500">{tab.slice(0, -1).charAt(0).toUpperCase() + tab.slice(1, -1)} {i + 1}</p>
+              <button
+                onClick={() => handleDownload(src, i)}
+                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity px-2 py-1 bg-white/90 rounded text-[10px] text-gray-600 border border-grace-border hover:bg-grace-mist"
+              >
+                Download
+              </button>
             </div>
           ))}
         </div>
       ) : (
-        <EmptyState icon={<Library size={28} />} title="Library is empty" subtitle="Create a logo or garment to save it here." />
+        <EmptyState
+          icon={<Library size={28} />}
+          title={`No ${tab} yet`}
+          subtitle={tab === 'logos' ? 'Generate or upload a logo in the Design Studio.' :
+                    tab === 'artwork' ? 'Upload artwork in the Design Studio.' :
+                    tab === 'garments' ? 'Select a garment in the Design Studio.' :
+                    'Generate a preview in the Preview in Reality phase.'}
+        />
       )}
     </div>
   )

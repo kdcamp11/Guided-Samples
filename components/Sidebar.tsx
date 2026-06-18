@@ -82,7 +82,6 @@ export default function Sidebar({ section, onSectionChange, mobileOpen, onMobile
       <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
         <NavItem icon={<LayoutDashboard size={14}/>} label="Dashboard" active={section === 'dashboard'} onClick={() => onSectionChange('dashboard')} />
         <NavItem icon={<FolderOpen size={14}/>} label="Projects" active={section === 'projects'} onClick={() => onSectionChange('projects')} />
-        <NavItem icon={<Palette size={14}/>} label="Logo & Design" active={section === 'design'} onClick={() => onSectionChange('design')} />
         <NavItem icon={<Ruler size={14}/>} label="Size Guide" active={section === 'sizeguide'} onClick={() => onSectionChange('sizeguide')} />
 <NavItem icon={<ShoppingCart size={14}/>} label="Orders" active={section === 'orders'} href="/track" />
         <NavItem icon={<Library size={14}/>} label="Library" active={section === 'library'} onClick={() => onSectionChange('library')} />
