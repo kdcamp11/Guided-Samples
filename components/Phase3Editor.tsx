@@ -13,6 +13,7 @@ import { fileToDataUrl } from '@/lib/fileToDataUrl'
 import { downloadDataUrl, downloadAssetsZip } from '@/lib/downloadAssets'
 import GarmentAssetPanel from './GarmentAssetPanel'
 import LogoAssetPanel from './LogoAssetPanel'
+import AccordionSection from './AccordionSection'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -325,6 +326,7 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onLogoUp
     state.studioState?.garmentColor ?? _cachedGarmentColor
   )
   const [leftTab, setLeftTab] = useState<'logoart' | 'garment' | 'text'>('garment')
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [localLogo, setLocalLogo] = useState<AppState['logo']>(state.logo)
   const artworkFileRef = useRef<HTMLInputElement>(null)
 
@@ -1129,10 +1131,254 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onLogoUp
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-4">
+      {/* ─────────────────────────────────────────────────────────────────────
+          Mobile accordion (hidden on desktop lg+)
+      ───────────────────────────────────────────────────────────────────── */}
+      <div className="lg:hidden space-y-2 mb-4">
+
+        {/* Garment Source */}
+        <AccordionSection title="Garment Source" defaultOpen>
+          <GarmentAssetPanel route={state.route ?? 'apparel'} state={state} onSetGarment={onSetGarment} />
+        </AccordionSection>
+
+        {/* Garment Colors */}
+        <AccordionSection title="Garment Colors">
+          <div className="space-y-3 pt-1">
+            <div className="grid grid-cols-4 gap-2">
+              {GARMENT_COLORS.map(c => (
+                <button key={c} onClick={() => setGarmentColor(c === garmentColor ? '' : c)}
+                  title={c} style={{ backgroundColor: c }}
+                  className={`w-full aspect-square rounded-lg border-2 transition-all ${garmentColor === c ? 'border-grace-ink scale-110 shadow-md' : 'border-transparent hover:border-slate-300'} ${c === '#FFFFFF' || c === '#F5F5F5' ? 'border-slate-200' : ''}`}
+                />
+              ))}
+            </div>
+            <label className="flex items-center gap-2 text-xs text-gray-500">
+              <span className="flex-1">Custom</span>
+              <input type="color" value={garmentColor || '#FFFFFF'} onChange={e => setGarmentColor(e.target.value)}
+                className="w-8 h-7 rounded cursor-pointer border border-slate-200"/>
+            </label>
+            {garmentColor && (
+              <button onClick={() => setGarmentColor('')} className="text-[11px] text-gray-400 hover:text-gray-700 transition-colors">Clear color</button>
+            )}
+          </div>
+        </AccordionSection>
+
+        {/* Garment Fit */}
+        {state.garment && (
+          <AccordionSection title="Garment Fit">
+            <div className="space-y-2 pt-1">
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-gray-500">Scale</span>
+                <span className="text-xs text-gray-700">{garmentScale}%</span>
+              </div>
+              <input type="range" min={25} max={200} value={garmentScale}
+                onChange={e => setGarmentScale(parseInt(e.target.value))}
+                className="w-full accent-brand-green"/>
+              <p className="text-[11px] text-gray-400 leading-relaxed">Drag the garment on the canvas to reposition it.</p>
+              <button onClick={() => { setGarmentScale(100); setGarmentOffset({ x: 0, y: 0 }) }}
+                className="text-[11px] text-gray-400 hover:text-gray-700 transition-colors">Reset size &amp; position</button>
+            </div>
+          </AccordionSection>
+        )}
+
+        {/* Logo Placement */}
+        <AccordionSection title="Logo Placement">
+          <LogoAssetPanel state={{ ...state, logo: localLogo }} onLogoUpdate={handleLogoUpdate} />
+        </AccordionSection>
+
+        {/* Artwork */}
+        <AccordionSection title="Artwork" badge={artworkGallery.length || undefined}>
+          <div className="space-y-3 pt-1">
+            <label className="flex items-center gap-2 w-full px-3 py-2.5 rounded-lg border border-dashed border-slate-300 hover:border-brand-green cursor-pointer transition-colors text-xs text-gray-500 hover:text-gray-700">
+              <Upload size={13}/> Upload Artwork
+              <input ref={artworkFileRef} type="file" multiple className="hidden"
+                accept="image/png,image/svg+xml,image/jpeg,image/webp" onChange={handleArtworkFile}/>
+            </label>
+            {(logoGallery.length > 0 || artworkGallery.length > 0) && (
+              <div className="grid grid-cols-2 gap-2">
+                {logoGallery.map((src, i) => (
+                  <AssetThumb key={`logo-${i}`} src={src} label="Logo"
+                    onAdd={() => addAssetToCanvas(src, true)}
+                    onRemove={() => setLogoGallery(g => g.filter(s => s !== src))}/>
+                ))}
+                {artworkGallery.map((src, i) => (
+                  <AssetThumb key={`art-${i}`} src={src} label="Artwork"
+                    onAdd={() => addAssetToCanvas(src, false)}
+                    onRemove={() => setArtworkGallery(g => g.filter(s => s !== src))}/>
+                ))}
+              </div>
+            )}
+          </div>
+        </AccordionSection>
+
+        {/* Recolor Artwork */}
+        {selected?.type === 'image' && (
+          <AccordionSection title="Recolor Artwork" defaultOpen>
+            <div className="space-y-2 pt-1">
+              <div className="grid grid-cols-6 gap-1.5">
+                {COLOR_SWATCHES.map(c => (
+                  <button key={c} onClick={() => updateSelected({ tintColor: (selected as ImageLayer).tintColor === c ? undefined : c })}
+                    style={{ backgroundColor: c }}
+                    className={`aspect-square rounded border-2 transition-all ${(selected as ImageLayer).tintColor === c ? 'border-grace-ink scale-110' : 'border-transparent hover:border-slate-300'} ${c === '#FFFFFF' ? 'border-slate-200' : ''}`}
+                  />
+                ))}
+              </div>
+              <input type="color" value={(selected as ImageLayer).tintColor || '#000000'}
+                onChange={e => updateSelected({ tintColor: e.target.value })}
+                className="w-full h-7 rounded cursor-pointer border border-slate-200"/>
+              {(selected as ImageLayer).tintColor && (
+                <button onClick={() => updateSelected({ tintColor: undefined })} className="text-[11px] text-gray-400 hover:text-gray-700 transition-colors">Clear tint</button>
+              )}
+            </div>
+          </AccordionSection>
+        )}
+
+        {/* Text */}
+        <AccordionSection title="Text" badge={layers.filter(l => l.type === 'text').length || undefined}>
+          <div className="space-y-3 pt-1">
+            <button onClick={addTextLayer} className="btn-primary w-full flex items-center justify-center gap-2">
+              <Type size={13}/> Add Text Layer
+            </button>
+            {selected?.type === 'text' && (
+              <>
+                <textarea
+                  value={selected.text}
+                  onChange={e => updateSelected({ text: e.target.value })}
+                  className="textarea-field text-sm resize-none"
+                  rows={2} placeholder="Your text here"
+                />
+                <div className="grid grid-cols-2 gap-1">
+                  {FONT_LIBRARY.map(f => (
+                    <button key={f.name} onClick={() => updateSelected({ fontFamily: f.name })}
+                      style={{ fontFamily: `"${f.name}", sans-serif` }}
+                      className={`px-2 py-1.5 rounded border text-xs truncate transition-all text-left ${(selected as TextLayer).fontFamily === f.name ? 'border-grace-ink bg-grace-ink text-white' : 'border-slate-200 hover:border-slate-300 text-gray-700'}`}>
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex gap-1.5">
+                  <button onClick={() => updateSelected({ fontWeight: (selected as TextLayer).fontWeight === 'bold' ? 'normal' : 'bold' })}
+                    className={`flex-1 py-1.5 rounded-lg border text-xs font-bold transition-all ${(selected as TextLayer).fontWeight !== 'normal' ? 'bg-grace-ink text-white border-grace-ink' : 'border-slate-200 text-gray-600 hover:border-gray-400'}`}>B</button>
+                  <button onClick={() => updateSelected({ fontStyle: (selected as TextLayer).fontStyle === 'italic' ? 'normal' : 'italic' })}
+                    className={`flex-1 py-1.5 rounded-lg border text-xs italic transition-all ${(selected as TextLayer).fontStyle === 'italic' ? 'bg-grace-ink text-white border-grace-ink' : 'border-slate-200 text-gray-600 hover:border-gray-400'}`}>I</button>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-gray-500">Size</span>
+                  <div className="flex items-center gap-1.5">
+                    <button onClick={() => updateSelected({ fontSize: Math.max(8, (selected as TextLayer).fontSize - 2) })} className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-100 text-gray-500 text-xs">−</button>
+                    <span className="text-xs text-gray-700 w-10 text-center">{(selected as TextLayer).fontSize}px</span>
+                    <button onClick={() => updateSelected({ fontSize: Math.min(120, (selected as TextLayer).fontSize + 2) })} className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-100 text-gray-500 text-xs">+</button>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-[11px] text-gray-500 mb-1.5">Color</p>
+                  <div className="grid grid-cols-6 gap-1.5 mb-2">
+                    {COLOR_SWATCHES.map(c => (
+                      <button key={c} onClick={() => updateSelected({ color: c })}
+                        style={{ backgroundColor: c }}
+                        className={`aspect-square rounded border-2 transition-all ${(selected as TextLayer).color === c ? 'border-grace-ink scale-110' : 'border-transparent hover:border-slate-300'} ${c === '#FFFFFF' ? 'border-slate-200' : ''}`}
+                      />
+                    ))}
+                  </div>
+                  <input type="color" value={(selected as TextLayer).color}
+                    onChange={e => updateSelected({ color: e.target.value })}
+                    className="w-full h-7 rounded cursor-pointer border border-slate-200"/>
+                </div>
+                <div>
+                  <div className="flex justify-between items-center mb-1.5">
+                    <span className="text-xs text-gray-500">Border</span>
+                    <div className="flex items-center gap-1.5">
+                      <button onClick={() => updateSelected({ strokeWidth: Math.max(0, ((selected as TextLayer).strokeWidth ?? 0) - 1) })} className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-100 text-gray-500 text-xs">−</button>
+                      <span className="text-xs text-gray-700 w-10 text-center">{(selected as TextLayer).strokeWidth ?? 0}px</span>
+                      <button onClick={() => updateSelected({ strokeWidth: Math.min(20, ((selected as TextLayer).strokeWidth ?? 0) + 1), strokeColor: (selected as TextLayer).strokeColor ?? '#000000' })} className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-100 text-gray-500 text-xs">+</button>
+                    </div>
+                  </div>
+                  {((selected as TextLayer).strokeWidth ?? 0) > 0 && (
+                    <>
+                      <div className="grid grid-cols-6 gap-1.5 mt-2">
+                        {COLOR_SWATCHES.map(c => (
+                          <button key={c} onClick={() => updateSelected({ strokeColor: c })}
+                            style={{ backgroundColor: c }}
+                            className={`aspect-square rounded border-2 transition-all ${(selected as TextLayer).strokeColor === c ? 'border-grace-ink scale-110' : 'border-transparent hover:border-slate-300'} ${c === '#FFFFFF' ? 'border-slate-200' : ''}`}
+                          />
+                        ))}
+                      </div>
+                      <input type="color" value={(selected as TextLayer).strokeColor || '#000000'}
+                        onChange={e => updateSelected({ strokeColor: e.target.value })}
+                        className="w-full h-7 rounded cursor-pointer border border-slate-200 mt-2"/>
+                    </>
+                  )}
+                </div>
+                <div>
+                  <div className="flex justify-between items-center mb-1.5">
+                    <span className="text-xs text-gray-500">Arch</span>
+                    <div className="flex items-center gap-1.5">
+                      <button onClick={() => setArch(((selected as TextLayer).archAmount ?? 0) - 10)} className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-100 text-gray-500 text-xs">−</button>
+                      <span className="text-xs text-gray-700 w-10 text-center">{(selected as TextLayer).archAmount ?? 0}</span>
+                      <button onClick={() => setArch(((selected as TextLayer).archAmount ?? 0) + 10)} className="w-5 h-5 flex items-center justify-center rounded hover:bg-slate-100 text-gray-500 text-xs">+</button>
+                    </div>
+                  </div>
+                  <input type="range" min={-100} max={100} value={(selected as TextLayer).archAmount ?? 0}
+                    onChange={e => setArch(parseInt(e.target.value))}
+                    className="w-full accent-brand-green"/>
+                  <p className="text-[11px] text-gray-400 mt-1">Positive curves up, negative curves down.</p>
+                </div>
+                {transformCard(selected)}
+                {layerControlsCard()}
+              </>
+            )}
+          </div>
+        </AccordionSection>
+
+        {/* Layers */}
+        {layers.length > 0 && (
+          <AccordionSection title="Layers" badge={layers.length}>
+            <div className="space-y-1 pt-1">
+              {[...layers].reverse().map((layer, i) => (
+                <button key={layer.id} onClick={() => selectLayer(layer.id)}
+                  className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs transition-colors ${selectedId === layer.id ? 'bg-brand-green/10 text-gray-900' : 'hover:bg-slate-100 text-gray-500'}`}>
+                  {layer.type === 'text' ? <Type size={11}/> : <Layers size={11}/>}
+                  <span className="truncate flex-1 text-left">
+                    {layer.type === 'text' ? (layer.text.slice(0, 16) || 'Text') : ((layer as ImageLayer).isLogo ? 'Logo' : `Artwork ${layers.length - i}`)}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </AccordionSection>
+        )}
+
+        {/* Downloads */}
+        {garmentSrcForView(activeEditorView) && (
+          <AccordionSection title="Downloads">
+            <div className="space-y-2 pt-1">
+              <p className="text-[11px] text-gray-400 leading-relaxed">Each file exports as a transparent PNG with the background removed.</p>
+              <button onClick={async () => {
+                const png = await renderDesign({ transparent: true })
+                if (png) downloadDataUrl(png, `full-design-${activeEditorView}.png`)
+              }} className="btn-secondary w-full flex items-center justify-center gap-2 text-xs">
+                <Download size={13}/> Full Design
+              </button>
+              <button onClick={async () => {
+                let png = await renderDesign({ includeLayers: false, transparent: true })
+                if (!png) return
+                try { png = await removeWhiteBackground(png) } catch {}
+                png = await cropPadding(png)
+                downloadDataUrl(png, `garment-${activeEditorView}.png`)
+              }} className="btn-secondary w-full flex items-center justify-center gap-2 text-xs">
+                <Download size={13}/> Garment Only
+              </button>
+            </div>
+          </AccordionSection>
+        )}
+      </div>
+
+      {/* ─────────────────────────────────────────────────────────────────────
+          Desktop layout (hidden on mobile)
+      ───────────────────────────────────────────────────────────────────── */}
+      <div className={`hidden lg:grid gap-4 transition-all duration-300 ${sidebarCollapsed ? 'lg:grid-cols-[0px_1fr]' : 'lg:grid-cols-[280px_1fr]'}`}>
 
         {/* ── Left panel ── */}
-        <div className="space-y-3">
+        <div className={`space-y-3 overflow-hidden transition-all duration-300 ${sidebarCollapsed ? 'w-0 opacity-0 pointer-events-none' : 'w-[280px] opacity-100'}`}>
           {/* Tab bar */}
           <div className="flex rounded-lg border border-slate-200 overflow-hidden">
             {([
@@ -1491,6 +1737,14 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onLogoUp
           {/* Toolbar */}
           <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-200 gap-2">
             <div className="flex items-center gap-1">
+              {/* Sidebar collapse toggle (desktop only) */}
+              <button
+                onClick={() => setSidebarCollapsed(c => !c)}
+                title={sidebarCollapsed ? 'Show panel' : 'Hide panel'}
+                className="p-1.5 rounded hover:bg-slate-100 text-gray-400 hover:text-gray-700 transition-colors mr-1"
+              >
+                {sidebarCollapsed ? <ArrowRight size={14}/> : <ArrowLeft size={14}/>}
+              </button>
               <button onClick={undo} disabled={past.length === 0} title="Undo"
                 className="p-1.5 rounded hover:bg-slate-100 text-gray-400 hover:text-gray-700 transition-colors disabled:opacity-30">
                 <Undo2 size={14}/>
@@ -1691,7 +1945,7 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onLogoUp
           </div>
         </div>
 
-      </div>
+      </div>{/* end desktop grid */}
     </div>
   )
 }
