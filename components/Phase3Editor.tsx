@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import {
   Undo2, Redo2, Minus, Plus, Upload, Layers, ArrowLeft, ArrowRight,
   Trash2, Copy, ChevronUp, ChevronDown, Check, Loader2, Download, Type, Palette, X, Save,
-  Shirt, Ruler, Image as ImageIcon, SlidersHorizontal, AlignCenter,
+  Shirt, Image as ImageIcon, SlidersHorizontal, AlignCenter,
 } from 'lucide-react'
 import { AppState } from '@/app/page'
 import { streamGenerate } from '@/lib/streamGenerate'
@@ -753,6 +753,14 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onLogoUp
     window.addEventListener('touchend', onUp)
   }
 
+  // Scale the garment with the scroll wheel (replaces the Garment Fit slider).
+  const handleGarmentWheel = (e: React.WheelEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const delta = e.deltaY < 0 ? 4 : -4
+    setGarmentScale(s => Math.min(200, Math.max(25, s + delta)))
+  }
+
   const addTextLayer = () => {
     const id = crypto.randomUUID()
     snapshot()
@@ -1242,19 +1250,20 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onLogoUp
               </div>
               <div className="card space-y-3">
                 <p className="text-xs font-medium text-gray-600">Garment Color</p>
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-6 gap-1.5">
                   {GARMENT_COLORS.map(c => (
                     <button key={c} onClick={() => setGarmentColor(c === garmentColor ? '' : c)}
                       title={c} style={{ backgroundColor: c }}
-                      className={`w-full aspect-square rounded-lg border-2 transition-all ${garmentColor === c ? 'border-grace-ink scale-110 shadow-md' : 'border-transparent hover:border-slate-300'} ${c === '#FFFFFF' || c === '#F5F5F5' ? 'border-slate-200' : ''}`}
+                      className={`w-full aspect-square rounded border-2 transition-all ${garmentColor === c ? 'border-grace-ink scale-110' : 'border-transparent hover:border-slate-300'} ${c === '#FFFFFF' || c === '#F5F5F5' ? 'border-slate-200' : ''}`}
                     />
                   ))}
+                  <label title="Custom color"
+                    className="w-full aspect-square rounded border-2 border-dashed border-slate-300 hover:border-grace-ink transition-all cursor-pointer relative overflow-hidden flex items-center justify-center">
+                    <Plus size={12} className="text-gray-400"/>
+                    <input type="color" value={garmentColor || '#FFFFFF'} onChange={e => setGarmentColor(e.target.value)}
+                      className="absolute inset-0 opacity-0 cursor-pointer"/>
+                  </label>
                 </div>
-                <label className="flex items-center gap-2 text-xs text-gray-500">
-                  <span className="flex-1">Custom</span>
-                  <input type="color" value={garmentColor || '#FFFFFF'} onChange={e => setGarmentColor(e.target.value)}
-                    className="w-8 h-7 rounded cursor-pointer border border-slate-200"/>
-                </label>
                 {garmentColor && <button onClick={() => setGarmentColor('')} className="text-[11px] text-gray-400 hover:text-gray-700 transition-colors">Clear color</button>}
               </div>
               {selected?.type === 'image' && (
@@ -1264,26 +1273,18 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onLogoUp
                     {COLOR_SWATCHES.map(c => (
                       <button key={c} onClick={() => updateSelected({ tintColor: (selected as ImageLayer).tintColor === c ? undefined : c })}
                         style={{ backgroundColor: c }}
-                        className={`aspect-square rounded border-2 transition-all ${(selected as ImageLayer).tintColor === c ? 'border-grace-ink scale-110' : 'border-transparent hover:border-slate-300'} ${c === '#FFFFFF' ? 'border-slate-200' : ''}`}
+                        className={`w-full aspect-square rounded border-2 transition-all ${(selected as ImageLayer).tintColor === c ? 'border-grace-ink scale-110' : 'border-transparent hover:border-slate-300'} ${c === '#FFFFFF' ? 'border-slate-200' : ''}`}
                       />
                     ))}
+                    <label title="Custom color"
+                      className="w-full aspect-square rounded border-2 border-dashed border-slate-300 hover:border-grace-ink transition-all cursor-pointer relative overflow-hidden flex items-center justify-center">
+                      <Plus size={12} className="text-gray-400"/>
+                      <input type="color" value={(selected as ImageLayer).tintColor || '#000000'}
+                        onChange={e => updateSelected({ tintColor: e.target.value })}
+                        className="absolute inset-0 opacity-0 cursor-pointer"/>
+                    </label>
                   </div>
-                  <input type="color" value={(selected as ImageLayer).tintColor || '#000000'}
-                    onChange={e => updateSelected({ tintColor: e.target.value })}
-                    className="w-full h-7 rounded cursor-pointer border border-slate-200"/>
                   {(selected as ImageLayer).tintColor && <button onClick={() => updateSelected({ tintColor: undefined })} className="text-[11px] text-gray-400 hover:text-gray-700 transition-colors">Clear tint</button>}
-                </div>
-              )}
-              {state.garment && (
-                <div className="card">
-                  <div className="flex justify-between items-center mb-2">
-                    <p className="text-xs font-medium text-gray-600">Garment Fit</p>
-                    <span className="text-xs text-gray-700">{garmentScale}%</span>
-                  </div>
-                  <input type="range" min={25} max={200} value={garmentScale}
-                    onChange={e => setGarmentScale(parseInt(e.target.value))} className="w-full accent-brand-green"/>
-                  <p className="text-[11px] text-gray-400 mt-2 leading-relaxed">Drag the garment on the canvas to reposition it.</p>
-                  <button onClick={() => { setGarmentScale(100); setGarmentOffset({ x: 0, y: 0 }) }} className="mt-1.5 text-[11px] text-gray-400 hover:text-gray-700 transition-colors">Reset size &amp; position</button>
                 </div>
               )}
             </>
@@ -1538,7 +1539,7 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onLogoUp
                 return garmentSrcForView(activeEditorView) ? (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none"
                   style={{ transform: `translate(${garmentOffset.x}px, ${garmentOffset.y}px) scale(${garmentScale / 100})`, transformOrigin: 'center center' }}>
-                  <div onMouseDown={startGarmentDrag} onTouchStart={startGarmentDrag}
+                  <div onMouseDown={startGarmentDrag} onTouchStart={startGarmentDrag} onWheel={handleGarmentWheel}
                     style={{ position: 'relative', width: GARMENT_DISPLAY_W, height: GARMENT_DISPLAY_H, flexShrink: 0, isolation: garmentColor ? 'isolate' : undefined, pointerEvents: 'auto', cursor: garmentDragging ? 'grabbing' : 'grab' }}>
                     {garmentColor && (
                       <div style={{ position: 'absolute', inset: 0, backgroundColor: garmentColor, WebkitMaskImage: `url("${garmentDisplaySrc}")`, WebkitMaskSize: 'contain', WebkitMaskRepeat: 'no-repeat', WebkitMaskPosition: 'center', maskImage: `url("${garmentDisplaySrc}")`, maskSize: 'contain', maskRepeat: 'no-repeat', maskPosition: 'center', pointerEvents: 'none' } as React.CSSProperties}/>
@@ -1642,38 +1643,23 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onLogoUp
             <AccordionSection title="Garment Colors" icon={<Palette size={16}/>}
               isOpen={mobileSection === 'garment-colors'} onToggle={() => toggleMobileSection('garment-colors')}>
               <div className="space-y-3">
-                <div className="grid grid-cols-5 gap-2">
+                <div className="grid grid-cols-6 gap-1.5">
                   {GARMENT_COLORS.map(c => (
                     <button key={c} onClick={() => setGarmentColor(c === garmentColor ? '' : c)}
                       title={c} style={{ backgroundColor: c }}
-                      className={`w-full aspect-square rounded-lg border-2 transition-all ${garmentColor === c ? 'border-grace-ink scale-110 shadow-md' : 'border-transparent hover:border-slate-300'} ${c === '#FFFFFF' || c === '#F5F5F5' ? 'border-slate-200' : ''}`}
+                      className={`w-full aspect-square rounded border-2 transition-all ${garmentColor === c ? 'border-grace-ink scale-110' : 'border-transparent hover:border-slate-300'} ${c === '#FFFFFF' || c === '#F5F5F5' ? 'border-slate-200' : ''}`}
                     />
                   ))}
+                  <label title="Custom color"
+                    className="w-full aspect-square rounded border-2 border-dashed border-slate-300 hover:border-grace-ink transition-all cursor-pointer relative overflow-hidden flex items-center justify-center">
+                    <Plus size={12} className="text-gray-400"/>
+                    <input type="color" value={garmentColor || '#FFFFFF'} onChange={e => setGarmentColor(e.target.value)}
+                      className="absolute inset-0 opacity-0 cursor-pointer"/>
+                  </label>
                 </div>
-                <label className="flex items-center gap-2 text-xs text-gray-500">
-                  <span className="flex-1">Custom color</span>
-                  <input type="color" value={garmentColor || '#FFFFFF'} onChange={e => setGarmentColor(e.target.value)}
-                    className="w-8 h-7 rounded cursor-pointer border border-slate-200"/>
-                </label>
                 {garmentColor && <button onClick={() => setGarmentColor('')} className="text-xs text-gray-400 hover:text-gray-700 transition-colors">Clear color</button>}
               </div>
             </AccordionSection>
-
-            {state.garment && (
-              <AccordionSection title="Garment Fit" icon={<Ruler size={16}/>}
-                isOpen={mobileSection === 'garment-fit'} onToggle={() => toggleMobileSection('garment-fit')}>
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs text-gray-500">Scale</span>
-                    <span className="text-xs font-medium text-gray-700">{garmentScale}%</span>
-                  </div>
-                  <input type="range" min={25} max={200} value={garmentScale}
-                    onChange={e => setGarmentScale(parseInt(e.target.value))} className="w-full accent-brand-green"/>
-                  <button onClick={() => { setGarmentScale(100); setGarmentOffset({ x: 0, y: 0 }) }}
-                    className="text-xs text-gray-400 hover:text-gray-700 transition-colors">Reset size &amp; position</button>
-                </div>
-              </AccordionSection>
-            )}
 
             <AccordionSection title="Logo Placement" icon={<AlignCenter size={16}/>}
               isOpen={mobileSection === 'logo'} onToggle={() => toggleMobileSection('logo')}>

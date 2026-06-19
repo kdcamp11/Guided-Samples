@@ -4,7 +4,7 @@ import { Loader2, Sparkles, Upload, X, ImagePlus, RefreshCw, ArrowRight, Wand2 }
 import { AppState } from '@/app/page'
 import { streamGenerate, PaywallError } from '@/lib/streamGenerate'
 import { cacheGet, cacheSet, cacheKey } from '@/lib/generateCache'
-import { trimTransparent, removeBackgroundClean, cleanBackgroundRemote } from '@/lib/removeWhiteBg'
+import { removeBackgroundClean } from '@/lib/removeWhiteBg'
 import { fileToDataUrl } from '@/lib/fileToDataUrl'
 import { useAICredits } from '@/lib/aiCreditsContext'
 import GenerationCounter from '@/components/GenerationCounter'
@@ -35,20 +35,16 @@ export default function LogoAssetPanel({ state, onLogoUpdate }: Props) {
   const [referenceImage, setReferenceImage] = useState<string | null>(null)
   const [cleaning, setCleaning] = useState(false)
 
-  // Remove the background on demand. Runs the deterministic client-side
-  // flood-fill + margin trim first (free, instant, preserves outline strokes),
-  // then attempts the deeper server-side rembg pipeline as an enhancement when
-  // it's configured. Always trims empty margins so the logo fills its box.
+  // Remove the background on demand. Uses ONLY the deterministic client-side
+  // flood-fill + margin trim: it clears the outer solid background while
+  // preserving interior multi-stroke outline borders (e.g. the gold+black
+  // letter borders). The server-side rembg/U²-Net model is intentionally not
+  // used here because it segments the subject and strips those outline strokes.
   const handleCleanBackground = async () => {
     if (!state.logo || cleaning) return
     setCleaning(true)
     try {
-      let cleaned = await removeBackgroundClean(state.logo.dataUrl)
-      // Optional deeper cutout if the Replicate pipeline is available.
-      try {
-        const remote = await cleanBackgroundRemote(cleaned)
-        if (remote && remote !== cleaned) cleaned = await trimTransparent(remote)
-      } catch {}
+      const cleaned = await removeBackgroundClean(state.logo.dataUrl)
       onLogoUpdate({ ...state.logo, dataUrl: cleaned })
     } finally {
       setCleaning(false)
