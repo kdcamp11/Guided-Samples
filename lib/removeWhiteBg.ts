@@ -97,29 +97,27 @@ export async function trimTransparent(dataUrl: string, alphaThreshold = 10): Pro
 // flood-fills the outer solid background to transparency (preserving interior
 // outline strokes), then trims the empty margins. Deterministic and dependency
 // free — no external API required.
+// removeWhiteBackground is a no-op on transparent images, so trimTransparent
+// is also skipped for them — transparent PNGs come through completely unmodified.
 export async function removeBackgroundClean(dataUrl: string): Promise<string> {
+  const before = dataUrl
   let out = dataUrl
   try { out = await removeWhiteBackground(out) } catch {}
-  try { out = await trimTransparent(out) } catch {}
+  // Only trim margins if removal actually changed the image (i.e. it was opaque
+  // with a solid background). Skip trimming for already-transparent images.
+  if (out !== before) {
+    try { out = await trimTransparent(out) } catch {}
+  }
   return out
 }
 
-// Conservatively remove a UNIFORM solid background (white or any single color)
-// via a BFS flood-fill from the borders.
+// Conservatively remove a UNIFORM solid background via a BFS flood-fill.
 //
-// This is deliberately safe, not clever. It first checks whether the image
-// border is essentially ONE color. Only then does it flood-fill that color from
-// the edges. This guarantees it never damages detailed or gray-filled logos:
-//   • Already-transparent logos (alpha PNG like GRACE) → border is transparent,
-//     so nothing is removed.
-//   • Logos on a solid white/colored background → background removed cleanly.
-//   • Messy backgrounds (baked-in transparency checkerboard, photos, gradients)
-//     → the border is NON-uniform, so this bails and returns the image
-//     untouched. Those cases are handled by the opt-in server-side AI cutout
-//     ("Deep Clean (AI)" button), which isolates the subject semantically.
-//
-// The flood-fill only clears the OUTER region connected to the border, so a
-// uniform-color area fully enclosed by artwork is preserved.
+// Rule: if the image already has ANY transparent pixels → it is already a
+// cut-out, return it untouched (absolute no-op, no trimming). Only run
+// background removal on fully-opaque images (logos on a solid background).
+// Non-uniform borders (checkerboard, photo, gradient) also bail so messy
+// images are left for the opt-in "Deep Clean (AI)" button.
 export async function removeWhiteBackground(dataUrl: string, tolerance = 24): Promise<string> {
   const img = await new Promise<HTMLImageElement>((resolve, reject) => {
     const i = new Image()
@@ -139,15 +137,18 @@ export async function removeWhiteBackground(dataUrl: string, tolerance = 24): Pr
   const imageData = ctx.getImageData(0, 0, w, h)
   const px = imageData.data
 
-  // Sample a thin border band and bucket the opaque colors to find the dominant
-  // candidate background color and how uniform the border actually is.
+  // If ANY pixel is already transparent → this is a cut-out PNG → absolute no-op.
+  for (let i = 3; i < px.length; i += 4) {
+    if (px[i] < 128) return dataUrl
+  }
+
+  // Image is fully opaque. Sample border to find dominant background color.
   const band = Math.max(2, Math.min(6, Math.round(Math.min(w, h) * 0.02)))
   const buckets = new Map<number, { r: number; g: number; b: number; n: number }>()
-  let opaqueBorder = 0
+  let borderCount = 0
   const sample = (x: number, y: number) => {
+    borderCount++
     const idx = (y * w + x) * 4
-    if (px[idx + 3] < 10) return
-    opaqueBorder++
     const r = px[idx], g = px[idx + 1], b = px[idx + 2]
     const key = ((r >> 4) << 8) | ((g >> 4) << 4) | (b >> 4)
     const e = buckets.get(key)
@@ -157,10 +158,6 @@ export async function removeWhiteBackground(dataUrl: string, tolerance = 24): Pr
   for (let y = 0; y < h; y++) for (let d = 0; d < band; d++) { sample(d, y); sample(w - 1 - d, y) }
   for (let x = 0; x < w; x++) for (let d = 0; d < band; d++) { sample(x, d); sample(x, h - 1 - d) }
 
-  // Border fully transparent → already cut out, leave untouched.
-  if (opaqueBorder === 0) return dataUrl
-
-  // Dominant border color = average of the largest bucket.
   const bucketList = Array.from(buckets.values()).sort((a, b) => b.n - a.n)
   const top = bucketList[0]
   const bg = { r: Math.round(top.r / top.n), g: Math.round(top.g / top.n), b: Math.round(top.b / top.n) }
@@ -168,18 +165,15 @@ export async function removeWhiteBackground(dataUrl: string, tolerance = 24): Pr
   const within = (r: number, g: number, b: number) =>
     Math.abs(r - bg.r) <= tolerance && Math.abs(g - bg.g) <= tolerance && Math.abs(b - bg.b) <= tolerance
 
-  // Uniformity check: what fraction of opaque border pixels match the dominant
-  // color? A solid background is ~1.0; a checkerboard/photo border is much lower.
-  // If the border isn't uniform, bail — leave the image for the AI button.
+  // Uniformity check: bail if border isn't predominantly one color.
   let matching = 0
-  const scan = (x: number, y: number) => {
+  const check = (x: number, y: number) => {
     const idx = (y * w + x) * 4
-    if (px[idx + 3] < 10) return
     if (within(px[idx], px[idx + 1], px[idx + 2])) matching++
   }
-  for (let y = 0; y < h; y++) for (let d = 0; d < band; d++) { scan(d, y); scan(w - 1 - d, y) }
-  for (let x = 0; x < w; x++) for (let d = 0; d < band; d++) { scan(x, d); scan(x, h - 1 - d) }
-  if (matching / opaqueBorder < 0.85) return dataUrl // non-uniform → AI handles it
+  for (let y = 0; y < h; y++) for (let d = 0; d < band; d++) { check(d, y); check(w - 1 - d, y) }
+  for (let x = 0; x < w; x++) for (let d = 0; d < band; d++) { check(x, d); check(x, h - 1 - d) }
+  if (matching / borderCount < 0.85) return dataUrl // non-uniform → leave for AI button
 
   const isBg = (idx: number) => px[idx + 3] > 10 && within(px[idx], px[idx + 1], px[idx + 2])
 
