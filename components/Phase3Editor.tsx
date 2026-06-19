@@ -1093,6 +1093,22 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onLogoUp
     setSelectedId(null)
   }
 
+  // Delete / Backspace removes the currently selected canvas layer, unless the
+  // user is typing in a text field.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Delete' && e.key !== 'Backspace') return
+      const tag = (e.target as HTMLElement)?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return
+      if (!selectedId) return
+      e.preventDefault()
+      deleteSelected()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId])
+
   // ─── Reusable control cards ────────────────────────────────────────────────
   const transformCard = (sel: LogoLayer) => (
     <div className="card">

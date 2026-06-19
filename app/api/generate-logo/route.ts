@@ -87,6 +87,10 @@ async function generateWithOpenAI(builtPrompt: string, referenceImage?: string):
     form.append('n', '2')
     form.append('size', '1024x1024')
     form.append('quality', 'medium')
+    // Ask gpt-image-2 for a real alpha channel so logos come back transparent
+    // natively (rembg later is a fallback for any residual background).
+    form.append('background', 'transparent')
+    form.append('output_format', 'png')
 
     const res = await fetch('https://api.openai.com/v1/images/edits', {
       method: 'POST',
@@ -116,6 +120,9 @@ async function generateWithOpenAI(builtPrompt: string, referenceImage?: string):
       n: 2,
       size: '1024x1024',
       quality: 'medium',
+      // Native transparent alpha channel for logos (rembg remains a fallback).
+      background: 'transparent',
+      output_format: 'png',
     }),
   })
 

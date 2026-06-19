@@ -97,19 +97,28 @@ export async function trimTransparent(dataUrl: string, alphaThreshold = 10): Pro
 // flood-fills the outer solid background to transparency (preserving interior
 // outline strokes), then trims the empty margins. Deterministic and dependency
 // free — no external API required.
+// removeWhiteBackground is a no-op on transparent images, so trimTransparent
+// is also skipped for them — transparent PNGs come through completely unmodified.
 export async function removeBackgroundClean(dataUrl: string): Promise<string> {
+  const before = dataUrl
   let out = dataUrl
   try { out = await removeWhiteBackground(out) } catch {}
-  try { out = await trimTransparent(out) } catch {}
+  // Only trim margins if removal actually changed the image (i.e. it was opaque
+  // with a solid background). Skip trimming for already-transparent images.
+  if (out !== before) {
+    try { out = await trimTransparent(out) } catch {}
+  }
   return out
 }
 
-// Remove a solid-color background from a logo image.
-// Averages all four corners to detect the background color, then BFS flood-fills
-// from the image borders — only the outer connected background region becomes
-// transparent. Interior pixels of the same color are preserved because they
-// aren't reachable from the border.
-export async function removeWhiteBackground(dataUrl: string, tolerance = 40): Promise<string> {
+// Conservatively remove a UNIFORM solid background via a BFS flood-fill.
+//
+// Rule: if the image already has ANY transparent pixels → it is already a
+// cut-out, return it untouched (absolute no-op, no trimming). Only run
+// background removal on fully-opaque images (logos on a solid background).
+// Non-uniform borders (checkerboard, photo, gradient) also bail so messy
+// images are left for the opt-in "Deep Clean (AI)" button.
+export async function removeWhiteBackground(dataUrl: string, tolerance = 24): Promise<string> {
   const img = await new Promise<HTMLImageElement>((resolve, reject) => {
     const i = new Image()
     i.onload = () => resolve(i)
@@ -128,26 +137,47 @@ export async function removeWhiteBackground(dataUrl: string, tolerance = 40): Pr
   const imageData = ctx.getImageData(0, 0, w, h)
   const px = imageData.data
 
-  // Sample all four corners and average to get a robust background color estimate.
-  // Corners that are fully transparent are skipped.
-  const cornerCoords = [[0, 0], [w - 1, 0], [0, h - 1], [w - 1, h - 1]] as const
-  let rSum = 0, gSum = 0, bSum = 0, count = 0
-  for (const [x, y] of cornerCoords) {
-    const idx = (y * w + x) * 4
-    if (px[idx + 3] < 10) continue // skip transparent corners
-    rSum += px[idx]; gSum += px[idx + 1]; bSum += px[idx + 2]
-    count++
+  // If ANY pixel is already transparent → this is a cut-out PNG → absolute no-op.
+  for (let i = 3; i < px.length; i += 4) {
+    if (px[i] < 128) return dataUrl
   }
-  if (count === 0) return dataUrl // all corners transparent — nothing to remove
-  const bg = { r: Math.round(rSum / count), g: Math.round(gSum / count), b: Math.round(bSum / count) }
 
-  const isBg = (idx: number) =>
-    px[idx + 3] > 10 && // only remove opaque pixels
-    Math.abs(px[idx]     - bg.r) <= tolerance &&
-    Math.abs(px[idx + 1] - bg.g) <= tolerance &&
-    Math.abs(px[idx + 2] - bg.b) <= tolerance
+  // Image is fully opaque. Sample border to find dominant background color.
+  const band = Math.max(2, Math.min(6, Math.round(Math.min(w, h) * 0.02)))
+  const buckets = new Map<number, { r: number; g: number; b: number; n: number }>()
+  let borderCount = 0
+  const sample = (x: number, y: number) => {
+    borderCount++
+    const idx = (y * w + x) * 4
+    const r = px[idx], g = px[idx + 1], b = px[idx + 2]
+    const key = ((r >> 4) << 8) | ((g >> 4) << 4) | (b >> 4)
+    const e = buckets.get(key)
+    if (e) { e.r += r; e.g += g; e.b += b; e.n++ }
+    else buckets.set(key, { r, g, b, n: 1 })
+  }
+  for (let y = 0; y < h; y++) for (let d = 0; d < band; d++) { sample(d, y); sample(w - 1 - d, y) }
+  for (let x = 0; x < w; x++) for (let d = 0; d < band; d++) { sample(x, d); sample(x, h - 1 - d) }
 
-  // BFS flood fill from all border pixels
+  const bucketList = Array.from(buckets.values()).sort((a, b) => b.n - a.n)
+  const top = bucketList[0]
+  const bg = { r: Math.round(top.r / top.n), g: Math.round(top.g / top.n), b: Math.round(top.b / top.n) }
+
+  const within = (r: number, g: number, b: number) =>
+    Math.abs(r - bg.r) <= tolerance && Math.abs(g - bg.g) <= tolerance && Math.abs(b - bg.b) <= tolerance
+
+  // Uniformity check: bail if border isn't predominantly one color.
+  let matching = 0
+  const check = (x: number, y: number) => {
+    const idx = (y * w + x) * 4
+    if (within(px[idx], px[idx + 1], px[idx + 2])) matching++
+  }
+  for (let y = 0; y < h; y++) for (let d = 0; d < band; d++) { check(d, y); check(w - 1 - d, y) }
+  for (let x = 0; x < w; x++) for (let d = 0; d < band; d++) { check(x, d); check(x, h - 1 - d) }
+  if (matching / borderCount < 0.85) return dataUrl // non-uniform → leave for AI button
+
+  const isBg = (idx: number) => px[idx + 3] > 10 && within(px[idx], px[idx + 1], px[idx + 2])
+
+  // ── BFS flood fill from all border pixels ──────────────────────────────────
   const visited = new Uint8Array(w * h)
   const queue: number[] = []
   const push = (x: number, y: number) => {

@@ -4,7 +4,7 @@ import { Loader2, Sparkles, Upload, X, ImagePlus, RefreshCw, ArrowRight, Wand2 }
 import { AppState } from '@/app/page'
 import { streamGenerate, PaywallError } from '@/lib/streamGenerate'
 import { cacheGet, cacheSet, cacheKey } from '@/lib/generateCache'
-import { removeBackgroundClean } from '@/lib/removeWhiteBg'
+import { removeBackgroundClean, cleanBackgroundRemote, trimTransparent } from '@/lib/removeWhiteBg'
 import { fileToDataUrl } from '@/lib/fileToDataUrl'
 import { useAICredits } from '@/lib/aiCreditsContext'
 import GenerationCounter from '@/components/GenerationCounter'
@@ -35,16 +35,18 @@ export default function LogoAssetPanel({ state, onLogoUpdate }: Props) {
   const [referenceImage, setReferenceImage] = useState<string | null>(null)
   const [cleaning, setCleaning] = useState(false)
 
-  // Remove the background on demand. Uses ONLY the deterministic client-side
-  // flood-fill + margin trim: it clears the outer solid background while
-  // preserving interior multi-stroke outline borders (e.g. the gold+black
-  // letter borders). The server-side rembg/U²-Net model is intentionally not
-  // used here because it segments the subject and strips those outline strokes.
+  // Aggressive, opt-in background removal. Upload already runs the gentle
+  // client-side flood-fill; this button escalates to the server-side AI (rembg)
+  // cutout for logos the flood-fill couldn't fully clear (baked-in checkerboards,
+  // multi-color/photographic backgrounds, soft anti-aliased edges). May soften
+  // very fine borders — that's the accepted tradeoff for a true cutout. Falls
+  // back to the original (then trimmed) when the AI service is unavailable.
   const handleCleanBackground = async () => {
     if (!state.logo || cleaning) return
     setCleaning(true)
     try {
-      const cleaned = await removeBackgroundClean(state.logo.dataUrl)
+      let cleaned = await cleanBackgroundRemote(state.logo.dataUrl)
+      try { cleaned = await trimTransparent(cleaned) } catch {}
       onLogoUpdate({ ...state.logo, dataUrl: cleaned })
     } finally {
       setCleaning(false)
@@ -117,8 +119,6 @@ export default function LogoAssetPanel({ state, onLogoUpdate }: Props) {
     e.target.value = ''
     try {
       let dataUrl = await fileToDataUrl(file)
-      // Remove a solid background (white/colored) and trim empty margins so the
-      // uploaded logo drops in clean and fills its placement box.
       try { dataUrl = await removeBackgroundClean(dataUrl) } catch {}
       const logo = { svg: '', dataUrl, style: 'Uploaded', color: '#0A0A0A' }
       onLogoUpdate(logo)
@@ -136,10 +136,10 @@ export default function LogoAssetPanel({ state, onLogoUpdate }: Props) {
             onClick={handleCleanBackground}
             disabled={cleaning}
             className="mb-3 w-full flex items-center justify-center gap-1.5 p-2.5 rounded-lg bg-gray-900 text-white text-[11px] hover:bg-black disabled:opacity-50 transition-colors"
-            title="Uses AI to remove the background for a cleaner cutout (counts as one AI generation)"
+            title="Already auto-cleaned on upload. Click to run a deeper AI cutout for tricky backgrounds (checkerboards, photos, soft edges). Counts as one AI generation."
           >
             {cleaning ? <Loader2 size={12} className="animate-spin"/> : <Wand2 size={12}/>}
-            {cleaning ? 'Removing…' : 'Remove Background'}
+            {cleaning ? 'Removing…' : 'Deep Clean (AI)'}
             <AIUsageHint />
           </button>
         )}
