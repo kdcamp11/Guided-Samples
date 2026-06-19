@@ -104,22 +104,23 @@ export async function removeBackgroundClean(dataUrl: string): Promise<string> {
   return out
 }
 
-// Remove the background from a logo image with a BFS flood-fill from the borders.
+// Conservatively remove a UNIFORM solid background (white or any single color)
+// via a BFS flood-fill from the borders.
 //
-// The classifier is the important part. A pixel counts as background if EITHER:
-//   1. it is LIGHT and LOW-SATURATION — i.e. white or any shade of pale gray.
-//      This is the robust rule for baked-in transparency checkerboards: both
-//      tiles (white + light gray) and their anti-aliased blends all satisfy it,
-//      so the whole grid is removed in one pass. Saturated or dark logo art
-//      (greens, golds, blacks, reds) never qualifies, so the artwork survives.
-//   2. it closely matches a color sampled from the image border — this keeps
-//      solid *colored* backgrounds (e.g. a logo on flat blue) working too.
+// This is deliberately safe, not clever. It first checks whether the image
+// border is essentially ONE color. Only then does it flood-fill that color from
+// the edges. This guarantees it never damages detailed or gray-filled logos:
+//   • Already-transparent logos (alpha PNG like GRACE) → border is transparent,
+//     so nothing is removed.
+//   • Logos on a solid white/colored background → background removed cleanly.
+//   • Messy backgrounds (baked-in transparency checkerboard, photos, gradients)
+//     → the border is NON-uniform, so this bails and returns the image
+//     untouched. Those cases are handled by the opt-in server-side AI cutout
+//     ("Deep Clean (AI)" button), which isolates the subject semantically.
 //
-// The flood-fill only clears the OUTER region connected to the border, so light
-// areas fully enclosed by the artwork (e.g. white counters inside letters) are
-// preserved. If the border is already transparent (an alpha PNG like the GRACE
-// wordmark), there is nothing to remove and the image is returned untouched.
-export async function removeWhiteBackground(dataUrl: string, tolerance = 28): Promise<string> {
+// The flood-fill only clears the OUTER region connected to the border, so a
+// uniform-color area fully enclosed by artwork is preserved.
+export async function removeWhiteBackground(dataUrl: string, tolerance = 24): Promise<string> {
   const img = await new Promise<HTMLImageElement>((resolve, reject) => {
     const i = new Image()
     i.onload = () => resolve(i)
@@ -138,14 +139,8 @@ export async function removeWhiteBackground(dataUrl: string, tolerance = 28): Pr
   const imageData = ctx.getImageData(0, 0, w, h)
   const px = imageData.data
 
-  // Light + low-saturation test → catches white and every checkerboard gray.
-  const isLightNeutral = (r: number, g: number, b: number) => {
-    const mx = Math.max(r, g, b)
-    const mn = Math.min(r, g, b)
-    return mx >= 175 && (mx - mn) <= 32
-  }
-
-  // Sample a thin border band for any solid *colored* background color(s).
+  // Sample a thin border band and bucket the opaque colors to find the dominant
+  // candidate background color and how uniform the border actually is.
   const band = Math.max(2, Math.min(6, Math.round(Math.min(w, h) * 0.02)))
   const buckets = new Map<number, { r: number; g: number; b: number; n: number }>()
   let opaqueBorder = 0
@@ -154,7 +149,6 @@ export async function removeWhiteBackground(dataUrl: string, tolerance = 28): Pr
     if (px[idx + 3] < 10) return
     opaqueBorder++
     const r = px[idx], g = px[idx + 1], b = px[idx + 2]
-    if (isLightNeutral(r, g, b)) return // light neutrals handled by rule #1
     const key = ((r >> 4) << 8) | ((g >> 4) << 4) | (b >> 4)
     const e = buckets.get(key)
     if (e) { e.r += r; e.g += g; e.b += b; e.n++ }
@@ -166,23 +160,28 @@ export async function removeWhiteBackground(dataUrl: string, tolerance = 28): Pr
   // Border fully transparent → already cut out, leave untouched.
   if (opaqueBorder === 0) return dataUrl
 
-  const bucketList = Array.from(buckets.values())
-  // Keep dominant non-neutral border colors (≥10% of opaque border) as a palette.
-  const palette = bucketList
-    .filter(e => e.n / opaqueBorder >= 0.10)
-    .sort((a, b) => b.n - a.n)
-    .slice(0, 3)
-    .map(e => ({ r: Math.round(e.r / e.n), g: Math.round(e.g / e.n), b: Math.round(e.b / e.n) }))
+  // Dominant border color = average of the largest bucket.
+  const bucketList = Array.from(buckets.values()).sort((a, b) => b.n - a.n)
+  const top = bucketList[0]
+  const bg = { r: Math.round(top.r / top.n), g: Math.round(top.g / top.n), b: Math.round(top.b / top.n) }
 
-  const isBg = (idx: number) => {
-    if (px[idx + 3] <= 10) return false
-    const r = px[idx], g = px[idx + 1], b = px[idx + 2]
-    if (isLightNeutral(r, g, b)) return true
-    for (const c of palette) {
-      if (Math.abs(r - c.r) <= tolerance && Math.abs(g - c.g) <= tolerance && Math.abs(b - c.b) <= tolerance) return true
-    }
-    return false
+  const within = (r: number, g: number, b: number) =>
+    Math.abs(r - bg.r) <= tolerance && Math.abs(g - bg.g) <= tolerance && Math.abs(b - bg.b) <= tolerance
+
+  // Uniformity check: what fraction of opaque border pixels match the dominant
+  // color? A solid background is ~1.0; a checkerboard/photo border is much lower.
+  // If the border isn't uniform, bail — leave the image for the AI button.
+  let matching = 0
+  const scan = (x: number, y: number) => {
+    const idx = (y * w + x) * 4
+    if (px[idx + 3] < 10) return
+    if (within(px[idx], px[idx + 1], px[idx + 2])) matching++
   }
+  for (let y = 0; y < h; y++) for (let d = 0; d < band; d++) { scan(d, y); scan(w - 1 - d, y) }
+  for (let x = 0; x < w; x++) for (let d = 0; d < band; d++) { scan(x, d); scan(x, h - 1 - d) }
+  if (matching / opaqueBorder < 0.85) return dataUrl // non-uniform → AI handles it
+
+  const isBg = (idx: number) => px[idx + 3] > 10 && within(px[idx], px[idx + 1], px[idx + 2])
 
   // ── BFS flood fill from all border pixels ──────────────────────────────────
   const visited = new Uint8Array(w * h)
