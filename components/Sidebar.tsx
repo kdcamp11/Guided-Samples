@@ -117,7 +117,7 @@ export default function Sidebar({ section, onSectionChange, mobileOpen, onMobile
         <NavItem icon={<LayoutDashboard size={14}/>} label="Dashboard" active={section === 'dashboard'} onClick={() => onSectionChange('dashboard')} collapsed={collapsed} />
         <NavItem icon={<FolderOpen size={14}/>} label="Projects" active={section === 'projects'} onClick={() => onSectionChange('projects')} collapsed={collapsed} />
         <NavItem icon={<Ruler size={14}/>} label="Size Guide" active={section === 'sizeguide'} onClick={() => onSectionChange('sizeguide')} collapsed={collapsed} />
-        <NavItem icon={<ShoppingCart size={14}/>} label="Orders" active={section === 'orders'} href="/track" collapsed={collapsed} />
+        <NavItem icon={<ShoppingCart size={14}/>} label="Orders" active={section === 'orders'} onClick={() => onSectionChange('orders')} collapsed={collapsed} />
         <NavItem icon={<Library size={14}/>} label="Library" active={section === 'library'} onClick={() => onSectionChange('library')} collapsed={collapsed} />
         <NavItem icon={<Settings size={14}/>} label="Settings" active={section === 'settings'} onClick={() => onSectionChange('settings')} collapsed={collapsed} />
 

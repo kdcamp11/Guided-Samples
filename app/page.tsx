@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { AuthProvider, useAuth } from '@/lib/auth'
 import { saveProject, saveTechPack, loadProject } from '@/lib/projects'
 import type { ProjectDetail } from '@/lib/projects'
@@ -79,6 +79,15 @@ const EMPTY_STATE: AppState = {
 function App() {
   const { user, loading } = useAuth()
   const { refreshCredits } = useAICredits()
+
+  // Redirect to landing whenever the user signs out (transitions from logged-in → null).
+  useEffect(() => {
+    if (!loading && prevUserRef.current && !user) {
+      setView('landing')
+      setSection('dashboard')
+    }
+    prevUserRef.current = user
+  }, [user, loading])
   // Allow deep-linking straight to the studio dashboard (e.g. the "home" link
   // from the /track orders page) via /?view=studio.
   const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null
@@ -89,6 +98,8 @@ function App() {
     window.history.replaceState({}, '', window.location.pathname + '?view=studio')
   }
   const [view, setView] = useState<'landing' | 'studio' | 'creative-direction'>(initialView)
+  // Track previous user to detect sign-out
+  const prevUserRef = useRef<{ id: string } | null>(null)
   const prevViewRef = useRef<'landing' | 'studio'>('landing')
   const [state, setState] = useState<AppState>(EMPTY_STATE)
   const [section, setSection] = useState(initialView === 'studio' ? 'dashboard' : 'design')
