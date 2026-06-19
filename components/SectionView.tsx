@@ -77,11 +77,23 @@ function Header({ icon, title, subtitle }: { icon: React.ReactNode; title: strin
 }
 
 function Dashboard({ state, onStartDesign }: { state: AppState; onStartDesign: () => void }) {
+  const { user } = useAuth()
+  const [counts, setCounts] = useState({ logos: 0, artworks: 0, garments: 0, previews: 0 })
+  const [countsLoaded, setCountsLoaded] = useState(false)
+
+  useEffect(() => {
+    if (!user) return
+    listAllUserAssets(user.id).then(a => {
+      setCounts({ logos: a.logos.length, artworks: a.artworks.length, garments: a.garments.length, previews: a.previews.length })
+      setCountsLoaded(true)
+    })
+  }, [user])
+
   const stats = [
-    { label: 'Logos Created', value: state.logo ? 1 : 0 },
-    { label: 'Garments', value: state.garment ? 1 : 0 },
-    { label: 'Designs', value: state.design ? 1 : 0 },
-    { label: 'Previews', value: state.preview ? 1 : 0 },
+    { label: 'Logos', value: counts.logos },
+    { label: 'Garments', value: counts.garments },
+    { label: 'Artwork', value: counts.artworks },
+    { label: 'Previews', value: counts.previews },
   ]
   return (
     <div className="p-4 md:p-6 max-w-[1100px] mx-auto">
@@ -89,7 +101,7 @@ function Dashboard({ state, onStartDesign }: { state: AppState; onStartDesign: (
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
         {stats.map(s => (
           <div key={s.label} className="card">
-            <p className="text-3xl font-bold text-gray-900">{s.value}</p>
+            <p className="text-3xl font-bold text-gray-900">{countsLoaded ? s.value : '—'}</p>
             <p className="text-xs text-gray-500 mt-1">{s.label}</p>
           </div>
         ))}

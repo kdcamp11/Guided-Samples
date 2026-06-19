@@ -316,37 +316,39 @@ function App() {
             {saveToast === 'saving' ? 'Saving…' : saveToast === 'saved' ? 'Project saved' : 'Save failed'}
           </div>
         )}
-        <header className="lg:hidden flex items-center gap-3 px-4 py-3 bg-white border-b border-slate-200 shrink-0">
-          <button onClick={() => setSidebarOpen(true)} className="p-2 rounded-lg hover:bg-slate-100 text-gray-600">
+        <header className="lg:hidden flex items-center gap-3 px-4 py-3 bg-grace-ink shrink-0">
+          <button onClick={() => setSidebarOpen(true)} className="p-2 rounded-lg hover:bg-white/10 text-white/70">
             <Menu size={20}/>
           </button>
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 bg-grace-ink rounded-md flex items-center justify-center text-xs font-bold text-white">G</div>
-            <span className="text-sm font-bold text-gray-900">GRACE</span>
+            <div className="w-6 h-6 bg-white/10 rounded-md flex items-center justify-center text-xs font-bold text-white">G</div>
+            <span className="text-sm font-bold text-white">GRACE</span>
           </div>
           {saveToast !== 'idle' && (
-            <span className={`ml-auto flex items-center gap-1 text-xs font-medium ${
-              saveToast === 'saving' ? 'text-gray-400' : saveToast === 'saved' ? 'text-brand-green' : 'text-red-500'
+            <span className={`flex items-center gap-1 text-xs font-medium ${
+              saveToast === 'saving' ? 'text-white/50' : saveToast === 'saved' ? 'text-brand-green' : 'text-red-300'
             }`}>
               {saveToast === 'saving' && <Loader2 size={11} className="animate-spin"/>}
               {saveToast === 'saved'  && <Check size={11}/>}
               {saveToast === 'error'  && <AlertCircle size={11}/>}
-              {saveToast === 'saving' ? 'Saving…' : saveToast === 'saved' ? 'Saved' : 'Save failed'}
+              {saveToast === 'saving' ? 'Saving…' : saveToast === 'saved' ? 'Saved' : 'Failed'}
             </span>
           )}
-          <button
-            onClick={() => { setSection('settings'); setSidebarOpen(false) }}
-            className={`${saveToast !== 'idle' ? '' : 'ml-auto'} flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 hover:border-brand-green transition-colors`}
-            title="Manage AI credits"
-          >
-            <Sparkles size={12} className="text-brand-green"/>
-            <span className={`text-xs font-bold ${generationsLeft > 0 ? 'text-gray-700' : 'text-red-500'}`}>{generationsLeft}</span>
-          </button>
-          {user && (
-            <button onClick={() => setView('projects')} className="text-xs text-gray-400 hover:text-grace-ink transition-colors">
-              My Projects
+          <div className="ml-auto flex items-center gap-3">
+            <button
+              onClick={() => { setSection('settings'); setSidebarOpen(false) }}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-white/20 hover:border-brand-green transition-colors"
+              title="Manage AI credits"
+            >
+              <Sparkles size={12} className="text-brand-green"/>
+              <span className={`text-xs font-bold ${generationsLeft > 0 ? 'text-white' : 'text-red-300'}`}>{generationsLeft}</span>
             </button>
-          )}
+            {user && (
+              <button onClick={() => setView('projects')} className="text-xs text-white/60 hover:text-white transition-colors">
+                My Projects
+              </button>
+            )}
+          </div>
         </header>
 
         <main className="flex-1 overflow-y-auto">

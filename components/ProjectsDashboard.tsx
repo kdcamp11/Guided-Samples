@@ -18,8 +18,6 @@ interface Props {
   onBack: () => void
 }
 
-// Lightweight in-app confirm so destructive actions use the GRACE UI instead of
-// the browser-native confirm() dialog ("www.graceofficial.app says…").
 type ConfirmState = {
   title: string
   body?: string
@@ -27,6 +25,9 @@ type ConfirmState = {
   danger?: boolean
   onConfirm: () => void
 } | null
+
+// Folder ID or null for "All Projects"
+type FolderTarget = string | null
 
 export default function ProjectsDashboard({ onNewProject, onOpenProject, onBack }: Props) {
   const { user, signOut } = useAuth()
@@ -37,12 +38,14 @@ export default function ProjectsDashboard({ onNewProject, onOpenProject, onBack 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
 
-  // Folder view: null = "All Projects"
-  const [activeFolder, setActiveFolder] = useState<string | null>(null)
+  const [activeFolder, setActiveFolder] = useState<FolderTarget>(null)
   const [editingFolderId, setEditingFolderId] = useState<string | null>(null)
   const [editFolderName, setEditFolderName] = useState('')
   const [creatingFolder, setCreatingFolder] = useState(false)
   const [newFolderName, setNewFolderName] = useState('')
+
+  // Drag-and-drop
+  const [dragOverFolder, setDragOverFolder] = useState<FolderTarget | 'none'>(null)
 
   // Multi-select
   const [selectMode, setSelectMode] = useState(false)
@@ -60,12 +63,12 @@ export default function ProjectsDashboard({ onNewProject, onOpenProject, onBack 
     })
   }, [user])
 
-  // ── Projects ───────────────────────────────────────────────────────────────
+  // ── Projects ────────────────────────────────────────────────────────────────
   const handleDelete = (id: string, e: React.MouseEvent) => {
     e.stopPropagation()
     setConfirmState({
       title: 'Delete this project?',
-      body: 'This permanently removes the design and its files. This can’t be undone.',
+      body: 'This permanently removes the design and its files.',
       confirmLabel: 'Delete',
       danger: true,
       onConfirm: async () => {
@@ -111,7 +114,7 @@ export default function ProjectsDashboard({ onNewProject, onOpenProject, onBack 
 
   const handleDeleteFolder = (folder: FolderType) => {
     setConfirmState({
-      title: `Delete “${folder.name}”?`,
+      title: `Delete "${folder.name}"?`,
       body: 'The folder is removed but its projects are kept and moved back to All Projects.',
       confirmLabel: 'Delete Folder',
       danger: true,
@@ -125,13 +128,9 @@ export default function ProjectsDashboard({ onNewProject, onOpenProject, onBack 
   }
 
   // ── Multi-select ─────────────────────────────────────────────────────────────
-  const toggleSelect = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation()
-    setSelected(s => {
-      const n = new Set(s)
-      n.has(id) ? n.delete(id) : n.add(id)
-      return n
-    })
+  const selectCard = (id: string) => {
+    if (!selectMode) setSelectMode(true)
+    setSelected(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
   }
 
   const exitSelectMode = () => {
@@ -140,12 +139,15 @@ export default function ProjectsDashboard({ onNewProject, onOpenProject, onBack 
     setMoveOpen(false)
   }
 
-  const handleMove = async (folderId: string | null) => {
-    const ids = Array.from(selected)
+  const moveTo = async (projectIds: string[], folderId: FolderTarget) => {
+    if (projectIds.length === 0) return
+    setProjects(ps => ps.map(p => (projectIds.includes(p.id) ? { ...p, folder_id: folderId } : p)))
+    await moveProjectsToFolder(projectIds, folderId)
+  }
+
+  const handleBulkMove = async (folderId: FolderTarget) => {
     setMoveOpen(false)
-    if (ids.length === 0) return
-    setProjects(ps => ps.map(p => (selected.has(p.id) ? { ...p, folder_id: folderId } : p)))
-    await moveProjectsToFolder(ids, folderId)
+    await moveTo(Array.from(selected), folderId)
     exitSelectMode()
   }
 
@@ -154,7 +156,7 @@ export default function ProjectsDashboard({ onNewProject, onOpenProject, onBack 
     if (ids.length === 0) return
     setConfirmState({
       title: `Delete ${ids.length} project${ids.length > 1 ? 's' : ''}?`,
-      body: 'This permanently removes the selected designs and their files. This can’t be undone.',
+      body: "This permanently removes the selected designs. This can’t be undone.",
       confirmLabel: 'Delete',
       danger: true,
       onConfirm: async () => {
@@ -165,32 +167,51 @@ export default function ProjectsDashboard({ onNewProject, onOpenProject, onBack 
     })
   }
 
+  // ── Drag-and-drop ────────────────────────────────────────────────────────────
+  const handleDragStart = (e: React.DragEvent, projectId: string) => {
+    e.dataTransfer.setData('projectId', projectId)
+    e.dataTransfer.effectAllowed = 'move'
+  }
+
+  const handleFolderDrop = async (e: React.DragEvent, folderId: FolderTarget) => {
+    e.preventDefault()
+    setDragOverFolder(null)
+    const projectId = e.dataTransfer.getData('projectId')
+    if (!projectId) return
+    await moveTo([projectId], folderId)
+  }
+
   // ── Derived ──────────────────────────────────────────────────────────────────
   const inFolder = projects.filter(p => (activeFolder ? p.folder_id === activeFolder : true))
   const filtered = inFolder.filter(p =>
     p.name.toLowerCase().includes(query.trim().toLowerCase()))
-  const folderCount = (id: string | null) =>
+  const folderCount = (id: FolderTarget) =>
     projects.filter(p => (id ? p.folder_id === id : true)).length
+
+  const allFolderItems: { id: FolderTarget; label: string }[] = [
+    { id: null, label: 'All Projects' },
+    ...folders.map(f => ({ id: f.id, label: f.name })),
+  ]
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
+      {/* Header — GRACE black bar */}
+      <header className="bg-grace-ink sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-brand-green flex items-center justify-center">
+            <div className="w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center">
               <span className="text-white text-xs font-bold">G</span>
             </div>
-            <span className="font-semibold text-gray-900 text-sm">GRACE Enterprise</span>
+            <span className="font-semibold text-white text-sm">GRACE Enterprise</span>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-gray-500 hidden sm:block">{user?.name} · {user?.email}</span>
+          <div className="flex items-center gap-4">
+            <span className="text-white/50 text-xs hidden sm:block">{user?.name} · {user?.email}</span>
             <button onClick={signOut}
-              className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-700 transition-colors">
+              className="flex items-center gap-1.5 text-xs text-white/60 hover:text-white transition-colors">
               <LogOut size={13}/> Sign Out
             </button>
             <button onClick={onBack}
-              className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-700 transition-colors">
+              className="flex items-center gap-1.5 text-xs text-white/60 hover:text-white transition-colors">
               <ArrowLeft size={13}/> Back
             </button>
           </div>
@@ -241,87 +262,97 @@ export default function ProjectsDashboard({ onNewProject, onOpenProject, onBack 
           </div>
         ) : (
           <div className="flex gap-6 items-start">
-            {/* Folder rail */}
-            <aside className="w-48 shrink-0 hidden md:block">
-              <p className="px-2 mb-2 text-[10px] font-bold tracking-[0.18em] uppercase text-gray-400">Folders</p>
-              <nav className="space-y-0.5">
-                <FolderItem
-                  label="All Projects"
-                  icon={<FolderOpen size={14}/>}
-                  count={folderCount(null)}
-                  active={activeFolder === null}
-                  onClick={() => setActiveFolder(null)}
-                />
-                {folders.map(f => (
-                  <div key={f.id}>
-                    {editingFolderId === f.id ? (
-                      <div className="flex items-center gap-1 px-2 py-1.5">
-                        <input
-                          autoFocus
-                          value={editFolderName}
-                          onChange={e => setEditFolderName(e.target.value)}
-                          onKeyDown={e => {
-                            if (e.key === 'Enter') commitFolderRename(f.id)
-                            if (e.key === 'Escape') setEditingFolderId(null)
-                          }}
-                          className="input-field text-xs py-1 px-2 min-w-0 flex-1"
-                        />
-                        <button onClick={() => commitFolderRename(f.id)} className="text-brand-green shrink-0">
-                          <Check size={13}/>
-                        </button>
+            {/* Folder rail — desktop sidebar, mobile horizontal chips */}
+            <aside className="shrink-0">
+              {/* Desktop rail */}
+              <div className="w-48 hidden md:block">
+                <p className="px-2 mb-2 text-[10px] font-bold tracking-[0.18em] uppercase text-gray-400">Folders</p>
+                <nav className="space-y-0.5">
+                  {allFolderItems.map(({ id, label }) => {
+                    const folderData = id ? folders.find(f => f.id === id) : null
+                    return (
+                      <div key={id ?? '__all__'}>
+                        {editingFolderId === id ? (
+                          <div className="flex items-center gap-1 px-2 py-1.5">
+                            <input autoFocus value={editFolderName}
+                              onChange={e => setEditFolderName(e.target.value)}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') commitFolderRename(id!)
+                                if (e.key === 'Escape') setEditingFolderId(null)
+                              }}
+                              className="input-field text-xs py-1 px-2 min-w-0 flex-1"/>
+                            <button onClick={() => commitFolderRename(id!)} className="text-brand-green shrink-0">
+                              <Check size={13}/>
+                            </button>
+                          </div>
+                        ) : (
+                          <FolderRailItem
+                            label={label}
+                            icon={id ? <Folder size={14}/> : <FolderOpen size={14}/>}
+                            count={folderCount(id)}
+                            active={activeFolder === id}
+                            isDragOver={dragOverFolder === id}
+                            onClick={() => setActiveFolder(id)}
+                            onRename={folderData ? () => { setEditingFolderId(id); setEditFolderName(label) } : undefined}
+                            onDelete={folderData ? () => handleDeleteFolder(folderData) : undefined}
+                            onDragOver={e => { e.preventDefault(); setDragOverFolder(id) }}
+                            onDragLeave={() => setDragOverFolder(null)}
+                            onDrop={e => handleFolderDrop(e, id)}
+                          />
+                        )}
                       </div>
-                    ) : (
-                      <FolderItem
-                        label={f.name}
-                        icon={<Folder size={14}/>}
-                        count={folderCount(f.id)}
-                        active={activeFolder === f.id}
-                        onClick={() => setActiveFolder(f.id)}
-                        onRename={() => { setEditingFolderId(f.id); setEditFolderName(f.name) }}
-                        onDelete={() => handleDeleteFolder(f)}
-                      />
-                    )}
-                  </div>
-                ))}
-              </nav>
+                    )
+                  })}
+                </nav>
 
-              {creatingFolder ? (
-                <div className="flex items-center gap-1 mt-2 px-2">
-                  <input
-                    autoFocus
-                    value={newFolderName}
-                    onChange={e => setNewFolderName(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') handleCreateFolder()
-                      if (e.key === 'Escape') { setCreatingFolder(false); setNewFolderName('') }
-                    }}
-                    placeholder="Folder name"
-                    className="input-field text-xs py-1 px-2 min-w-0 flex-1"
-                  />
-                  <button onClick={handleCreateFolder} className="text-brand-green shrink-0">
-                    <Check size={13}/>
+                {creatingFolder ? (
+                  <div className="flex items-center gap-1 mt-2 px-2">
+                    <input autoFocus value={newFolderName}
+                      onChange={e => setNewFolderName(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') handleCreateFolder()
+                        if (e.key === 'Escape') { setCreatingFolder(false); setNewFolderName('') }
+                      }}
+                      placeholder="Folder name"
+                      className="input-field text-xs py-1 px-2 min-w-0 flex-1"/>
+                    <button onClick={handleCreateFolder} className="text-brand-green shrink-0"><Check size={13}/></button>
+                  </div>
+                ) : (
+                  <button onClick={() => setCreatingFolder(true)}
+                    className="mt-2 w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-gray-400 hover:text-brand-green hover:bg-brand-green/5 transition-colors">
+                    <FolderPlus size={14}/> New Folder
                   </button>
-                </div>
-              ) : (
+                )}
+              </div>
+
+              {/* Mobile chips */}
+              <div className="md:hidden flex gap-2 mb-4 overflow-x-auto pb-1">
+                {allFolderItems.map(({ id, label }) => (
+                  <button key={id ?? '__all__'}
+                    onClick={() => setActiveFolder(id)}
+                    className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                      activeFolder === id
+                        ? 'bg-grace-ink text-white'
+                        : 'bg-white border border-slate-200 text-gray-600 hover:border-grace-ink'
+                    }`}>
+                    {id ? <Folder size={12}/> : <FolderOpen size={12}/>}
+                    {label}
+                    <span className="text-[10px] opacity-60">{folderCount(id)}</span>
+                  </button>
+                ))}
                 <button onClick={() => setCreatingFolder(true)}
-                  className="mt-2 w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-gray-400 hover:text-brand-green hover:bg-brand-green/5 transition-colors">
-                  <FolderPlus size={14}/> New Folder
+                  className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs border border-dashed border-slate-300 text-gray-400 hover:text-brand-green hover:border-brand-green transition-colors">
+                  <FolderPlus size={12}/> New Folder
                 </button>
-              )}
+              </div>
             </aside>
 
-            {/* Main column */}
+            {/* Main grid */}
             <div className="flex-1 min-w-0">
-              {/* Search */}
               <div className="relative mb-6 max-w-sm">
                 <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/>
-                <input
-                  type="text"
-                  value={query}
-                  onChange={e => setQuery(e.target.value)}
-                  placeholder="Search projects by name…"
-                  className="input-field w-full pl-9"
-                />
+                <input type="text" value={query} onChange={e => setQuery(e.target.value)}
+                  placeholder="Search projects by name…" className="input-field w-full pl-9"/>
                 {query && (
                   <button onClick={() => setQuery('')}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-600">
@@ -331,7 +362,6 @@ export default function ProjectsDashboard({ onNewProject, onOpenProject, onBack 
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {/* New project card — hidden in select mode to keep the grid clean */}
                 {!selectMode && (
                   <button onClick={onNewProject}
                     className="card border-dashed border-2 border-slate-200 hover:border-brand-green flex flex-col items-center justify-center py-10 gap-3 text-gray-400 hover:text-brand-green transition-colors group">
@@ -344,7 +374,7 @@ export default function ProjectsDashboard({ onNewProject, onOpenProject, onBack 
 
                 {filtered.length === 0 && (
                   <div className="col-span-full text-center py-12 text-sm text-gray-400">
-                    {query ? `No projects match “${query}”.` : 'No projects in this folder yet.'}
+                    {query ? `No projects match "${query}".` : 'No projects in this folder yet.'}
                   </div>
                 )}
 
@@ -352,22 +382,29 @@ export default function ProjectsDashboard({ onNewProject, onOpenProject, onBack 
                   const isSelected = selected.has(project.id)
                   return (
                     <div key={project.id}
-                      onClick={() => selectMode ? toggleSelect(project.id, { stopPropagation() {} } as React.MouseEvent) : onOpenProject(project.id)}
-                      className={`card cursor-pointer transition-colors group relative overflow-hidden ${
+                      draggable={!selectMode}
+                      onDragStart={e => handleDragStart(e, project.id)}
+                      onClick={() => {
+                        if (selectMode) selectCard(project.id)
+                        else onOpenProject(project.id)
+                      }}
+                      className={`card cursor-pointer transition-colors group relative overflow-hidden select-none ${
                         isSelected ? 'border-brand-green ring-2 ring-brand-green/30' : 'hover:border-brand-green/30'
                       }`}>
-                      {/* Selection checkbox */}
-                      {selectMode && (
-                        <button onClick={e => toggleSelect(project.id, e)}
-                          className="absolute top-2 left-2 z-10 text-brand-green bg-white/90 rounded">
-                          {isSelected ? <CheckSquare size={20}/> : <Square size={20} className="text-gray-300"/>}
-                        </button>
-                      )}
+
+                      {/* Hover / select checkbox — always visible on hover; in select mode always shown */}
+                      <div
+                        className={`absolute top-2 left-2 z-10 transition-opacity ${selectMode || isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                        onClick={e => { e.stopPropagation(); selectCard(project.id) }}>
+                        {isSelected
+                          ? <CheckSquare size={20} className="text-brand-green bg-white rounded shadow-sm"/>
+                          : <Square size={20} className="text-gray-300 bg-white/90 rounded shadow-sm"/>}
+                      </div>
+
                       {/* Thumbnail */}
                       <div className="bg-slate-50 rounded-lg mb-3 flex items-center justify-center overflow-hidden" style={{ height: 140 }}>
                         {project.thumbnail_url ? (
-                          <img src={project.thumbnail_url} alt={project.name}
-                            className="w-full h-full object-contain p-3"/>
+                          <img src={project.thumbnail_url} alt={project.name} className="w-full h-full object-contain p-3"/>
                         ) : (
                           <div className="flex flex-col items-center gap-2 text-gray-300">
                             <FolderOpen size={28}/>
@@ -380,24 +417,14 @@ export default function ProjectsDashboard({ onNewProject, onOpenProject, onBack 
                         <div className="min-w-0 flex-1">
                           {editingId === project.id ? (
                             <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
-                              <input
-                                autoFocus
-                                value={editName}
-                                onChange={e => setEditName(e.target.value)}
+                              <input autoFocus value={editName} onChange={e => setEditName(e.target.value)}
                                 onKeyDown={e => {
                                   if (e.key === 'Enter') commitRename(project.id)
                                   if (e.key === 'Escape') setEditingId(null)
                                 }}
-                                className="input-field text-sm py-1 px-2 min-w-0 flex-1"
-                              />
-                              <button onClick={e => commitRename(project.id, e)}
-                                className="text-brand-green hover:text-brand-green/70 shrink-0">
-                                <Check size={14}/>
-                              </button>
-                              <button onClick={e => { e.stopPropagation(); setEditingId(null) }}
-                                className="text-gray-300 hover:text-gray-600 shrink-0">
-                                <X size={14}/>
-                              </button>
+                                className="input-field text-sm py-1 px-2 min-w-0 flex-1"/>
+                              <button onClick={e => commitRename(project.id, e)} className="text-brand-green shrink-0"><Check size={14}/></button>
+                              <button onClick={e => { e.stopPropagation(); setEditingId(null) }} className="text-gray-300 hover:text-gray-600 shrink-0"><X size={14}/></button>
                             </div>
                           ) : (
                             <p className="text-sm font-semibold text-gray-900 truncate">{project.name}</p>
@@ -420,10 +447,8 @@ export default function ProjectsDashboard({ onNewProject, onOpenProject, onBack 
                         )}
                       </div>
 
-                      {/* Phase progress bar */}
                       <div className="mt-3 h-1 bg-slate-100 rounded-full overflow-hidden">
-                        <div className="h-full bg-brand-green rounded-full transition-all"
-                          style={{ width: `${(project.phase_reached / 6) * 100}%` }}/>
+                        <div className="h-full bg-brand-green rounded-full" style={{ width: `${(project.phase_reached / 6) * 100}%` }}/>
                       </div>
                       <p className="text-[10px] text-gray-400 mt-1">{project.phase_reached}/6 phases complete</p>
                     </div>
@@ -447,13 +472,13 @@ export default function ProjectsDashboard({ onNewProject, onOpenProject, onBack 
             </button>
             {moveOpen && (
               <div className="absolute bottom-full mb-2 left-0 w-52 bg-white text-gray-700 rounded-xl shadow-xl border border-slate-200 py-1 max-h-64 overflow-y-auto">
-                <button onClick={() => handleMove(null)}
+                <button onClick={() => handleBulkMove(null)}
                   className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50 text-left">
                   <FolderOpen size={14}/> All Projects (top level)
                 </button>
                 {folders.length > 0 && <div className="my-1 border-t border-slate-100"/>}
                 {folders.map(f => (
-                  <button key={f.id} onClick={() => handleMove(f.id)}
+                  <button key={f.id} onClick={() => handleBulkMove(f.id)}
                     className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50 text-left truncate">
                     <Folder size={14}/> {f.name}
                   </button>
@@ -495,19 +520,31 @@ export default function ProjectsDashboard({ onNewProject, onOpenProject, onBack 
   )
 }
 
-function FolderItem({ label, icon, count, active, onClick, onRename, onDelete }: {
+function FolderRailItem({ label, icon, count, active, isDragOver, onClick, onRename, onDelete, onDragOver, onDragLeave, onDrop }: {
   label: string
   icon: React.ReactNode
   count: number
   active: boolean
+  isDragOver: boolean
   onClick: () => void
   onRename?: () => void
   onDelete?: () => void
+  onDragOver: (e: React.DragEvent) => void
+  onDragLeave: () => void
+  onDrop: (e: React.DragEvent) => void
 }) {
   return (
-    <div className={`group flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm transition-colors cursor-pointer ${
-      active ? 'bg-grace-mist text-grace-ink font-semibold' : 'text-gray-500 hover:bg-grace-mist hover:text-grace-ink'
-    }`} onClick={onClick}>
+    <div
+      className={`group flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm transition-all cursor-pointer ${
+        isDragOver ? 'bg-brand-green/10 border border-brand-green/40 border-dashed' :
+        active ? 'bg-grace-mist text-grace-ink font-semibold' :
+        'text-gray-500 hover:bg-grace-mist hover:text-grace-ink'
+      }`}
+      onClick={onClick}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+    >
       <span className="shrink-0 text-gray-400">{icon}</span>
       <span className="flex-1 truncate">{label}</span>
       <span className="text-[10px] text-gray-400 shrink-0 group-hover:hidden">{count}</span>

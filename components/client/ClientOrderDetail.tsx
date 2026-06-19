@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { ArrowLeft, RefreshCw, Loader2, Truck, Package, ChevronDown, ChevronUp } from 'lucide-react'
+import { ArrowLeft, RefreshCw, Loader2, Truck, Package, ChevronDown, ChevronUp, History } from 'lucide-react'
 import { useAuth } from '@/lib/auth'
 import type { ProductionStage } from '@/types/productionStages'
 import { getClientOrder, getOrderMediaForClient, getStageHistory } from '@/lib/clientPortal'
@@ -182,6 +182,30 @@ function OrderDetailsCollapsible({ order }: { order: ProductionOrder }) {
   )
 }
 
+// ─── Collapsible media history ────────────────────────────────────────────────
+
+function MediaHistoryCollapsible({ media }: { media: import('@/types/supplier').OrderMedia[] }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="card">
+      <button onClick={() => setOpen(o => !o)} className="w-full flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <History size={13} className="text-gray-400"/>
+          <p className="text-xs font-semibold text-gray-700">Production Media History</p>
+          <span className="px-1.5 py-0.5 rounded-full bg-slate-100 text-[10px] text-gray-500">{media.length}</span>
+        </div>
+        {open ? <ChevronUp size={13} className="text-gray-400"/> : <ChevronDown size={13} className="text-gray-400"/>}
+      </button>
+      {open && (
+        <div className="mt-3 pt-3 border-t border-slate-100">
+          <p className="text-[10px] text-gray-400 mb-3">All media from previous stages, including rejected and approved submissions.</p>
+          <MediaGallery media={media} />
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function ClientOrderDetail({ orderId, onBack }: Props) {
@@ -252,27 +276,28 @@ export default function ClientOrderDetail({ orderId, onBack }: Props) {
     order.shipped_at
   )
 
-  // Show media only when it's relevant (after first piece is done)
-  const showMedia = media.length > 0 && stage !== 'PRODUCTION_FILES_RECEIVED'
+  // Current stage's media (shown prominently); historical media from earlier stages.
+  const currentStageMedia = media.filter(m => m.stage === stage)
+  const historicalMedia   = media.filter(m => m.stage !== stage)
 
   return (
     <div className="min-h-screen bg-gray-50">
       <StageToastContainer toasts={toasts} onDismiss={dismiss} />
 
       {/* Sticky header */}
-      <header className="sticky top-0 z-10 bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between">
+      <header className="sticky top-0 z-10 bg-grace-ink px-5 py-3 flex items-center justify-between">
         <button
           onClick={onBack}
-          className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-900 transition-colors"
+          className="flex items-center gap-1.5 text-xs text-white/60 hover:text-white transition-colors"
         >
           <ArrowLeft size={13} /> All Orders
         </button>
-        <p className="text-xs font-semibold text-gray-700 absolute left-1/2 -translate-x-1/2">
+        <p className="text-xs font-semibold text-white absolute left-1/2 -translate-x-1/2">
           {si?.styleName ?? 'Order'}
         </p>
         <button
           onClick={load}
-          className="p-1.5 rounded-lg hover:bg-slate-100 text-gray-400 hover:text-gray-700 transition-colors"
+          className="p-1.5 rounded-lg hover:bg-white/10 text-white/50 hover:text-white transition-colors"
         >
           <RefreshCw size={13} />
         </button>
@@ -350,14 +375,19 @@ export default function ClientOrderDetail({ orderId, onBack }: Props) {
             {/* Tracking (surface prominently when available) */}
             {showTracking && <TrackingCard order={order} />}
 
-            {/* Production photos — only when visible to client */}
-            {showMedia && (
+            {/* Current-stage production photos */}
+            {currentStageMedia.length > 0 && (
               <div>
                 <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-2 px-0.5">
                   Production Photos
                 </p>
-                <MediaGallery media={media} />
+                <MediaGallery media={currentStageMedia} />
               </div>
+            )}
+
+            {/* Historical media — collapsible, grouped by stage */}
+            {historicalMedia.length > 0 && (
+              <MediaHistoryCollapsible media={historicalMedia} />
             )}
 
             {/* Order details — collapsed by default to reduce noise */}
