@@ -38,12 +38,82 @@ export async function cleanBackgroundRemote(dataUrl: string): Promise<string> {
   }
 }
 
+// Load a data URL into an HTMLImageElement.
+function loadImage(dataUrl: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const i = new Image()
+    i.onload = () => resolve(i)
+    i.onerror = reject
+    i.src = dataUrl
+  })
+}
+
+// Crop fully-transparent margins so the logo content fills its bounding box.
+// Fixes uploads/cutouts that carry large empty padding, which otherwise makes
+// the artwork appear tiny and off-center inside its placement box.
+export async function trimTransparent(dataUrl: string, alphaThreshold = 10): Promise<string> {
+  try {
+    const img = await loadImage(dataUrl)
+    const canvas = document.createElement('canvas')
+    canvas.width = img.width
+    canvas.height = img.height
+    const ctx = canvas.getContext('2d', { willReadFrequently: true })
+    if (!ctx) return dataUrl
+    ctx.drawImage(img, 0, 0)
+
+    const { width: w, height: h } = canvas
+    const px = ctx.getImageData(0, 0, w, h).data
+
+    let minX = w, minY = h, maxX = -1, maxY = -1
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        if (px[(y * w + x) * 4 + 3] > alphaThreshold) {
+          if (x < minX) minX = x
+          if (x > maxX) maxX = x
+          if (y < minY) minY = y
+          if (y > maxY) maxY = y
+        }
+      }
+    }
+
+    if (maxX < minX) return dataUrl // fully transparent — nothing to trim
+    const tw = maxX - minX + 1
+    const th = maxY - minY + 1
+    if (tw === w && th === h) return dataUrl // already tight
+
+    const out = document.createElement('canvas')
+    out.width = tw
+    out.height = th
+    const octx = out.getContext('2d')
+    if (!octx) return dataUrl
+    octx.drawImage(img, minX, minY, tw, th, 0, 0, tw, th)
+    return out.toDataURL('image/png')
+  } catch {
+    return dataUrl
+  }
+}
+
+// Full client-side cleanup used by the "Remove Background" action and on upload:
+// flood-fills the outer solid background to transparency (preserving interior
+// outline strokes), then trims the empty margins. Deterministic and dependency
+// free — no external API required.
+export async function removeBackgroundClean(dataUrl: string): Promise<string> {
+  let out = dataUrl
+  try { out = await removeWhiteBackground(out) } catch {}
+  try { out = await trimTransparent(out) } catch {}
+  return out
+}
+
 // Remove a solid-color background from a logo image.
 // Averages all four corners to detect the background color, then BFS flood-fills
 // from the image borders — only the outer connected background region becomes
 // transparent. Interior pixels of the same color are preserved because they
 // aren't reachable from the border.
-export async function removeWhiteBackground(dataUrl: string, tolerance = 40): Promise<string> {
+//
+// Tolerance lowered to 30 (was 40) to avoid blending into thin outline strokes.
+// If all 4 corners are already transparent, the image has no solid background —
+// skip flood-fill entirely so border strokes are never accidentally removed.
+export async function removeWhiteBackground(dataUrl: string, tolerance = 30): Promise<string> {
   const img = await new Promise<HTMLImageElement>((resolve, reject) => {
     const i = new Image()
     i.onload = () => resolve(i)
@@ -72,7 +142,9 @@ export async function removeWhiteBackground(dataUrl: string, tolerance = 40): Pr
     rSum += px[idx]; gSum += px[idx + 1]; bSum += px[idx + 2]
     count++
   }
-  if (count === 0) return dataUrl // all corners transparent — nothing to remove
+  // All corners already transparent — image has no solid background to remove.
+  // Skip flood-fill entirely; just return as-is so trimTransparent can crop it.
+  if (count === 0) return dataUrl
   const bg = { r: Math.round(rSum / count), g: Math.round(gSum / count), b: Math.round(bSum / count) }
 
   const isBg = (idx: number) =>

@@ -9,7 +9,7 @@ import {
 import { AppState } from '@/app/page'
 import { streamGenerate } from '@/lib/streamGenerate'
 import { cacheGet, cacheSet, cacheKey } from '@/lib/generateCache'
-import { removeWhiteBackground, cleanupBackground } from '@/lib/removeWhiteBg'
+import { removeWhiteBackground, removeBackgroundClean } from '@/lib/removeWhiteBg'
 import { fileToDataUrl } from '@/lib/fileToDataUrl'
 import { downloadDataUrl, downloadAssetsZip } from '@/lib/downloadAssets'
 import GarmentAssetPanel from './GarmentAssetPanel'
@@ -593,7 +593,7 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onLogoUp
     for (const file of files) {
       try {
         let dataUrl = await fileToDataUrl(file)
-        try { dataUrl = await cleanupBackground(dataUrl) } catch {}
+        try { dataUrl = await removeBackgroundClean(dataUrl) } catch {}
         setArtworkGallery(g => g.includes(dataUrl) ? g : [...g, dataUrl])
       } catch (err) { console.error('Artwork upload failed', err) }
     }
@@ -665,6 +665,23 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onLogoUp
       window.removeEventListener('touchend', handlePointerUp)
     }
   }, [handlePointerMove, handlePointerUp])
+
+  // Delete/Backspace key removes the selected layer (skip when typing in an input)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Delete' && e.key !== 'Backspace') return
+      const tag = (e.target as HTMLElement)?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return
+      if (!selectedId) return
+      e.preventDefault()
+      snapshot()
+      setLayers(ls => ls.filter(l => l.id !== selectedId))
+      setSelectedId(null)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId])
 
   const startResize = (e: React.MouseEvent | React.TouchEvent, layer: LogoLayer, cursor: string) => {
     e.stopPropagation()
@@ -754,7 +771,7 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onLogoUp
     e.target.value = ''
     try {
       let dataUrl = await fileToDataUrl(file)
-      try { dataUrl = await removeWhiteBackground(dataUrl) } catch {}
+      try { dataUrl = await removeBackgroundClean(dataUrl) } catch {}
       const id = crypto.randomUUID()
       snapshot()
       setLayers(ls => [...ls, { id, type: 'image', dataUrl, x: 60, y: 80, width: 160, height: 80, rotation: 0 }])

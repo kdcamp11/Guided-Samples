@@ -4,7 +4,7 @@ import { Loader2, Sparkles, Upload, X, ImagePlus, RefreshCw, ArrowRight, Wand2 }
 import { AppState } from '@/app/page'
 import { streamGenerate, PaywallError } from '@/lib/streamGenerate'
 import { cacheGet, cacheSet, cacheKey } from '@/lib/generateCache'
-import { removeWhiteBackground, cleanupBackground, cleanBackgroundRemote } from '@/lib/removeWhiteBg'
+import { removeBackgroundClean } from '@/lib/removeWhiteBg'
 import { fileToDataUrl } from '@/lib/fileToDataUrl'
 import { useAICredits } from '@/lib/aiCreditsContext'
 import GenerationCounter from '@/components/GenerationCounter'
@@ -35,13 +35,11 @@ export default function LogoAssetPanel({ state, onLogoUpdate }: Props) {
   const [referenceImage, setReferenceImage] = useState<string | null>(null)
   const [cleaning, setCleaning] = useState(false)
 
-  // Opt-in deeper background removal via the server-side Replicate pipeline.
-  // Only runs when the user clicks — preserves the as-uploaded image otherwise.
   const handleCleanBackground = async () => {
     if (!state.logo || cleaning) return
     setCleaning(true)
     try {
-      const cleaned = await cleanBackgroundRemote(state.logo.dataUrl)
+      const cleaned = await removeBackgroundClean(state.logo.dataUrl)
       onLogoUpdate({ ...state.logo, dataUrl: cleaned })
     } finally {
       setCleaning(false)
@@ -97,7 +95,7 @@ export default function LogoAssetPanel({ state, onLogoUpdate }: Props) {
 
   const applyLogo = async (image: string, svg: string, style: string, color: string) => {
     let dataUrl = image
-    try { dataUrl = await removeWhiteBackground(image) } catch {}
+    try { dataUrl = await removeBackgroundClean(image) } catch {}
     const logo = { svg, dataUrl, style, color }
     onLogoUpdate(logo)
   }
@@ -114,7 +112,7 @@ export default function LogoAssetPanel({ state, onLogoUpdate }: Props) {
     e.target.value = ''
     try {
       let dataUrl = await fileToDataUrl(file)
-      try { dataUrl = await cleanupBackground(dataUrl) } catch {}
+      try { dataUrl = await removeBackgroundClean(dataUrl) } catch {}
       const logo = { svg: '', dataUrl, style: 'Uploaded', color: '#0A0A0A' }
       onLogoUpdate(logo)
     } catch (err) {
