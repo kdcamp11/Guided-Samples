@@ -10,6 +10,7 @@ export type Project = {
   updated_at: string
   thumbnail_url?: string | null
   folder_id?: string | null
+  is_archived?: boolean
 }
 
 export type Folder = {
@@ -189,7 +190,7 @@ export async function listProjects(userId: string): Promise<Project[]> {
   if (!supabase) return []
   const { data, error } = await supabase
     .from('projects')
-    .select('id, user_id, name, phase_reached, created_at, updated_at, thumbnail_url, folder_id')
+    .select('id, user_id, name, phase_reached, created_at, updated_at, thumbnail_url, folder_id, is_archived')
     .eq('user_id', userId)
     .order('updated_at', { ascending: false })
   if (error) { console.error(error); return [] }
@@ -368,6 +369,12 @@ export async function listAllUserAssets(userId: string): Promise<{
   ])
 
   return { logos, artworks, garments, previews }
+}
+
+export async function archiveProject(projectId: string, archived: boolean): Promise<void> {
+  const supabase = createClient()
+  if (!supabase) return
+  await supabase.from('projects').update({ is_archived: archived }).eq('id', projectId)
 }
 
 export async function deleteProject(projectId: string): Promise<{ error: string | null }> {

@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '@/lib/auth'
 import {
-  listProjects, deleteProject, renameProject,
+  listProjects, deleteProject, archiveProject, renameProject,
   listFolders, createFolder, renameFolder, deleteFolder, moveProjectsToFolder,
 } from '@/lib/projects'
 import type { Project, Folder as FolderType } from '@/lib/projects'
@@ -53,6 +53,7 @@ export default function ProjectsDashboard({ onNewProject, onOpenProject }: Props
   const [moveOpen, setMoveOpen] = useState(false)
 
   const [confirmState, setConfirmState] = useState<ConfirmState>(null)
+  const [showArchived, setShowArchived] = useState(false)
 
   useEffect(() => {
     if (!user) return
@@ -75,10 +76,13 @@ export default function ProjectsDashboard({ onNewProject, onOpenProject }: Props
         const { error } = await deleteProject(id)
         if (error) {
           setConfirmState({
-            title: 'Can’t delete this project',
-            body: error,
-            confirmLabel: 'OK',
-            onConfirm: () => {},
+            title: 'Archive instead?',
+            body: "This project has a production order and can't be permanently deleted. Archive it to hide it from your Projects view.",
+            confirmLabel: 'Archive',
+            onConfirm: async () => {
+              await archiveProject(id, true)
+              setProjects(ps => ps.map(p => p.id === id ? { ...p, is_archived: true } : p))
+            },
           })
           return
         }
@@ -86,6 +90,12 @@ export default function ProjectsDashboard({ onNewProject, onOpenProject }: Props
         setSelected(s => { const n = new Set(s); n.delete(id); return n })
       },
     })
+  }
+
+  const handleUnarchive = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    await archiveProject(id, false)
+    setProjects(ps => ps.map(p => p.id === id ? { ...p, is_archived: false } : p))
   }
 
   const startRename = (p: Project, e: React.MouseEvent) => {
@@ -165,7 +175,7 @@ export default function ProjectsDashboard({ onNewProject, onOpenProject }: Props
     if (ids.length === 0) return
     setConfirmState({
       title: `Delete ${ids.length} project${ids.length > 1 ? 's' : ''}?`,
-      body: "This permanently removes the selected designs. This can’t be undone.",
+      body: "This permanently removes the selected designs. This can't be undone.",
       confirmLabel: 'Delete',
       danger: true,
       onConfirm: async () => {
@@ -176,8 +186,8 @@ export default function ProjectsDashboard({ onNewProject, onOpenProject }: Props
         exitSelectMode()
         if (failed.length > 0) {
           setConfirmState({
-            title: `Couldn’t delete ${failed.length} project${failed.length > 1 ? 's' : ''}`,
-            body: 'Projects with a production order can’t be deleted. The rest were removed.',
+            title: `Couldn't delete ${failed.length} project${failed.length > 1 ? 's' : ''}`,
+            body: "Projects with a production order can't be deleted. The rest were removed.",
             confirmLabel: 'OK',
             onConfirm: () => {},
           })
@@ -201,11 +211,14 @@ export default function ProjectsDashboard({ onNewProject, onOpenProject }: Props
   }
 
   // ── Derived ──────────────────────────────────────────────────────────────────
-  const inFolder = projects.filter(p => (activeFolder ? p.folder_id === activeFolder : true))
+  const archivedCount = projects.filter(p => p.is_archived).length
+  const inFolder = projects.filter(p =>
+    (activeFolder ? p.folder_id === activeFolder : true) &&
+    (showArchived ? p.is_archived : !p.is_archived))
   const filtered = inFolder.filter(p =>
     p.name.toLowerCase().includes(query.trim().toLowerCase()))
   const folderCount = (id: FolderTarget) =>
-    projects.filter(p => (id ? p.folder_id === id : true)).length
+    projects.filter(p => (id ? p.folder_id === id : true) && !p.is_archived).length
 
   const allFolderItems: { id: FolderTarget; label: string }[] = [
     { id: null, label: 'All Projects' },
@@ -239,6 +252,17 @@ export default function ProjectsDashboard({ onNewProject, onOpenProject }: Props
               <span className="text-[11px] text-gray-400">{folders.length}</span>
               <ChevronDown size={15} className={`text-gray-400 transition-transform ${foldersOpen ? 'rotate-180' : ''}`}/>
             </button>
+            {!loading && archivedCount > 0 && (
+              <button onClick={() => setShowArchived(o => !o)}
+                className={`flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg border transition-colors ${
+                  showArchived
+                    ? 'border-grace-ink bg-grace-ink text-white'
+                    : 'border-slate-200 text-gray-600 hover:bg-slate-50'
+                }`}>
+                Archived
+                <span className={`text-[11px] ${showArchived ? 'text-white/70' : 'text-gray-400'}`}>{archivedCount}</span>
+              </button>
+            )}
             {!loading && projects.length > 0 && (
               selectMode ? (
                 <button onClick={exitSelectMode}
@@ -390,7 +414,12 @@ export default function ProjectsDashboard({ onNewProject, onOpenProject }: Props
                       </div>
 
                       {/* Thumbnail */}
-                      <div className="bg-slate-50 rounded-lg mb-3 flex items-center justify-center overflow-hidden" style={{ height: 140 }}>
+                      <div className="relative bg-slate-50 rounded-lg mb-3 flex items-center justify-center overflow-hidden" style={{ height: 140 }}>
+                        {project.is_archived && (
+                          <span className="absolute top-2 right-2 text-[9px] font-semibold uppercase tracking-wider bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded-full z-10">
+                            Archived
+                          </span>
+                        )}
                         {project.thumbnail_url ? (
                           <img src={project.thumbnail_url} alt={project.name} className="w-full h-full object-contain p-3"/>
                         ) : (
@@ -423,14 +452,23 @@ export default function ProjectsDashboard({ onNewProject, onOpenProject }: Props
                         </div>
                         {!selectMode && editingId !== project.id && (
                           <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
-                            <button onClick={e => startRename(project, e)}
-                              className="text-gray-200 hover:text-brand-green opacity-0 group-hover:opacity-100 transition-all">
-                              <Pencil size={13}/>
-                            </button>
-                            <button onClick={e => handleDelete(project.id, e)}
-                              className="text-gray-200 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all">
-                              <Trash2 size={13}/>
-                            </button>
+                            {project.is_archived ? (
+                              <button onClick={e => handleUnarchive(project.id, e)}
+                                className="text-[10px] text-gray-400 hover:text-brand-green opacity-0 group-hover:opacity-100 transition-all font-medium">
+                                Restore
+                              </button>
+                            ) : (
+                              <>
+                                <button onClick={e => startRename(project, e)}
+                                  className="text-gray-200 hover:text-brand-green opacity-0 group-hover:opacity-100 transition-all">
+                                  <Pencil size={13}/>
+                                </button>
+                                <button onClick={e => handleDelete(project.id, e)}
+                                  className="text-gray-200 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all">
+                                  <Trash2 size={13}/>
+                                </button>
+                              </>
+                            )}
                           </div>
                         )}
                       </div>
