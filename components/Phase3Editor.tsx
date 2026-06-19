@@ -339,6 +339,7 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onLogoUp
   const [garmentScale, setGarmentScale] = useState(100)
   const [garmentOffset, setGarmentOffset] = useState({ x: 0, y: 0 })
   const [garmentDragging, setGarmentDragging] = useState(false)
+  const [garmentSelected, setGarmentSelected] = useState(false)
   // Restore garment color and layers — prefer persisted studioState (for project loads),
   // then fall back to the module-level SPA cache (for back-navigation within a session).
   const [garmentColor, setGarmentColor] = useState(
@@ -649,6 +650,7 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onLogoUp
   // Drag handlers
   const handlePointerDown = (e: React.MouseEvent | React.TouchEvent, id: string) => {
     e.stopPropagation()
+    setGarmentSelected(false)
     const layer = layers.find(l => l.id === id)
     setSelectedId(id)
     if (layer) setLeftTab(layer.type === 'text' ? 'text' : 'logoart')
@@ -729,6 +731,7 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onLogoUp
   const startGarmentDrag = (e: React.MouseEvent | React.TouchEvent) => {
     e.stopPropagation()
     setSelectedId(null)
+    setGarmentSelected(true)
     setGarmentDragging(true)
     const start = 'touches' in e
       ? { x: e.touches[0].clientX, y: e.touches[0].clientY }
@@ -759,6 +762,36 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onLogoUp
     e.stopPropagation()
     const delta = e.deltaY < 0 ? 4 : -4
     setGarmentScale(s => Math.min(200, Math.max(25, s + delta)))
+  }
+
+  // Corner-handle resize for the garment — mirrors the logo layer startResize behavior.
+  const startGarmentResize = (e: React.MouseEvent | React.TouchEvent) => {
+    e.stopPropagation()
+    e.preventDefault()
+    const startPt = 'touches' in e
+      ? { x: e.touches[0].clientX, y: e.touches[0].clientY }
+      : { x: (e as React.MouseEvent).clientX, y: (e as React.MouseEvent).clientY }
+    const origScale = garmentScale
+    const z = zoom / 100
+    const onMove = (ev: MouseEvent | TouchEvent) => {
+      if ('touches' in ev) ev.preventDefault()
+      const p = getPoint(ev)
+      const dx = (p.x - startPt.x) / z
+      const dy = (p.y - startPt.y) / z
+      const delta = (Math.abs(dx) > Math.abs(dy) ? dx : dy)
+      const next = Math.min(200, Math.max(25, origScale + delta * 0.4))
+      setGarmentScale(next)
+    }
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+      window.removeEventListener('touchmove', onMove)
+      window.removeEventListener('touchend', onUp)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+    window.addEventListener('touchmove', onMove, { passive: false })
+    window.addEventListener('touchend', onUp)
   }
 
   const addTextLayer = () => {
@@ -1547,7 +1580,7 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onLogoUp
           <div ref={canvasRef}
             className="relative bg-white overflow-hidden flex items-center justify-center"
             style={{ minHeight: 'calc(100svh - 160px)' }}
-            onClick={e => { if (e.target === e.currentTarget) setSelectedId(null) }}>
+            onClick={e => { if (e.target === e.currentTarget) { setSelectedId(null); setGarmentSelected(false) } }}>
             <div style={{ transform: `scale(${zoom / 100})`, transformOrigin: 'center center', position: 'relative', width: 380, height: 460 }}>
               {/* Garment */}
               {(() => {
@@ -1556,7 +1589,7 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onLogoUp
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none"
                   style={{ transform: `translate(${garmentOffset.x}px, ${garmentOffset.y}px) scale(${garmentScale / 100})`, transformOrigin: 'center center' }}>
                   <div onMouseDown={startGarmentDrag} onTouchStart={startGarmentDrag} onWheel={handleGarmentWheel}
-                    style={{ position: 'relative', width: GARMENT_DISPLAY_W, height: GARMENT_DISPLAY_H, flexShrink: 0, isolation: garmentColor ? 'isolate' : undefined, pointerEvents: 'auto', cursor: garmentDragging ? 'grabbing' : 'grab' }}>
+                    style={{ position: 'relative', width: GARMENT_DISPLAY_W, height: GARMENT_DISPLAY_H, flexShrink: 0, isolation: garmentColor ? 'isolate' : undefined, pointerEvents: 'auto', cursor: garmentDragging ? 'grabbing' : 'grab', outline: garmentSelected ? '2px solid #0A0A0A' : 'none', outlineOffset: 2 }}>
                     {garmentColor && (
                       <div style={{ position: 'absolute', inset: 0, backgroundColor: garmentColor, WebkitMaskImage: `url("${garmentDisplaySrc}")`, WebkitMaskSize: 'contain', WebkitMaskRepeat: 'no-repeat', WebkitMaskPosition: 'center', maskImage: `url("${garmentDisplaySrc}")`, maskSize: 'contain', maskRepeat: 'no-repeat', maskPosition: 'center', pointerEvents: 'none' } as React.CSSProperties}/>
                     )}
@@ -1567,6 +1600,18 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onLogoUp
                         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', mixBlendMode: 'soft-light', opacity: 0.5, pointerEvents: 'none' } as React.CSSProperties}/>
                     )}
                     <div style={{ width: '100%', height: '100%' }}/>
+                    {garmentSelected && ([
+                      { cursor: 'nw-resize', top: -4, left: -4 },
+                      { cursor: 'ne-resize', top: -4, right: -4 },
+                      { cursor: 'sw-resize', bottom: -4, left: -4 },
+                      { cursor: 'se-resize', bottom: -4, right: -4 },
+                    ] as const).map((handle, i) => (
+                      <div key={i}
+                        style={{ position: 'absolute', width: 18, height: 18, background: 'white', border: '2px solid #0A0A0A', borderRadius: 3, touchAction: 'none', zIndex: 10, ...handle }}
+                        onMouseDown={startGarmentResize}
+                        onTouchStart={startGarmentResize}
+                      />
+                    ))}
                   </div>
                 </div>
                 ) : null
