@@ -258,9 +258,9 @@ export default function ProjectsDashboard({ onNewProject, onOpenProject }: Props
         ) : (
           <div>
 
-            {/* Folder accordion content — chips next to the search row */}
+            {/* Folder accordion content — chips sit under the right-side controls */}
             {foldersOpen && (
-              <div className="flex flex-wrap items-center gap-2 mb-6">
+              <div className="flex flex-wrap items-center justify-end gap-2 mb-6">
                 {allFolderItems.map(({ id, label }) => {
                   const folderData = id ? folders.find(f => f.id === id) : null
                   if (editingFolderId === id) {
