@@ -104,22 +104,22 @@ export async function removeBackgroundClean(dataUrl: string): Promise<string> {
   return out
 }
 
-// Remove the background from a logo image via a BFS flood-fill that understands
-// MULTI-COLOR backgrounds.
+// Remove the background from a logo image with a BFS flood-fill from the borders.
 //
-// Instead of detecting one averaged background color, it builds a small *palette*
-// of the colors that actually appear along the image border. A solid background
-// yields one palette color; a baked-in transparency checkerboard yields two
-// (white + light gray); a gradient yields a few. A pixel counts as background if
-// it's opaque and matches ANY palette color within tolerance. The flood-fill
-// then clears only the OUTER connected region reachable from the border, so
-// interior strokes (e.g. the GRACE gold/black double border or the ram crest)
-// are preserved because they aren't border colors and aren't reachable.
+// The classifier is the important part. A pixel counts as background if EITHER:
+//   1. it is LIGHT and LOW-SATURATION — i.e. white or any shade of pale gray.
+//      This is the robust rule for baked-in transparency checkerboards: both
+//      tiles (white + light gray) and their anti-aliased blends all satisfy it,
+//      so the whole grid is removed in one pass. Saturated or dark logo art
+//      (greens, golds, blacks, reds) never qualifies, so the artwork survives.
+//   2. it closely matches a color sampled from the image border — this keeps
+//      solid *colored* backgrounds (e.g. a logo on flat blue) working too.
 //
-// If the border is fully transparent (the logo is already cut out, like the
-// transparent GRACE PNG), the palette is empty and the image is returned
-// untouched — never risking damage to an already-clean logo.
-export async function removeWhiteBackground(dataUrl: string, tolerance = 32): Promise<string> {
+// The flood-fill only clears the OUTER region connected to the border, so light
+// areas fully enclosed by the artwork (e.g. white counters inside letters) are
+// preserved. If the border is already transparent (an alpha PNG like the GRACE
+// wordmark), there is nothing to remove and the image is returned untouched.
+export async function removeWhiteBackground(dataUrl: string, tolerance = 28): Promise<string> {
   const img = await new Promise<HTMLImageElement>((resolve, reject) => {
     const i = new Image()
     i.onload = () => resolve(i)
@@ -138,16 +138,23 @@ export async function removeWhiteBackground(dataUrl: string, tolerance = 32): Pr
   const imageData = ctx.getImageData(0, 0, w, h)
   const px = imageData.data
 
-  // ── Build the border-color palette ─────────────────────────────────────────
-  // Sample a thin band along all four edges, quantize each opaque color into a
-  // coarse 16-level bucket, and keep the buckets that make up a meaningful
-  // fraction of the border. This robustly captures a checkerboard's two tones.
+  // Light + low-saturation test → catches white and every checkerboard gray.
+  const isLightNeutral = (r: number, g: number, b: number) => {
+    const mx = Math.max(r, g, b)
+    const mn = Math.min(r, g, b)
+    return mx >= 175 && (mx - mn) <= 32
+  }
+
+  // Sample a thin border band for any solid *colored* background color(s).
   const band = Math.max(2, Math.min(6, Math.round(Math.min(w, h) * 0.02)))
   const buckets = new Map<number, { r: number; g: number; b: number; n: number }>()
+  let opaqueBorder = 0
   const sample = (x: number, y: number) => {
     const idx = (y * w + x) * 4
-    if (px[idx + 3] < 10) return // skip transparent border pixels
+    if (px[idx + 3] < 10) return
+    opaqueBorder++
     const r = px[idx], g = px[idx + 1], b = px[idx + 2]
+    if (isLightNeutral(r, g, b)) return // light neutrals handled by rule #1
     const key = ((r >> 4) << 8) | ((g >> 4) << 4) | (b >> 4)
     const e = buckets.get(key)
     if (e) { e.r += r; e.g += g; e.b += b; e.n++ }
@@ -156,22 +163,21 @@ export async function removeWhiteBackground(dataUrl: string, tolerance = 32): Pr
   for (let y = 0; y < h; y++) for (let d = 0; d < band; d++) { sample(d, y); sample(w - 1 - d, y) }
   for (let x = 0; x < w; x++) for (let d = 0; d < band; d++) { sample(x, d); sample(x, h - 1 - d) }
 
-  const bucketList = Array.from(buckets.values())
-  const totalSamples = bucketList.reduce((s, e) => s + e.n, 0)
-  // Border fully (or almost) transparent → already cut out, leave untouched.
-  if (totalSamples === 0) return dataUrl
+  // Border fully transparent → already cut out, leave untouched.
+  if (opaqueBorder === 0) return dataUrl
 
-  // Keep buckets that are at least 6% of border samples, up to 4 palette colors.
+  const bucketList = Array.from(buckets.values())
+  // Keep dominant non-neutral border colors (≥10% of opaque border) as a palette.
   const palette = bucketList
-    .filter(e => e.n / totalSamples >= 0.06)
+    .filter(e => e.n / opaqueBorder >= 0.10)
     .sort((a, b) => b.n - a.n)
-    .slice(0, 4)
+    .slice(0, 3)
     .map(e => ({ r: Math.round(e.r / e.n), g: Math.round(e.g / e.n), b: Math.round(e.b / e.n) }))
-  if (palette.length === 0) return dataUrl
 
   const isBg = (idx: number) => {
-    if (px[idx + 3] <= 10) return false // already transparent
+    if (px[idx + 3] <= 10) return false
     const r = px[idx], g = px[idx + 1], b = px[idx + 2]
+    if (isLightNeutral(r, g, b)) return true
     for (const c of palette) {
       if (Math.abs(r - c.r) <= tolerance && Math.abs(g - c.g) <= tolerance && Math.abs(b - c.b) <= tolerance) return true
     }

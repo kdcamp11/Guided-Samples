@@ -599,11 +599,30 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onLogoUp
     }
   }
 
-  // Drop a gallery asset onto the canvas as a new layer.
-  const addAssetToCanvas = (dataUrl: string, isLogo: boolean) => {
+  // Drop a gallery asset onto the canvas as a new layer. Defensively runs the
+  // background cleanup so the layer is transparent regardless of how the asset
+  // entered the gallery (a no-op on already-cut-out art), and sizes the box to
+  // the image's aspect ratio so square logos aren't squashed into 160×80.
+  const addAssetToCanvas = async (dataUrl: string, isLogo: boolean) => {
     const id = crypto.randomUUID()
+    let url = dataUrl
+    try { url = await removeBackgroundClean(dataUrl) } catch {}
+    let width = 160, height = 80
+    try {
+      const dims = await new Promise<{ w: number; h: number }>((resolve, reject) => {
+        const im = new Image()
+        im.onload = () => resolve({ w: im.naturalWidth, h: im.naturalHeight })
+        im.onerror = reject
+        im.src = url
+      })
+      if (dims.w && dims.h) {
+        const scale = 160 / Math.max(dims.w, dims.h)
+        width = Math.round(dims.w * scale)
+        height = Math.round(dims.h * scale)
+      }
+    } catch {}
     snapshot()
-    setLayers(ls => [...ls, { id, type: 'image', dataUrl, isLogo, x: 60, y: 80, width: 160, height: 80, rotation: 0 }])
+    setLayers(ls => [...ls, { id, type: 'image', dataUrl: url, isLogo, x: 60, y: 80, width, height, rotation: 0 }])
     setSelectedId(id)
   }
 
