@@ -18,6 +18,12 @@ import AccordionSection from './AccordionSection'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+// CSS mix-blend-mode values exposed in the Studio. Preview-only realism control —
+// never baked into exported production artwork (see collectAssets/renderLayerPng).
+type BlendMode =
+  | 'normal' | 'multiply' | 'screen' | 'overlay'
+  | 'soft-light' | 'hard-light' | 'color-burn' | 'color-dodge'
+
 interface BaseLayer {
   id: string
   x: number
@@ -25,6 +31,10 @@ interface BaseLayer {
   width: number
   height: number
   rotation: number
+  /** Editable layer property. Applied via CSS mix-blend-mode in the live preview only. */
+  blendMode?: BlendMode
+  /** Editable layer property, 0–100. Defaults to 100 when unset. */
+  opacity?: number
 }
 
 interface ImageLayer extends BaseLayer {
@@ -49,6 +59,17 @@ interface TextLayer extends BaseLayer {
 
 type LogoLayer = ImageLayer | TextLayer
 export type ViewLayers = Record<string, LogoLayer[]>
+
+const BLEND_MODES: { value: BlendMode; label: string }[] = [
+  { value: 'normal',      label: 'Normal' },
+  { value: 'multiply',    label: 'Multiply' },
+  { value: 'screen',      label: 'Screen' },
+  { value: 'overlay',     label: 'Overlay' },
+  { value: 'soft-light',  label: 'Soft Light' },
+  { value: 'hard-light',  label: 'Hard Light' },
+  { value: 'color-burn',  label: 'Color Burn' },
+  { value: 'color-dodge', label: 'Color Dodge' },
+]
 
 interface Props {
   state: AppState
@@ -573,7 +594,7 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onLogoUp
     if (!pendingArtwork) return
     const id = crypto.randomUUID()
     snapshot()
-    setLayers(ls => [...ls, { id, type: 'image', dataUrl: pendingArtwork, x: 60, y: 80, width: 160, height: 80, rotation: 0 }])
+    setLayers(ls => [...ls, { id, type: 'image', dataUrl: pendingArtwork, x: 60, y: 80, width: 160, height: 80, rotation: 0, blendMode: 'multiply', opacity: 100 }])
     setSelectedId(id)
     onArtworkConsumed?.()
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -624,7 +645,7 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onLogoUp
     const id = crypto.randomUUID()
     const { width, height } = await imageLayerBox(dataUrl)
     snapshot()
-    setLayers(ls => [...ls, { id, type: 'image', dataUrl, isLogo, x: 60, y: 80, width, height, rotation: 0 }])
+    setLayers(ls => [...ls, { id, type: 'image', dataUrl, isLogo, x: 60, y: 80, width, height, rotation: 0, blendMode: isLogo ? 'normal' : 'multiply', opacity: 100 }])
     setSelectedId(id)
   }
 
@@ -819,7 +840,7 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onLogoUp
       const id = crypto.randomUUID()
       const { width, height } = await imageLayerBox(dataUrl)
       snapshot()
-      setLayers(ls => [...ls, { id, type: 'image', dataUrl, x: 60, y: 80, width, height, rotation: 0 }])
+      setLayers(ls => [...ls, { id, type: 'image', dataUrl, x: 60, y: 80, width, height, rotation: 0, blendMode: 'normal', opacity: 100 }])
       setSelectedId(id)
     } catch (err) { console.error('Upload failed', err) }
   }
@@ -1185,6 +1206,31 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onLogoUp
     </div>
   )
 
+  // Blend mode + opacity — editable, preview-only properties for image layers.
+  const blendCard = (sel: ImageLayer) => (
+    <div className="card space-y-3">
+      <p className="text-xs font-medium text-gray-600">Blending</p>
+      <div>
+        <label className="text-xs text-gray-500 block mb-1.5">Blend Mode</label>
+        <select
+          value={sel.blendMode ?? 'normal'}
+          onChange={e => updateSelected({ blendMode: e.target.value as BlendMode })}
+          className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-gray-700 focus:outline-none focus:border-grace-ink">
+          {BLEND_MODES.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+        </select>
+      </div>
+      <div>
+        <div className="flex justify-between items-center mb-1.5">
+          <span className="text-xs text-gray-500">Opacity</span>
+          <span className="text-xs text-gray-700 w-10 text-center tabular-nums">{sel.opacity ?? 100}%</span>
+        </div>
+        <input type="range" min={0} max={100} value={sel.opacity ?? 100}
+          onChange={e => updateSelected({ opacity: parseInt(e.target.value) })}
+          className="w-full accent-brand-green"/>
+      </div>
+    </div>
+  )
+
   const layerControlsCard = () => (
     <div className="card">
       <p className="text-xs font-medium text-gray-600 mb-2">Layer Controls</p>
@@ -1277,7 +1323,7 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onLogoUp
                 )}
               </div>
               {selected?.type === 'image' ? (
-                <>{transformCard(selected)}{layerControlsCard()}</>
+                <>{transformCard(selected)}{blendCard(selected as ImageLayer)}{layerControlsCard()}</>
               ) : (
                 <div className="card"><div className="text-center py-6">
                   <Layers size={22} className="mx-auto text-gray-300 mb-2"/>
@@ -1645,7 +1691,7 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onLogoUp
                     </div>
                     )
                   ) : (
-                    <img src={(layer.tintColor ? tintedDataUrls[`${layer.id}_${layer.tintColor}`] : undefined) ?? layer.dataUrl} alt="artwork" className="w-full h-full object-contain" draggable={false} style={{ pointerEvents: 'none' }}/>
+                    <img src={(layer.tintColor ? tintedDataUrls[`${layer.id}_${layer.tintColor}`] : undefined) ?? layer.dataUrl} alt="artwork" className="w-full h-full object-contain" draggable={false} style={{ pointerEvents: 'none', mixBlendMode: (layer.blendMode ?? 'normal') as React.CSSProperties['mixBlendMode'], opacity: (layer.opacity ?? 100) / 100 }}/>
                   )}
                   {selectedId === layer.id && (
                     <>
@@ -1765,6 +1811,24 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onLogoUp
                       onChange={e => updateSelected({ tintColor: e.target.value })}
                       className="w-full h-7 rounded cursor-pointer border border-slate-200"/>
                     {(selected as ImageLayer).tintColor && <button onClick={() => updateSelected({ tintColor: undefined })} className="text-xs text-gray-400 hover:text-gray-700 transition-colors">Clear tint</button>}
+                    <div className="pt-2">
+                      <label className="text-xs text-gray-500 block mb-1.5">Blend Mode</label>
+                      <select
+                        value={(selected as ImageLayer).blendMode ?? 'normal'}
+                        onChange={e => updateSelected({ blendMode: e.target.value as BlendMode })}
+                        className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-gray-700 focus:outline-none focus:border-grace-ink">
+                        {BLEND_MODES.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                      </select>
+                    </div>
+                    <div className="pt-1">
+                      <div className="flex justify-between items-center mb-1.5">
+                        <span className="text-xs text-gray-500">Opacity</span>
+                        <span className="text-xs text-gray-700 w-10 text-center tabular-nums">{(selected as ImageLayer).opacity ?? 100}%</span>
+                      </div>
+                      <input type="range" min={0} max={100} value={(selected as ImageLayer).opacity ?? 100}
+                        onChange={e => updateSelected({ opacity: parseInt(e.target.value) })}
+                        className="w-full accent-brand-green"/>
+                    </div>
                   </div>
                 )}
               </div>

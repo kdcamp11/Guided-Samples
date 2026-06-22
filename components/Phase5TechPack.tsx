@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react'
 import {
   CheckCircle2, Pencil, Plus, Trash2, Download, Save, Send, ArrowLeft,
-  MoreVertical, ChevronRight, X,
+  MoreVertical, ChevronRight, X, Wand2, Loader2,
 } from 'lucide-react'
 import { AppState } from '@/app/page'
 import type { TechPackData } from '@/components/Phase6Production'
@@ -148,6 +148,60 @@ export default function Phase5TechPack({ state, onBack, onSendToProduction }: Pr
   }, [drawingM])
 
   const [placements, setPlacements] = useState<EditablePlacement[]>(derivedPlacements)
+
+  // ── AI placement auto-detect (from the actual artwork) ────────────────────
+  const [detecting, setDetecting] = useState(false)
+  const [detectError, setDetectError] = useState<string | null>(null)
+  const [detected, setDetected] = useState<EditablePlacement | null>(null)
+
+  async function autoDetectPlacement() {
+    if (!artworkUrl || detecting) return
+    setDetecting(true)
+    setDetectError(null)
+    try {
+      // The endpoint scales the artwork box against the real measurement table:
+      // chest = flat width across body, length = collar seam (HPS) to hem.
+      const chestRow = ALL_SIZES.map(
+        s => getTechnicalDrawingData(garmentType, fit, s, overrides)?.measurements.chest ?? 0,
+      )
+      const lengthRow = ALL_SIZES.map(
+        s => getTechnicalDrawingData(garmentType, fit, s, overrides)?.measurements.frontLength ?? 0,
+      )
+      const sizeIndex = Math.max(0, ALL_SIZES.indexOf('M'))
+
+      const res = await fetch('/api/detect-placement', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          image: artworkUrl,
+          measurements: { 'Chest (Flat)': chestRow, Length: lengthRow },
+          sizeIndex,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) {
+        setDetectError(json?.error ?? 'Could not detect placement from artwork.')
+        return
+      }
+      const zone: string = json.zone ?? 'center chest'
+      const zoneLabel = zone.charAt(0).toUpperCase() + zone.slice(1)
+      const next: EditablePlacement = {
+        location: json.location ?? 'Front',
+        description: `${zoneLabel} (auto-detected from artwork)`,
+        widthInches: json.widthIn ?? 0,
+        heightInches: json.heightIn ?? 0,
+        yOffsetInches: json.topOffsetIn ?? 0,
+        notes: json.alignment ?? '',
+      }
+      setDetected(next)
+      // Surface in the exported tech pack, replacing any prior detected entry.
+      setPlacements(prev => [next, ...prev.filter(p => p.location !== next.location)])
+    } catch {
+      setDetectError('Network error while detecting placement.')
+    } finally {
+      setDetecting(false)
+    }
+  }
 
   // ── Measurement editing ───────────────────────────────────────────────────
   function handleMeasurementEdit(rowKey: string, size: SizeKey, raw: string) {
@@ -736,7 +790,68 @@ export default function Phase5TechPack({ state, onBack, onSendToProduction }: Pr
                 Placement measurements are based on the selected size and fit.
               </div>
             </div>
+            {drawingM?.category === 'top' && (
+              <button
+                onClick={autoDetectPlacement}
+                disabled={!artworkUrl || detecting}
+                title={artworkUrl ? 'Measure the logo from your artwork' : 'Upload artwork first'}
+                className="ml-auto flex items-center gap-1.5 text-[10px] font-bold tracking-widest uppercase px-3 py-1.5 rounded-full border border-grace-border bg-white text-grace-ink hover:bg-grace-mist disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                {detecting ? <Loader2 size={12} className="animate-spin"/> : <Wand2 size={12}/>}
+                {detecting ? 'Detecting…' : 'Auto-detect'}
+              </button>
+            )}
           </div>
+
+          {detectError && (
+            <div className="mb-3 rounded-lg border border-grace-red/30 bg-grace-red/5 px-3 py-2 text-[11px] text-grace-red">
+              {detectError}
+            </div>
+          )}
+
+          {detected && (
+            <div className="mb-3 rounded-xl border border-grace-ink/15 bg-grace-mist/40 p-3">
+              <div className="flex items-start gap-3">
+                {artworkUrl ? (
+                  <img src={artworkUrl} alt="logo" className="w-12 h-12 object-contain rounded-lg border border-grace-border bg-white p-1 shrink-0"/>
+                ) : (
+                  <div className="w-12 h-12 rounded-lg border border-grace-border bg-white shrink-0"/>
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <Wand2 size={11} className="text-grace-ink"/>
+                    <p className="text-[12px] font-bold text-grace-ink leading-none">{detected.location}</p>
+                    <span className="text-[8px] font-bold uppercase tracking-widest text-grace-ink/60">Auto-detected</span>
+                  </div>
+                  <p className="text-[10px] text-grace-stone mt-0.5">{detected.description}</p>
+                  <div className="mt-1.5 grid grid-cols-2 gap-x-3">
+                    <div>
+                      <p className="text-[9px] text-grace-stone uppercase tracking-wider font-semibold">Size</p>
+                      <p className="text-[11px] font-semibold text-grace-ink tabular-nums">
+                        {formatInches(detected.widthInches)}" W × {formatInches(detected.heightInches)}" H
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] text-grace-stone uppercase tracking-wider font-semibold">Offset</p>
+                      <p className="text-[11px] font-semibold text-grace-ink tabular-nums">
+                        {formatInches(detected.yOffsetInches)}" below collar
+                      </p>
+                    </div>
+                  </div>
+                  {detected.notes && (
+                    <p className="text-[10px] text-grace-stone mt-1">{detected.notes}</p>
+                  )}
+                </div>
+                <button onClick={() => setDetected(null)} className="text-grace-stone hover:text-grace-ink p-1 shrink-0" aria-label="Dismiss detected placement">
+                  <X size={12}/>
+                </button>
+              </div>
+              <p className="text-[9px] text-grace-stone mt-2 pt-2 border-t border-grace-border leading-relaxed">
+                Measured from your artwork at size M and added to the tech pack. Standard placements below remain available.
+              </p>
+            </div>
+          )}
+
           <div className="space-y-3 mb-3">
             {(drawingM?.placements ?? []).filter(p => ['center_chest', 'left_chest', 'left_hip', 'right_hip'].includes(p.location)).map((p, i) => (
               <div key={i} className="flex items-start gap-3">
