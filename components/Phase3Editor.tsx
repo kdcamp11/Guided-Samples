@@ -363,7 +363,9 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onLogoUp
   const [garmentScale, setGarmentScale] = useState(100)
   const [garmentOffset, setGarmentOffset] = useState({ x: 0, y: 0 })
   // Design mode = clean artwork for editing. Preview mode = fabric-printed realism.
-  const [previewMode, setPreviewMode] = useState(false)
+  // Default to Preview so the realism controls visibly respond; users flip to Design
+  // for a clean editing view.
+  const [previewMode, setPreviewMode] = useState(true)
   const [garmentDragging, setGarmentDragging] = useState(false)
   const [garmentSelected, setGarmentSelected] = useState(false)
   // Restore garment color and layers — prefer persisted studioState (for project loads),
@@ -1228,17 +1230,17 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onLogoUp
           <span className="text-xs text-gray-700 w-10 text-center tabular-nums">{sel.fabricStrength ?? 0}%</span>
         </div>
         <input type="range" min={0} max={100} value={sel.fabricStrength ?? 0}
-          onChange={e => updateSelected({ fabricStrength: parseInt(e.target.value) })}
+          onChange={e => { setPreviewMode(true); updateSelected({ fabricStrength: parseInt(e.target.value) }) }}
           className="w-full accent-brand-green"/>
         <p className="text-[10px] text-gray-400 mt-1 leading-tight">
-          How strongly fabric texture, wrinkles &amp; shading print into the artwork. Shows in <span className="font-semibold">Preview</span> mode; the design stays fully visible.
+          How strongly fabric texture, wrinkles &amp; shading print into the artwork. Shown in <span className="font-semibold">Preview</span>; switch to <span className="font-semibold">Design</span> for clean editing. The design stays fully visible either way.
         </p>
       </div>
       <div>
         <label className="text-xs text-gray-500 block mb-1.5">Print Blend</label>
         <select
           value={sel.blendMode ?? 'soft-light'}
-          onChange={e => updateSelected({ blendMode: e.target.value as BlendMode })}
+          onChange={e => { setPreviewMode(true); updateSelected({ blendMode: e.target.value as BlendMode }) }}
           className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-gray-700 focus:outline-none focus:border-grace-ink">
           {BLEND_MODES.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
         </select>
@@ -1901,14 +1903,14 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onLogoUp
                         <span className="text-xs text-gray-700 w-10 text-center tabular-nums">{(selected as ImageLayer).fabricStrength ?? 0}%</span>
                       </div>
                       <input type="range" min={0} max={100} value={(selected as ImageLayer).fabricStrength ?? 0}
-                        onChange={e => updateSelected({ fabricStrength: parseInt(e.target.value) })}
+                        onChange={e => { setPreviewMode(true); updateSelected({ fabricStrength: parseInt(e.target.value) }) }}
                         className="w-full accent-brand-green"/>
                     </div>
                     <div>
                       <label className="text-xs text-gray-500 block mb-1.5">Print Blend</label>
                       <select
                         value={(selected as ImageLayer).blendMode ?? 'soft-light'}
-                        onChange={e => updateSelected({ blendMode: e.target.value as BlendMode })}
+                        onChange={e => { setPreviewMode(true); updateSelected({ blendMode: e.target.value as BlendMode }) }}
                         className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-gray-700 focus:outline-none focus:border-grace-ink">
                         {BLEND_MODES.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
                       </select>
