@@ -1677,11 +1677,25 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onLogoUp
                 </label>
               )}
               {/* Layers */}
-              {layers.map(layer => (
+              {layers.map(layer => {
+                // Blend + opacity must live on an element whose nearest ancestor
+                // stacking context is the canvas (which contains the garment) — NOT
+                // inside a rotate transform, which would isolate it and make
+                // mix-blend-mode composite against nothing. So rotation lives on the
+                // inner content wrapper here, and the outer wrapper stays untransformed
+                // (it only carries selection outline + resize handles).
+                const blendStyle: React.CSSProperties = layer.type === 'image'
+                  ? {
+                      mixBlendMode: ((layer as ImageLayer).blendMode ?? 'normal') as React.CSSProperties['mixBlendMode'],
+                      opacity: ((layer as ImageLayer).opacity ?? 100) / 100,
+                    }
+                  : {}
+                return (
                 <div key={layer.id}
                   onMouseDown={e => handlePointerDown(e, layer.id)}
                   onTouchStart={e => handlePointerDown(e, layer.id)}
-                  style={{ position: 'absolute', left: layer.x, top: layer.y, width: layer.width, height: layer.height, transform: `rotate(${layer.rotation}deg)`, cursor: dragging?.id === layer.id ? 'grabbing' : 'grab', outline: selectedId === layer.id ? '2px solid #0A0A0A' : 'none', outlineOffset: 2, userSelect: 'none', touchAction: 'none' }}>
+                  style={{ position: 'absolute', left: layer.x, top: layer.y, width: layer.width, height: layer.height, cursor: dragging?.id === layer.id ? 'grabbing' : 'grab', outline: selectedId === layer.id ? '2px solid #0A0A0A' : 'none', outlineOffset: 2, userSelect: 'none', touchAction: 'none' }}>
+                  <div style={{ width: '100%', height: '100%', transform: `rotate(${layer.rotation}deg)`, ...blendStyle }}>
                   {layer.type === 'text' ? (
                     (layer as TextLayer).archAmount ? (
                       <ArchTextPreview layer={layer as TextLayer} />
@@ -1691,8 +1705,9 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onLogoUp
                     </div>
                     )
                   ) : (
-                    <img src={(layer.tintColor ? tintedDataUrls[`${layer.id}_${layer.tintColor}`] : undefined) ?? layer.dataUrl} alt="artwork" className="w-full h-full object-contain" draggable={false} style={{ pointerEvents: 'none', mixBlendMode: (layer.blendMode ?? 'normal') as React.CSSProperties['mixBlendMode'], opacity: (layer.opacity ?? 100) / 100 }}/>
+                    <img src={(layer.tintColor ? tintedDataUrls[`${layer.id}_${layer.tintColor}`] : undefined) ?? layer.dataUrl} alt="artwork" className="w-full h-full object-contain" draggable={false} style={{ pointerEvents: 'none' }}/>
                   )}
+                  </div>
                   {selectedId === layer.id && (
                     <>
                       {([
@@ -1710,7 +1725,8 @@ export default function Phase3Editor({ state, onComplete, onSetGarment, onLogoUp
                     </>
                   )}
                 </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         </div>
