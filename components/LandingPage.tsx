@@ -150,6 +150,28 @@ export default function LandingPage({ onSelfService, onCreativeDirection, onSign
         </div>
       </section>
 
+      {/* See how GRACE works — walkthrough demo */}
+      <section id="walkthrough" className="max-w-4xl mx-auto px-6 pb-24">
+        <div className="text-center mb-8">
+          <p className="phase-header">Product Walkthrough</p>
+          <h2 className="text-3xl font-black text-grace-ink uppercase tracking-tight">See how GRACE works</h2>
+          <p className="text-grace-stone text-sm mt-3 max-w-md mx-auto">
+            From first project to production in one continuous flow — logo, garment, design studio, tech pack, and send-off.
+          </p>
+        </div>
+        <div className="rounded-2xl overflow-hidden border border-grace-border bg-grace-mist shadow-sm">
+          <video
+            className="w-full h-auto block bg-black"
+            controls
+            playsInline
+            preload="metadata"
+          >
+            <source src="/demo/grace-walkthrough.webm" type="video/webm" />
+            Your browser does not support embedded video.
+          </video>
+        </div>
+      </section>
+
       {/* Workflow */}
       <section id="workflow" className="max-w-6xl mx-auto px-6 pb-24">
         <div className="text-center mb-14">
