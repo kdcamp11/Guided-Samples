@@ -8,11 +8,10 @@ import { AppState } from '@/app/page'
 import { useAuth } from '@/lib/auth'
 import { useAICredits } from '@/lib/aiCreditsContext'
 import { listAllUserAssets } from '@/lib/projects'
-import SizeGuide from '@/components/SizeGuide'
+import SizingStudio from '@/components/sizing/SizingStudio'
 import TechnicalDrawing from '@/components/TechnicalDrawing'
 import ClientProductionTracker from '@/components/client/ClientProductionTracker'
 import ClientOrderDetail from '@/components/client/ClientOrderDetail'
-import type { SizeGuideOverrides } from '@/lib/fitBlocks/sizeGuide'
 import { resolveGarmentType } from '@/lib/fitBlocks'
 import type { GarmentType } from '@/lib/fitBlocks/types'
 
@@ -25,28 +24,12 @@ interface Props {
 export default function SectionView({ section, state, onStartDesign }: Props) {
   if (section === 'dashboard') return <Dashboard state={state} onStartDesign={onStartDesign} />
   if (section === 'projects') return <Projects state={state} onStartDesign={onStartDesign} />
-  if (section === 'sizeguide') return <SizeGuideSection state={state} />
+  if (section === 'sizeguide') return <SizingStudio />
   if (section === 'techdrawing') return <TechnicalDrawingSection state={state} />
   if (section === 'orders') return <Orders />
   if (section === 'library') return <LibraryView state={state} />
   if (section === 'settings') return <SettingsView />
   return null
-}
-
-// Size Guide section. Defaults to the garment the user is designing (if any).
-// Consumer overrides persist for the session; technical specs stay hidden,
-// surfacing only through tech pack generation.
-function SizeGuideSection({ state }: { state: AppState }) {
-  const [overrides, setOverrides] = useState<SizeGuideOverrides>({})
-  const designed: GarmentType | undefined =
-    (state.garment?.type ? resolveGarmentType(state.garment.type) ?? undefined : undefined)
-  return (
-    <SizeGuide
-      garmentType={designed}
-      overrides={overrides}
-      onOverridesChange={setOverrides}
-    />
-  )
 }
 
 // Technical Drawing section. Reads ONLY getTechPackMeasurements() (via the drawing
