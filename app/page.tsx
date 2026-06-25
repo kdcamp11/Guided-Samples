@@ -18,6 +18,7 @@ import PhaseDesignStudio from '@/components/PhaseDesignStudio'
 import type { TechPackData } from '@/components/Phase6Production'
 import SectionView from '@/components/SectionView'
 import LandingPage from '@/components/LandingPage'
+import UploadProduction from '@/components/UploadProduction'
 import CreativeDirectionForm from '@/components/CreativeDirectionForm'
 import AIPaywallModal from '@/components/AIPaywallModal'
 import { AICreditsProvider, useAICredits } from '@/lib/aiCreditsContext'
@@ -97,7 +98,7 @@ function App() {
     refreshCredits()
     window.history.replaceState({}, '', window.location.pathname + '?view=studio')
   }
-  const [view, setView] = useState<'landing' | 'studio' | 'creative-direction'>(initialView)
+  const [view, setView] = useState<'landing' | 'studio' | 'creative-direction' | 'upload-production'>(initialView)
   // Track previous user to detect sign-out
   const prevUserRef = useRef<{ id: string } | null>(null)
   const prevViewRef = useRef<'landing' | 'studio'>('landing')
@@ -264,6 +265,16 @@ function App() {
     return <CreativeDirectionForm onBack={() => setView(prevViewRef.current)} />
   }
 
+  // Upload Production Files — AI prepress / production-readiness assistant
+  if (view === 'upload-production') {
+    return (
+      <UploadProduction
+        onBack={() => setView('landing')}
+        onContinue={() => { setSection('dashboard'); setView('studio') }}
+      />
+    )
+  }
+
   // Landing page
   if (view === 'landing') {
     return (
@@ -271,6 +282,7 @@ function App() {
         <LandingPage
           onSelfService={() => setView('studio')}
           onCreativeDirection={() => { prevViewRef.current = 'landing'; setView('creative-direction') }}
+          onUploadFiles={() => setView('upload-production')}
           onSignIn={() => { setAuthInitialMode('signin'); setAuthOpen(true) }}
           onSignUp={() => { setAuthInitialMode('signup'); setAuthOpen(true) }}
         />

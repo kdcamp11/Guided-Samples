@@ -5,6 +5,7 @@ import { ArrowRight, Layers, Eye, FileText, Send, CheckCircle2 } from 'lucide-re
 interface Props {
   onSelfService:        () => void
   onCreativeDirection:  () => void
+  onUploadFiles?:       () => void
   onSignIn?:            () => void
   onSignUp?:            () => void
 }
@@ -70,7 +71,7 @@ const FEATURES = [
   'One-click supplier email with attachments',
 ]
 
-export default function LandingPage({ onSelfService, onCreativeDirection, onSignIn, onSignUp }: Props) {
+export default function LandingPage({ onSelfService, onCreativeDirection, onUploadFiles, onSignIn, onSignUp }: Props) {
   return (
     <div className="min-h-screen bg-white text-grace-ink overflow-y-auto">
 
@@ -106,7 +107,7 @@ export default function LandingPage({ onSelfService, onCreativeDirection, onSign
         </p>
 
         {/* Path picker */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl mx-auto mb-20">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-4xl mx-auto mb-20">
 
           {/* Creative Direction */}
           <button
@@ -144,6 +145,26 @@ export default function LandingPage({ onSelfService, onCreativeDirection, onSign
             </div>
             <span className="flex items-center gap-1 text-xs font-bold text-white mt-auto tracking-widest uppercase">
               Open Studio <ArrowRight size={12}/>
+            </span>
+          </button>
+
+          {/* Upload Production Files */}
+          <button
+            onClick={() => onUploadFiles?.()}
+            className="group text-left bg-white hover:border-grace-ink transition-all p-7 rounded-2xl flex flex-col gap-4 border border-grace-border"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold tracking-[0.2em] text-grace-stone uppercase">Already Production Ready</span>
+              <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-grace-ink text-white tracking-widest uppercase">AI Preflight</span>
+            </div>
+            <div>
+              <h2 className="text-xl font-black text-grace-ink uppercase tracking-tight mb-2">Upload Production Files</h2>
+              <p className="text-xs text-grace-stone leading-relaxed">
+                Have finished artwork? Upload it and GRACE’s AI prepress technician inspects, scores, and fixes anything missing — then sends it straight to manufacturing.
+              </p>
+            </div>
+            <span className="flex items-center gap-1 text-xs font-bold text-grace-ink mt-auto tracking-widest uppercase">
+              Run Preflight <ArrowRight size={12}/>
             </span>
           </button>
 
