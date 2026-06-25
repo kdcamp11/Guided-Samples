@@ -1,7 +1,9 @@
-// Prepress analysis runner. Classifies uploaded files, derives a shared context,
-// runs every registered check, and produces a scored production-readiness report.
+// Prepress analysis runner. Classifies uploaded files, inspects their real
+// contents, derives a shared context from that real data (with filename heuristics
+// only as a fallback), runs every registered check, and scores readiness.
 
 import { CHECKS, STATUS_WEIGHT, type CheckContext } from './checks'
+import { inspectFile } from './inspect'
 import type { FileKind, PrepressReport, UploadedFile } from './types'
 
 const VECTOR = ['svg', 'ai', 'eps']
@@ -9,6 +11,7 @@ const RASTER = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'tif', 'tiff', 'bmp', 'heic
 const SPREADSHEET = ['csv', 'xls', 'xlsx', 'numbers']
 const DOCUMENT = ['pdf']
 const MIN_PRINT_PX = 1500
+const MIN_PRINT_DPI = 200
 
 const extOf = (name: string) => (name.split('.').pop() || '').toLowerCase()
 
@@ -20,7 +23,7 @@ function kindOf(ext: string): FileKind {
   return 'other'
 }
 
-// Read raster dimensions + a preview data URL (best effort; never throws).
+// Preview + fallback dimensions for rasters (never throws).
 function loadRasterMeta(file: File): Promise<{ width?: number; height?: number; dataUrl?: string }> {
   return new Promise(resolve => {
     try {
@@ -45,11 +48,18 @@ async function classify(file: File): Promise<UploadedFile> {
     id: (globalThis.crypto?.randomUUID?.() ?? `${file.name}-${file.size}-${Math.random()}`),
     name: file.name, size: file.size, type: file.type, ext, kind,
   }
+  const inspection = await inspectFile(file, kind)
   if (kind === 'raster') {
     const meta = await loadRasterMeta(file)
-    return { ...base, ...meta }
+    return {
+      ...base,
+      width: inspection.width ?? meta.width,
+      height: inspection.height ?? meta.height,
+      dataUrl: meta.dataUrl,
+      inspection,
+    }
   }
-  return base
+  return { ...base, inspection }
 }
 
 const any = (names: string[], re: RegExp) => names.some(n => re.test(n))
@@ -57,7 +67,23 @@ const any = (names: string[], re: RegExp) => names.some(n => re.test(n))
 function buildContext(files: UploadedFile[]): CheckContext {
   const names = files.map(f => f.name.toLowerCase())
   const rasterFiles = files.filter(f => f.kind === 'raster')
-  const lowRes = rasterFiles.filter(f => Math.max(f.width ?? 0, f.height ?? 0) > 0 && Math.max(f.width ?? 0, f.height ?? 0) < MIN_PRINT_PX)
+
+  // Real low-res detection: prefer DPI when known, else fall back to pixel size.
+  const lowRes = rasterFiles.filter(f => {
+    const dpi = f.inspection?.dpi
+    if (dpi && dpi > 0) return dpi < MIN_PRINT_DPI
+    const maxDim = Math.max(f.width ?? 0, f.height ?? 0)
+    return maxDim > 0 && maxDim < MIN_PRINT_PX
+  })
+
+  // Real signals parsed from file contents.
+  const insp = files.map(f => f.inspection).filter((i): i is NonNullable<typeof i> => !!i?.inspected)
+  const realCmyk = insp.some(i => i.cmyk || i.colorType === 'cmyk')
+  const realPantone = insp.some(i => i.pantone)
+  const liveText = insp.some(i => i.hasLiveText)
+  const dimFile = files.find(f => f.inspection?.pageSizeIn)
+  const sizeChartFile = files.find(f => f.inspection?.isSizeChart)
+  const embeddedImages = insp.reduce((n, i) => n + (i.embeddedImages ?? 0), 0)
 
   return {
     files,
@@ -72,16 +98,22 @@ function buildContext(files: UploadedFile[]): CheckContext {
       side: any(names, /side|sleeve|left|right/),
     },
     garmentViews: any(names, /mockup|garment|flat|model|tee|hoodie|shirt|crew|jacket/),
+    // Real-content signals, with filename heuristics only as fallback.
+    liveTextDetected: liveText,
+    inspectedText: insp.some(i => i.hasLiveText !== undefined || i.pages !== undefined),
+    embeddedImages,
+    printSize: dimFile?.inspection?.pageSizeIn,
+    sizeChartFile: sizeChartFile?.name,
     flags: {
-      sizeChart: any(names, /size.?chart|sizing|measurement|grading|spec.?sheet/),
+      sizeChart: !!sizeChartFile || any(names, /size.?chart|sizing|measurement|grading|spec.?sheet/),
       techPack: any(names, /tech.?pack|techpack|specification|\bspec\b/),
       placement: any(names, /placement|position|layout/),
       fabric: any(names, /fabric|material|composition|cotton|poly|gsm/),
       decoration: any(names, /screen.?print|dtg|embroider|vinyl|sublimation|decoration|print.?method|heat.?press/),
-      pantone: any(names, /pantone|pms/),
-      cmyk: any(names, /cmyk/),
+      pantone: realPantone || any(names, /pantone|pms/),
+      cmyk: realCmyk || any(names, /cmyk/),
       bleed: any(names, /bleed|safe.?area|trim/),
-      dimensions: any(names, /\d+\s?(x|×)\s?\d+|inch|\bin\b|\bcm\b|\bmm\b|dimension/),
+      dimensions: !!dimFile || any(names, /\d+\s?(x|×)\s?\d+|inch|\bin\b|\bcm\b|\bmm\b|dimension/),
     },
   }
 }
