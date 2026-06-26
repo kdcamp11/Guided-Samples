@@ -12,10 +12,12 @@ import { STATUS_WEIGHT } from '@/lib/prepress/checks'
 import { CATEGORY_LABEL, type CheckResult, type PrepressReport, type Severity, type UploadedFile } from '@/lib/prepress/types'
 import { useAssistant } from '@/components/assistant/AssistantProvider'
 import { downloadTextFile } from '@/lib/prepress/sizeSpec'
+import ProductionIntake from '@/components/intake/ProductionIntake'
+import type { TechPackData } from '@/components/Phase6Production'
 
 interface Props {
   onBack: () => void
-  onContinue: () => void
+  onContinue: (techPack?: TechPackData) => void
 }
 
 const ANALYZING_STEPS = [
@@ -42,7 +44,7 @@ function stagedIcon(name: string) {
 }
 
 export default function UploadProduction({ onBack, onContinue }: Props) {
-  const [phase, setPhase] = useState<'upload' | 'analyzing' | 'report'>('upload')
+  const [phase, setPhase] = useState<'upload' | 'analyzing' | 'intake'>('upload')
   const [report, setReport] = useState<PrepressReport | null>(null)
   const [dragging, setDragging] = useState(false)
   const [stepIdx, setStepIdx] = useState(0)
@@ -109,7 +111,7 @@ export default function UploadProduction({ onBack, onContinue }: Props) {
       new Promise(res => setTimeout(res, ANALYZING_STEPS.length * 650 + 300)), // let the inspection read deliberately
     ])
     setReport(result)
-    setPhase('report')
+    setPhase('intake')
   }, [staged])
 
   const onDrop = (e: React.DragEvent) => {
@@ -266,7 +268,19 @@ export default function UploadProduction({ onBack, onContinue }: Props) {
     )
   }
 
-  // ── Report ────────────────────────────────────────────────────────────────
+  // ── Intake conversation (conversational-first) ─────────────────────────────
+  if (phase === 'intake' && report) {
+    return (
+      <ProductionIntake
+        files={staged}
+        report={report}
+        onBack={onBack}
+        onComplete={(tp) => onContinue(tp)}
+      />
+    )
+  }
+
+  // ── Report (detailed preflight) — retained as a fallback view ───────────────
   if (!report) return null
   const { score, summary, ready, results, files } = report
   const criticals = results.filter(r => r.status === 'critical')
@@ -298,7 +312,7 @@ export default function UploadProduction({ onBack, onContinue }: Props) {
 
       {/* Ready → continue */}
       {ready && (
-        <button onClick={onContinue}
+        <button onClick={() => onContinue()}
           className="w-full mb-4 rounded-2xl bg-grace-ink text-white px-6 py-4 flex items-center justify-between hover:bg-zinc-800 transition-colors group">
           <span className="flex items-center gap-3">
             <CheckCircle2 size={18} className="text-green-600"/>
