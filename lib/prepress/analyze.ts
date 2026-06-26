@@ -4,7 +4,14 @@
 
 import { CHECKS, STATUS_WEIGHT, type CheckContext } from './checks'
 import { inspectFile } from './inspect'
+import { classifyImage, previewDataUrl } from './classify'
 import type { FileKind, PrepressReport, UploadedFile } from './types'
+import type { SizeProfile } from '@/lib/sizing/types'
+
+export interface AnalyzeOptions {
+  /** The user's saved default size profile (sizing source of truth), if any. */
+  sizeProfile?: SizeProfile | null
+}
 
 const VECTOR = ['svg', 'ai', 'eps']
 const RASTER = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'tif', 'tiff', 'bmp', 'heic']
@@ -49,22 +56,29 @@ async function classify(file: File): Promise<UploadedFile> {
     name: file.name, size: file.size, type: file.type, ext, kind,
   }
   const inspection = await inspectFile(file, kind)
+  const uploaded: UploadedFile = { ...base, inspection }
   if (kind === 'raster') {
     const meta = await loadRasterMeta(file)
-    return {
-      ...base,
-      width: inspection.width ?? meta.width,
-      height: inspection.height ?? meta.height,
-      dataUrl: meta.dataUrl,
-      inspection,
+    uploaded.width = inspection.width ?? meta.width
+    uploaded.height = inspection.height ?? meta.height
+    uploaded.dataUrl = meta.dataUrl
+  }
+
+  // Real vision classification: does the image show a garment mockup, and which
+  // views? Only for image-bearing files; falls back to null (→ filename) on failure.
+  if (kind === 'raster' || kind === 'document' || kind === 'vector') {
+    const preview = await previewDataUrl(file, kind, uploaded.dataUrl)
+    if (preview) {
+      const classification = await classifyImage(preview)
+      if (classification) uploaded.classification = classification
     }
   }
-  return { ...base, inspection }
+  return uploaded
 }
 
 const any = (names: string[], re: RegExp) => names.some(n => re.test(n))
 
-function buildContext(files: UploadedFile[]): CheckContext {
+function buildContext(files: UploadedFile[], opts: AnalyzeOptions = {}): CheckContext {
   const names = files.map(f => f.name.toLowerCase())
   const rasterFiles = files.filter(f => f.kind === 'raster')
 
@@ -85,6 +99,18 @@ function buildContext(files: UploadedFile[]): CheckContext {
   const sizeChartFile = files.find(f => f.inspection?.isSizeChart)
   const embeddedImages = insp.reduce((n, i) => n + (i.embeddedImages ?? 0), 0)
 
+  // Real vision classification (what the model actually saw), with filename
+  // heuristics only as a fallback when no image could be classified.
+  const classified = files.map(f => f.classification).filter((c): c is NonNullable<typeof c> => !!c?.classified)
+  const visionViews = classified.length
+    ? {
+        front: classified.some(c => c.views.front),
+        back: classified.some(c => c.views.back),
+        side: classified.some(c => c.views.side),
+      }
+    : null
+  const visionMockup = classified.length ? classified.some(c => c.isGarmentMockup) : null
+
   return {
     files,
     hasVector: files.some(f => f.kind === 'vector'),
@@ -92,18 +118,19 @@ function buildContext(files: UploadedFile[]): CheckContext {
     hasDocument: files.some(f => f.kind === 'document'),
     rasterFiles,
     lowRes,
-    views: {
+    views: visionViews ?? {
       front: any(names, /front|[-_ ]f[-_. ]|chest/),
       back: any(names, /back|[-_ ]b[-_. ]|rear/),
       side: any(names, /side|sleeve|left|right/),
     },
-    garmentViews: any(names, /mockup|garment|flat|model|tee|hoodie|shirt|crew|jacket/),
+    garmentViews: visionMockup ?? any(names, /mockup|garment|flat|model|tee|hoodie|shirt|crew|jacket/),
     // Real-content signals, with filename heuristics only as fallback.
     liveTextDetected: liveText,
     inspectedText: insp.some(i => i.hasLiveText !== undefined || i.pages !== undefined),
     embeddedImages,
     printSize: dimFile?.inspection?.pageSizeIn,
     sizeChartFile: sizeChartFile?.name,
+    savedSizeProfileName: opts.sizeProfile?.name,
     flags: {
       sizeChart: !!sizeChartFile || any(names, /size.?chart|sizing|measurement|grading|spec.?sheet/),
       techPack: any(names, /tech.?pack|techpack|specification|\bspec\b/),
@@ -118,9 +145,9 @@ function buildContext(files: UploadedFile[]): CheckContext {
   }
 }
 
-export async function analyzeFiles(fileList: File[]): Promise<PrepressReport> {
+export async function analyzeFiles(fileList: File[], opts: AnalyzeOptions = {}): Promise<PrepressReport> {
   const files = await Promise.all(Array.from(fileList).map(classify))
-  const ctx = buildContext(files)
+  const ctx = buildContext(files, opts)
 
   const results = CHECKS.map(def => ({ id: def.id, label: def.label, category: def.category, ...def.run(ctx) }))
 

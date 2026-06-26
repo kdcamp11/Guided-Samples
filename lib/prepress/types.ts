@@ -35,6 +35,16 @@ export interface FileInspection {
   notes?: string[]
 }
 
+/** What a vision model actually sees in an uploaded image (not filename guessing). */
+export interface FileClassification {
+  /** The image depicts a garment mockup / technical flat / on-body shot. */
+  isGarmentMockup: boolean
+  /** Garment views visible in the image. */
+  views: { front: boolean; back: boolean; side: boolean }
+  /** True only when the model genuinely classified the image. */
+  classified: boolean
+}
+
 export interface UploadedFile {
   id: string
   name: string
@@ -46,6 +56,8 @@ export interface UploadedFile {
   height?: number
   dataUrl?: string
   inspection?: FileInspection
+  /** Real vision classification of the image (mockup? which views?). */
+  classification?: FileClassification
 }
 
 export interface FixAction {

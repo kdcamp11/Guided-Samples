@@ -29,7 +29,8 @@ function sessionToUser(session: Session | null): User | null {
     id: su.id,
     email: su.email ?? '',
     name: (su.user_metadata?.name as string) ?? su.email?.split('@')[0] ?? 'User',
-    brandName: (su.user_metadata?.brand_name as string) ?? 'GRACE',
+    // The user's own brand, set in their profile — never defaulted to GRACE.
+    brandName: (su.user_metadata?.brand_name as string) || undefined,
   }
 }
 
@@ -66,7 +67,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { error } = await sb.auth.signUp({
       email,
       password,
-      options: { data: { name, brand_name: 'GRACE' } },
+      // Don't stamp a brand on sign-up — the user sets their own in their profile.
+      options: { data: { name } },
     })
     return error?.message ?? null
   }

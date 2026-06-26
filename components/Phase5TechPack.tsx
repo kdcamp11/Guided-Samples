@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
   CheckCircle2, Pencil, Plus, Trash2, Download, Save, Send, ArrowLeft,
   MoreVertical, ChevronRight, X, Wand2, Loader2,
@@ -19,6 +19,11 @@ import { ALL_SIZES } from '@/lib/fitBlocks/types'
 import type { GarmentType, FitVariant, SizeKey } from '@/lib/fitBlocks/types'
 import { TechFlat, FLAT_FOR_GARMENT } from '@/components/TechFlats'
 import { downloadAssetsZip } from '@/lib/downloadAssets'
+import { getDefaultSizeProfile, onSizingChange } from '@/lib/sizing/store'
+import { profileToCsv } from '@/lib/sizing/sources'
+import { downloadTextFile } from '@/lib/prepress/sizeSpec'
+import type { SizeProfile } from '@/lib/sizing/types'
+import { Ruler } from 'lucide-react'
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -59,6 +64,20 @@ type EditablePlacement = {
   heightInches: number
   yOffsetInches: number
   notes: string
+  /** True when measured from the user's artwork by Auto-detect. */
+  autoDetected?: boolean
+}
+
+// Map a graded template placement to an editable tech-pack placement.
+function toEditable(p: { location: string; label: string; widthInches: number; heightInches: number; yOffsetInches: number; notes: string }): EditablePlacement {
+  return {
+    location: p.location.split('_').map(w => w[0].toUpperCase() + w.slice(1)).join(' '),
+    description: p.label,
+    widthInches: p.widthInches,
+    heightInches: p.heightInches,
+    yOffsetInches: p.yOffsetInches,
+    notes: p.notes,
+  }
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
@@ -74,6 +93,15 @@ export default function Phase5TechPack({ state, onBack, onSendToProduction }: Pr
   const [garmentType, setGarmentType] = useState<GarmentType>(inferredGarmentType)
   const [fit, setFit] = useState<FitVariant | undefined>(undefined)
   const [overrides, setOverrides] = useState<SizeGuideOverrides>({})
+
+  // ── Saved sizing source of truth (reused across projects) ────────────────
+  const [savedProfile, setSavedProfile] = useState<SizeProfile | null>(null)
+  const [appliedProfileId, setAppliedProfileId] = useState<string | null>(null)
+  useEffect(() => {
+    const load = () => setSavedProfile(getDefaultSizeProfile())
+    load()
+    return onSizingChange(load)
+  }, [])
 
   const [pantones, setPantones] = useState<{ color: string; name: string }[]>([
     { color: '#0A0A0A', name: 'PANTONE Black C' },
@@ -134,25 +162,27 @@ export default function Phase5TechPack({ state, onBack, onSendToProduction }: Pr
     [garmentType, fit, overrides],
   )
 
-  // Auto-derive placements from drawing data
+  // A single uploaded graphic = a single placement. The garment template exposes
+  // several *standard* zones (center chest, left chest, hips…) as options, but those
+  // are not all printed — enumerating them produced duplicate placements in the tech
+  // pack. Default to one primary placement; the user adds more only for genuinely
+  // multi-graphic designs, and Auto-detect measures the real artwork into this entry.
   const derivedPlacements = useMemo((): EditablePlacement[] => {
-    if (!drawingM?.placements.length) return [{ location: 'Front', description: '', widthInches: 10, heightInches: 10, yOffsetInches: 2.5, notes: '' }]
-    return drawingM.placements.map(p => ({
-      location: p.location.split('_').map(w => w[0].toUpperCase() + w.slice(1)).join(' '),
-      description: p.label,
-      widthInches: p.widthInches,
-      heightInches: p.heightInches,
-      yOffsetInches: p.yOffsetInches,
-      notes: p.notes,
-    }))
+    const all = drawingM?.placements ?? []
+    if (!all.length) return [{ location: 'Front', description: '', widthInches: 10, heightInches: 10, yOffsetInches: 2.5, notes: '' }]
+    const primary = all.find(p => p.location === 'center_chest') ?? all[0]
+    return [toEditable(primary)]
   }, [drawingM])
 
   const [placements, setPlacements] = useState<EditablePlacement[]>(derivedPlacements)
 
+  // Reset placements to the garment's primary default when the garment changes
+  // (measurement edits don't reset, so an auto-detected placement is preserved).
+  useEffect(() => { setPlacements(derivedPlacements) }, [garmentType]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── AI placement auto-detect (from the actual artwork) ────────────────────
   const [detecting, setDetecting] = useState(false)
   const [detectError, setDetectError] = useState<string | null>(null)
-  const [detected, setDetected] = useState<EditablePlacement | null>(null)
 
   async function autoDetectPlacement() {
     if (!artworkUrl || detecting) return
@@ -184,18 +214,22 @@ export default function Phase5TechPack({ state, onBack, onSendToProduction }: Pr
         return
       }
       const zone: string = json.zone ?? 'center chest'
-      const zoneLabel = zone.charAt(0).toUpperCase() + zone.slice(1)
+      const zoneLabel = zone.split(' ').map(w => w[0].toUpperCase() + w.slice(1)).join(' ')
       const next: EditablePlacement = {
-        location: json.location ?? 'Front',
-        description: `${zoneLabel} (auto-detected from artwork)`,
+        location: zoneLabel,
+        description: `${zoneLabel} placement (auto-detected from artwork)`,
         widthInches: json.widthIn ?? 0,
         heightInches: json.heightIn ?? 0,
         yOffsetInches: json.topOffsetIn ?? 0,
         notes: json.alignment ?? '',
+        autoDetected: true,
       }
-      setDetected(next)
-      // Surface in the exported tech pack, replacing any prior detected entry.
-      setPlacements(prev => [next, ...prev.filter(p => p.location !== next.location)])
+      // One graphic → one placement: replace the primary entry, preserving any
+      // additional placements the user explicitly added for a multi-graphic design.
+      setPlacements(prev => {
+        const extras = prev.filter(p => !p.autoDetected).slice(1)
+        return [next, ...extras]
+      })
     } catch {
       setDetectError('Network error while detecting placement.')
     } finally {
@@ -217,6 +251,32 @@ export default function Phase5TechPack({ state, onBack, onSendToProduction }: Pr
     })
   }
 
+  // Apply the saved size profile into the measurement table by matching rows
+  // (by key/label) and writing each shared size as an override — real, not cosmetic.
+  function applySavedProfile() {
+    if (!savedProfile || !guide || !resolvedFit) return
+    const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '')
+    let applied = 0
+    setOverrides(prev => {
+      const next = JSON.parse(JSON.stringify(prev)) as SizeGuideOverrides
+      for (const grow of guide.rows) {
+        const match = savedProfile.rows.find(pr => norm(pr.key) === norm(grow.key) || norm(pr.label) === norm(grow.label))
+        if (!match) continue
+        for (const s of guide.sizes) {
+          const v = match.values[s]
+          if (typeof v !== 'number' || !Number.isFinite(v) || v <= 0) continue
+          next[garmentType] ??= {}
+          next[garmentType][resolvedFit] ??= {}
+          next[garmentType][resolvedFit][grow.key] ??= {}
+          next[garmentType][resolvedFit][grow.key][s as SizeKey] = v
+          applied++
+        }
+      }
+      return next
+    })
+    if (applied > 0) setAppliedProfileId(savedProfile.id)
+  }
+
   function resetRow(rowKey: string) {
     if (!resolvedFit) return
     setOverrides(prev => {
@@ -233,6 +293,7 @@ export default function Phase5TechPack({ state, onBack, onSendToProduction }: Pr
     setGarmentType(g)
     setFit(undefined)
     setOverrides({})
+    setAppliedProfileId(null)
   }
 
   // ── Build TechPackData for production ─────────────────────────────────────
@@ -427,6 +488,39 @@ export default function Phase5TechPack({ state, onBack, onSendToProduction }: Pr
           ))}
         </div>
       </div>}
+
+      {/* ── Saved sizing source of truth ──────────────────────────────── */}
+      {!isUniform && savedProfile && (
+        <div className="mb-6 rounded-2xl border border-grace-border bg-grace-mist/50 px-4 py-3.5 flex items-start gap-3">
+          <span className="w-8 h-8 rounded-full bg-grace-ink text-white flex items-center justify-center shrink-0 mt-0.5">
+            <Ruler size={15} />
+          </span>
+          <div className="flex-1 min-w-0">
+            <p className="text-[13px] font-bold text-grace-ink leading-tight">Use your saved size profile</p>
+            <p className="text-[11px] text-grace-stone leading-relaxed mt-0.5">
+              “{savedProfile.name}” — {savedProfile.rows.length} measurements graded {savedProfile.sizes.join('/')}.
+              {appliedProfileId === savedProfile.id
+                ? ' Applied to the table below. Edit any cell to fine-tune.'
+                : ' Apply it to fill the measurements below, or export it for your supplier.'}
+            </p>
+            <div className="flex flex-wrap gap-1.5 mt-2.5">
+              <button
+                onClick={applySavedProfile}
+                disabled={appliedProfileId === savedProfile.id}
+                className="inline-flex items-center gap-1.5 text-[11px] font-semibold rounded-full px-3 py-1.5 border transition-colors disabled:opacity-50 disabled:cursor-default bg-grace-ink text-white border-grace-ink hover:bg-zinc-800"
+              >
+                <Wand2 size={11} /> {appliedProfileId === savedProfile.id ? 'Applied' : 'Apply to measurements'}
+              </button>
+              <button
+                onClick={() => downloadTextFile('grace-size-chart.csv', profileToCsv(savedProfile), 'text/csv')}
+                className="inline-flex items-center gap-1.5 text-[11px] font-semibold rounded-full px-3 py-1.5 border border-grace-border bg-white text-grace-ink hover:bg-grace-mist transition-colors"
+              >
+                <Download size={11} /> Export size chart
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Section 2: Fit selector + Measurements (apparel only) ──────── */}
       {!isUniform && (
@@ -809,51 +903,8 @@ export default function Phase5TechPack({ state, onBack, onSendToProduction }: Pr
             </div>
           )}
 
-          {detected && (
-            <div className="mb-3 rounded-xl border border-grace-ink/15 bg-grace-mist/40 p-3">
-              <div className="flex items-start gap-3">
-                {artworkUrl ? (
-                  <img src={artworkUrl} alt="logo" className="w-12 h-12 object-contain rounded-lg border border-grace-border bg-white p-1 shrink-0"/>
-                ) : (
-                  <div className="w-12 h-12 rounded-lg border border-grace-border bg-white shrink-0"/>
-                )}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <Wand2 size={11} className="text-grace-ink"/>
-                    <p className="text-[12px] font-bold text-grace-ink leading-none">{detected.location}</p>
-                    <span className="text-[8px] font-bold uppercase tracking-widest text-grace-ink/60">Auto-detected</span>
-                  </div>
-                  <p className="text-[10px] text-grace-stone mt-0.5">{detected.description}</p>
-                  <div className="mt-1.5 grid grid-cols-2 gap-x-3">
-                    <div>
-                      <p className="text-[9px] text-grace-stone uppercase tracking-wider font-semibold">Size</p>
-                      <p className="text-[11px] font-semibold text-grace-ink tabular-nums">
-                        {formatInches(detected.widthInches)}" W × {formatInches(detected.heightInches)}" H
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-[9px] text-grace-stone uppercase tracking-wider font-semibold">Offset</p>
-                      <p className="text-[11px] font-semibold text-grace-ink tabular-nums">
-                        {formatInches(detected.yOffsetInches)}" below collar
-                      </p>
-                    </div>
-                  </div>
-                  {detected.notes && (
-                    <p className="text-[10px] text-grace-stone mt-1">{detected.notes}</p>
-                  )}
-                </div>
-                <button onClick={() => setDetected(null)} className="text-grace-stone hover:text-grace-ink p-1 shrink-0" aria-label="Dismiss detected placement">
-                  <X size={12}/>
-                </button>
-              </div>
-              <p className="text-[9px] text-grace-stone mt-2 pt-2 border-t border-grace-border leading-relaxed">
-                Measured from your artwork at size M and added to the tech pack. Standard placements below remain available.
-              </p>
-            </div>
-          )}
-
           <div className="space-y-3 mb-3">
-            {(drawingM?.placements ?? []).filter(p => ['center_chest', 'left_chest', 'left_hip', 'right_hip'].includes(p.location)).map((p, i) => (
+            {placements.map((p, i) => (
               <div key={i} className="flex items-start gap-3">
                 {artworkUrl ? (
                   <img src={artworkUrl} alt="logo" className="w-12 h-12 object-contain rounded-lg border border-grace-border bg-grace-mist p-1 shrink-0"/>
@@ -865,12 +916,25 @@ export default function Phase5TechPack({ state, onBack, onSendToProduction }: Pr
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between">
                     <div>
-                      <p className="text-[12px] font-bold text-grace-ink leading-none">
-                        {p.location.split('_').map(w => w[0].toUpperCase() + w.slice(1)).join(' ')}
-                      </p>
-                      <p className="text-[10px] text-grace-stone mt-0.5">{p.label}</p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-[12px] font-bold text-grace-ink leading-none">{p.location}</p>
+                        {p.autoDetected && (
+                          <span className="inline-flex items-center gap-0.5 text-[8px] font-bold uppercase tracking-widest text-grace-ink/60">
+                            <Wand2 size={9}/> Auto-detected
+                          </span>
+                        )}
+                      </div>
+                      {p.description && <p className="text-[10px] text-grace-stone mt-0.5">{p.description}</p>}
                     </div>
-                    <button className="text-grace-stone hover:text-grace-ink p-1 shrink-0"><MoreVertical size={12}/></button>
+                    {placements.length > 1 && (
+                      <button
+                        onClick={() => setPlacements(prev => prev.filter((_, j) => j !== i))}
+                        className="text-grace-stone hover:text-grace-red p-1 shrink-0"
+                        aria-label="Remove placement"
+                      >
+                        <Trash2 size={12}/>
+                      </button>
+                    )}
                   </div>
                   <div className="mt-1.5 grid grid-cols-2 gap-x-3">
                     <div>
@@ -886,11 +950,13 @@ export default function Phase5TechPack({ state, onBack, onSendToProduction }: Pr
                       </p>
                     </div>
                   </div>
+                  {p.notes && <p className="text-[10px] text-grace-stone mt-1">{p.notes}</p>}
                 </div>
               </div>
             ))}
           </div>
           <button
+            onClick={() => setPlacements(prev => [...prev, { location: 'Additional Placement', description: '', widthInches: 4, heightInches: 4, yOffsetInches: 3, notes: '' }])}
             className="w-full text-[11px] text-grace-stone hover:text-grace-ink font-medium flex items-center justify-center gap-1 pt-2 border-t border-grace-border"
           >
             <Plus size={11}/> Add Placement

@@ -16,6 +16,7 @@ interface Props {
   mobileOpen: boolean
   onMobileClose: () => void
   onExpertHelp?: () => void
+  onSignIn?: () => void
   currentPhase?: number
   onPhaseChange?: (phase: number) => void
   state?: AppState
@@ -37,7 +38,7 @@ function GraceMark({ size = 24 }: { size?: number }) {
   )
 }
 
-export default function Sidebar({ section, onSectionChange, mobileOpen, onMobileClose, onExpertHelp, currentPhase, onPhaseChange, state }: Props) {
+export default function Sidebar({ section, onSectionChange, mobileOpen, onMobileClose, onExpertHelp, onSignIn, currentPhase, onPhaseChange, state }: Props) {
   const { user, signOut } = useAuth() ?? {}
   const { freeUsed, freeLimit, creditBalance } = useAICredits()
   const generationsLeft = Math.max(0, freeLimit - freeUsed) + creditBalance
@@ -65,7 +66,7 @@ export default function Sidebar({ section, onSectionChange, mobileOpen, onMobile
 
   const initials = user?.name
     ? user.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
-    : 'GB'
+    : 'GU'
 
   return (
     <aside className={`
@@ -191,21 +192,31 @@ export default function Sidebar({ section, onSectionChange, mobileOpen, onMobile
       {/* User */}
       <div className="p-3 border-t border-grace-border space-y-1">
         <button
-          onClick={() => onSectionChange('settings')}
-          title={collapsed ? (user?.name ?? 'Account') : undefined}
+          onClick={() => (user ? onSectionChange('settings') : onSignIn?.())}
+          title={collapsed ? (user?.name ?? 'Sign in') : undefined}
           className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-grace-mist transition-colors ${collapsed ? 'lg:justify-center lg:px-0' : ''}`}
         >
           <div className="w-6 h-6 bg-grace-ink rounded-full flex items-center justify-center text-[9px] font-bold text-white shrink-0">{initials}</div>
-          <span className={`text-xs text-grace-stone flex-1 text-left truncate ${collapsed ? 'lg:hidden' : ''}`}>{user?.name ?? 'Grace Brand'}</span>
+          <span className={`text-xs text-grace-stone flex-1 text-left truncate ${collapsed ? 'lg:hidden' : ''}`}>{user?.name ?? 'Guest'}</span>
           <ChevronRight size={11} className={`text-grace-stone shrink-0 ${collapsed ? 'lg:hidden' : ''}`}/>
         </button>
-        <button
-          onClick={signOut}
-          title={collapsed ? 'Sign out' : undefined}
-          className={`w-full px-2 py-1 text-[10px] text-grace-stone hover:text-grace-ink transition-colors rounded-lg hover:bg-grace-mist tracking-widest uppercase ${collapsed ? 'lg:hidden' : 'text-left'}`}
-        >
-          Sign out
-        </button>
+        {user ? (
+          <button
+            onClick={signOut}
+            title={collapsed ? 'Sign out' : undefined}
+            className={`w-full px-2 py-1 text-[10px] text-grace-stone hover:text-grace-ink transition-colors rounded-lg hover:bg-grace-mist tracking-widest uppercase ${collapsed ? 'lg:hidden' : 'text-left'}`}
+          >
+            Sign out
+          </button>
+        ) : onSignIn ? (
+          <button
+            onClick={onSignIn}
+            title={collapsed ? 'Sign in' : undefined}
+            className={`w-full px-2 py-1 text-[10px] font-bold text-grace-ink hover:text-grace-ink transition-colors rounded-lg hover:bg-grace-mist tracking-widest uppercase ${collapsed ? 'lg:hidden' : 'text-left'}`}
+          >
+            Sign in
+          </button>
+        ) : null}
       </div>
     </aside>
   )

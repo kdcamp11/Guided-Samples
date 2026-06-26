@@ -19,6 +19,8 @@ export interface CheckContext {
   embeddedImages: number
   printSize?: { w: number; h: number }
   sizeChartFile?: string
+  /** Name of the user's saved default size profile, if one exists in the sizing store. */
+  savedSizeProfileName?: string
   flags: {
     sizeChart: boolean
     techPack: boolean
@@ -160,13 +162,21 @@ export const CHECKS: CheckDef[] = [
   // ── Specifications ───────────────────────────────────────────────────────────
   {
     id: 'size-chart', label: 'Size chart', category: 'specs',
-    run: ({ flags, sizeChartFile }) => flags.sizeChart
-      ? {
-          status: 'pass',
-          detail: sizeChartFile ? `Size chart detected and parsed: ${sizeChartFile}.` : 'Size chart / measurement spec provided.',
-          evidence: sizeChartFile ? [sizeChartFile] : undefined,
-        }
-      : { status: 'critical', detail: 'No size chart found. Manufacturing needs graded measurements.', fixes: [fix('generate-sizechart', 'Generate size chart')] },
+    run: ({ flags, sizeChartFile, savedSizeProfileName }) => {
+      if (flags.sizeChart) return {
+        status: 'pass',
+        detail: sizeChartFile ? `Size chart detected and parsed: ${sizeChartFile}.` : 'Size chart / measurement spec provided.',
+        evidence: sizeChartFile ? [sizeChartFile] : undefined,
+      }
+      // No chart in this upload, but the user has a saved sizing source of truth.
+      if (savedSizeProfileName) return {
+        status: 'pass',
+        detail: `Using your saved size profile “${savedSizeProfileName}.” Production can reference it, or attach it to this order.`,
+        evidence: [savedSizeProfileName],
+        fixes: [fix('attach-sizechart', 'Attach saved size profile')],
+      }
+      return { status: 'critical', detail: 'No size chart found. Manufacturing needs graded measurements.', fixes: [fix('generate-sizechart', 'Generate size chart')] }
+    },
   },
   {
     id: 'placement-spec', label: 'Placement specifications', category: 'specs',

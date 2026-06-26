@@ -3,18 +3,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   ArrowLeft, ArrowRight, UploadCloud, FileText, Image as ImageIcon, Box,
-  CheckCircle2, AlertTriangle, XCircle, Info, Sparkles, Loader2, ChevronDown, Wand2,
+  CheckCircle2, AlertTriangle, XCircle, Info, Sparkles, Loader2, ChevronDown, Wand2, X, Plus,
 } from 'lucide-react'
 import { analyzeFiles } from '@/lib/prepress/analyze'
 import { runFix } from '@/lib/prepress/fixes'
+import { getDefaultSizeProfile } from '@/lib/sizing/store'
 import { STATUS_WEIGHT } from '@/lib/prepress/checks'
 import { CATEGORY_LABEL, type CheckResult, type PrepressReport, type Severity, type UploadedFile } from '@/lib/prepress/types'
 import { useAssistant } from '@/components/assistant/AssistantProvider'
 import { downloadTextFile } from '@/lib/prepress/sizeSpec'
+import ProductionIntake from '@/components/intake/ProductionIntake'
+import type { TechPackData } from '@/components/Phase6Production'
 
 interface Props {
   onBack: () => void
-  onContinue: () => void
+  onContinue: (techPack?: TechPackData) => void
 }
 
 const ANALYZING_STEPS = [
@@ -25,14 +28,29 @@ const ANALYZING_STEPS = [
   'Scoring production readiness…',
 ]
 
-const ACCEPT = '.png,.jpg,.jpeg,.webp,.gif,.tif,.tiff,.svg,.ai,.eps,.pdf,.csv,.xls,.xlsx,.zip'
+// .ai / .eps are intentionally NOT accepted — they can't be inspected in-browser
+// and suppliers prefer outlined PDF/SVG/PNG. Users are told to export instead.
+const ACCEPT = '.png,.jpg,.jpeg,.webp,.gif,.tif,.tiff,.svg,.pdf,.csv,.xls,.xlsx,.zip'
+const ALLOWED = new Set(['png', 'jpg', 'jpeg', 'webp', 'gif', 'tif', 'tiff', 'svg', 'pdf', 'csv', 'xls', 'xlsx', 'zip'])
+const BLOCKED = new Set(['ai', 'eps'])
+const extOf = (name: string) => (name.split('.').pop() || '').toLowerCase()
+
+function stagedIcon(name: string) {
+  const e = extOf(name)
+  if (['png', 'jpg', 'jpeg', 'webp', 'gif', 'tif', 'tiff'].includes(e)) return <ImageIcon size={14} />
+  if (e === 'svg') return <Sparkles size={14} />
+  if (['csv', 'xls', 'xlsx'].includes(e)) return <Box size={14} />
+  return <FileText size={14} />
+}
 
 export default function UploadProduction({ onBack, onContinue }: Props) {
-  const [phase, setPhase] = useState<'upload' | 'analyzing' | 'report'>('upload')
+  const [phase, setPhase] = useState<'upload' | 'analyzing' | 'intake'>('upload')
   const [report, setReport] = useState<PrepressReport | null>(null)
   const [dragging, setDragging] = useState(false)
   const [stepIdx, setStepIdx] = useState(0)
   const [fixing, setFixing] = useState<Record<string, boolean>>({})
+  const [staged, setStaged] = useState<File[]>([])
+  const [notice, setNotice] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -54,21 +72,51 @@ export default function UploadProduction({ onBack, onContinue }: Props) {
     })
   }, [phase, report, publish])
 
-  const handleFiles = useCallback(async (fileList: FileList | File[]) => {
-    const files = Array.from(fileList)
-    if (!files.length) return
+  // Stage files (accumulate across multiple drops/selections) instead of
+  // analyzing immediately. Rejects .ai/.eps and unsupported types, dedupes.
+  const addFiles = useCallback((fileList: FileList | File[]) => {
+    const incoming = Array.from(fileList)
+    const accepted: File[] = []
+    const rejected: string[] = []
+    for (const f of incoming) {
+      ALLOWED.has(extOf(f.name)) ? accepted.push(f) : rejected.push(f.name)
+    }
+    if (accepted.length) {
+      setStaged(prev => {
+        const seen = new Set(prev.map(f => `${f.name}:${f.size}`))
+        const merged = [...prev]
+        for (const f of accepted) {
+          const key = `${f.name}:${f.size}`
+          if (!seen.has(key)) { seen.add(key); merged.push(f) }
+        }
+        return merged
+      })
+    }
+    const hasAiEps = rejected.some(n => BLOCKED.has(extOf(n)))
+    setNotice(
+      rejected.length === 0 ? null
+      : hasAiEps
+        ? `.ai and .eps files aren’t accepted — export to PDF, SVG, or PNG and add it again. (${rejected.length} skipped)`
+        : `${rejected.length} unsupported file${rejected.length > 1 ? 's' : ''} skipped.`,
+    )
+  }, [])
+
+  const removeStaged = (i: number) => setStaged(prev => prev.filter((_, idx) => idx !== i))
+
+  const startAnalysis = useCallback(async () => {
+    if (!staged.length) return
     setPhase('analyzing')
     const [result] = await Promise.all([
-      analyzeFiles(files),
+      analyzeFiles(staged, { sizeProfile: getDefaultSizeProfile() }),
       new Promise(res => setTimeout(res, ANALYZING_STEPS.length * 650 + 300)), // let the inspection read deliberately
     ])
     setReport(result)
-    setPhase('report')
-  }, [])
+    setPhase('intake')
+  }, [staged])
 
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault(); setDragging(false)
-    if (e.dataTransfer?.files?.length) handleFiles(e.dataTransfer.files)
+    if (e.dataTransfer?.files?.length) addFiles(e.dataTransfer.files)
   }
 
   async function applyFix(check: CheckResult, fixId: string) {
@@ -102,18 +150,79 @@ export default function UploadProduction({ onBack, onContinue }: Props) {
           onDragOver={e => { e.preventDefault(); setDragging(true) }}
           onDragLeave={() => setDragging(false)}
           onDrop={onDrop}
-          className={`block cursor-pointer rounded-3xl border-2 border-dashed transition-all p-14 text-center
+          className={`block cursor-pointer rounded-3xl border-2 border-dashed transition-all p-12 text-center
             ${dragging ? 'border-grace-ink bg-grace-mist scale-[1.01]' : 'border-grace-border hover:border-grace-ink/40 bg-white'}`}
         >
           <input ref={inputRef} type="file" multiple accept={ACCEPT} className="hidden"
-            onChange={e => e.target.files && handleFiles(e.target.files)} />
+            onChange={e => { if (e.target.files) addFiles(e.target.files); e.target.value = '' }} />
           <div className="w-16 h-16 rounded-2xl bg-grace-ink text-white flex items-center justify-center mx-auto mb-5">
             <UploadCloud size={26} />
           </div>
           <p className="text-grace-ink font-bold tracking-tight mb-1">Drop production files here</p>
-          <p className="text-grace-stone text-xs mb-5">Artwork, mockups, tech packs, size charts — PNG · SVG · AI · EPS · PDF · CSV</p>
-          <span className="btn-primary inline-flex items-center gap-2"><Sparkles size={14}/> Choose files to analyze</span>
+          <p className="text-grace-stone text-xs mb-5">Artwork, mockups, tech packs, size charts — PNG · JPG · SVG · PDF · CSV · ZIP</p>
+          <span className="btn-primary inline-flex items-center gap-2"><Plus size={14}/> {staged.length ? 'Add more files' : 'Choose files'}</span>
         </label>
+
+        {/* Rejected-file notice (.ai/.eps and unsupported types) */}
+        {notice && (
+          <div className="mt-3 flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/5 px-3.5 py-2.5">
+            <AlertTriangle size={14} className="text-amber-500 shrink-0 mt-0.5" />
+            <p className="text-xs text-grace-ink leading-relaxed flex-1">{notice}</p>
+            <button onClick={() => setNotice(null)} className="text-grace-stone hover:text-grace-ink shrink-0" aria-label="Dismiss"><X size={13} /></button>
+          </div>
+        )}
+
+        {/* Naming tip — how to get the tech pack & size chart recognized */}
+        <div className="mt-3 flex items-start gap-2 rounded-xl border border-grace-border bg-grace-mist/40 px-3.5 py-2.5">
+          <Info size={14} className="text-grace-ink shrink-0 mt-0.5" />
+          <p className="text-xs text-grace-stone leading-relaxed">
+            <span className="font-semibold text-grace-ink">Naming tip:</span> so GRACE recognizes your documents, include{' '}
+            <span className="font-semibold text-grace-ink">“tech pack”</span> or <span className="font-semibold text-grace-ink">“spec”</span> in your tech-pack filename
+            (e.g. <span className="font-mono text-[11px]">good-shepard-tech-pack.pdf</span>), and{' '}
+            <span className="font-semibold text-grace-ink">“size chart”</span> in your measurements file
+            (e.g. <span className="font-mono text-[11px]">size-chart.csv</span>).
+          </p>
+        </div>
+
+        {/* Staged files — accumulate, then analyze when ready */}
+        {staged.length > 0 && (
+          <div className="mt-6">
+            <div className="flex items-center justify-between mb-2.5">
+              <p className="text-[11px] font-bold tracking-[0.14em] uppercase text-grace-ink">
+                {staged.length} file{staged.length > 1 ? 's' : ''} ready
+              </p>
+              <button onClick={() => { setStaged([]); setNotice(null) }} className="text-[11px] text-grace-stone hover:text-grace-ink font-medium">
+                Clear all
+              </button>
+            </div>
+            <div className="space-y-2">
+              {staged.map((f, i) => (
+                <div key={`${f.name}:${f.size}:${i}`} className="flex items-center gap-3 rounded-xl border border-grace-border bg-white px-3 py-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-grace-mist text-grace-ink flex items-center justify-center shrink-0">
+                    {stagedIcon(f.name)}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-medium text-grace-ink truncate">{f.name}</p>
+                    <p className="text-[10px] text-grace-stone uppercase tracking-wider">{extOf(f.name)} · {(f.size / 1024).toFixed(0)} KB</p>
+                  </div>
+                  <button onClick={() => removeStaged(i)} className="text-grace-stone hover:text-grace-red p-1 shrink-0" aria-label={`Remove ${f.name}`}>
+                    <X size={15} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Analyze — the explicit "I'm finished uploading" action */}
+        <button
+          onClick={startAnalysis}
+          disabled={!staged.length}
+          className="btn-primary w-full mt-6 inline-flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          <Sparkles size={15} />
+          {staged.length ? `Analyze ${staged.length} file${staged.length > 1 ? 's' : ''}` : 'Add files to analyze'}
+        </button>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-8">
           {[
@@ -159,7 +268,19 @@ export default function UploadProduction({ onBack, onContinue }: Props) {
     )
   }
 
-  // ── Report ────────────────────────────────────────────────────────────────
+  // ── Intake conversation (conversational-first) ─────────────────────────────
+  if (phase === 'intake' && report) {
+    return (
+      <ProductionIntake
+        files={staged}
+        report={report}
+        onBack={onBack}
+        onComplete={(tp) => onContinue(tp)}
+      />
+    )
+  }
+
+  // ── Report (detailed preflight) — retained as a fallback view ───────────────
   if (!report) return null
   const { score, summary, ready, results, files } = report
   const criticals = results.filter(r => r.status === 'critical')
@@ -191,7 +312,7 @@ export default function UploadProduction({ onBack, onContinue }: Props) {
 
       {/* Ready → continue */}
       {ready && (
-        <button onClick={onContinue}
+        <button onClick={() => onContinue()}
           className="w-full mb-4 rounded-2xl bg-grace-ink text-white px-6 py-4 flex items-center justify-between hover:bg-zinc-800 transition-colors group">
           <span className="flex items-center gap-3">
             <CheckCircle2 size={18} className="text-green-600"/>
@@ -326,6 +447,8 @@ function FileRow({ file }: { file: UploadedFile }) {
   const kindIcon = file.kind === 'raster' ? <ImageIcon size={14}/> : file.kind === 'document' ? <FileText size={14}/> : file.kind === 'vector' ? <Sparkles size={14}/> : <Box size={14}/>
   const i = file.inspection
   // Real, parsed facts — shown so the inspection is visibly genuine.
+  const c = file.classification
+  const viewsSeen = c ? (['front', 'back', 'side'] as const).filter(v => c.views[v]) : []
   const facts = [
     file.width ? `${file.width}×${file.height}px` : null,
     i?.dpi ? `${i.dpi}dpi` : null,
@@ -334,6 +457,8 @@ function FileRow({ file }: { file: UploadedFile }) {
     i?.pageSizeIn ? `${i.pageSizeIn.w}×${i.pageSizeIn.h}in` : null,
     i?.hasLiveText ? 'live text' : null,
     i?.isSizeChart ? 'size chart' : null,
+    c?.isGarmentMockup ? 'garment mockup' : null,
+    viewsSeen.length ? viewsSeen.join('+') : null,
   ].filter(Boolean)
   return (
     <div className="flex items-center gap-3 rounded-xl border border-grace-border bg-white px-3 py-2.5">
