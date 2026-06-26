@@ -39,9 +39,10 @@ export async function POST(req: NextRequest) {
 
 Rules:
 - NEVER invent or assume values. Capture a field ONLY if the user explicitly stated it in their latest message.
+- Extract EVERY field the user mentions in a single message — one message can fill multiple fields. E.g. "250 gsm and screen printed" → { "fabricWeight": "250 gsm", "decorationMethod": "Screen print" }. "heavyweight 100% cotton tee for my brand Atlas" → { "garmentType": "heavyweight t-shirt", "fabricContent": "100% cotton", "brandName": "Atlas" }.
 - Capture into this exact JSON shape (omit fields the user didn't provide):
   "captured": { ${FIELD_KEYS.map(k => `"${k}"?`).join(', ')} }
-- Normalize lightly (e.g. "cotton 240gsm" → fabricContent "100% cotton" only if they said 100%; otherwise keep what they said; fabricWeight "240 gsm").
+- Normalize lightly (e.g. fabricWeight "240 gsm"; decorationMethod one of: Screen print, DTG, Embroidery, Sublimation, Heat transfer vinyl, Puff print).
 - placementNotes: capture a free-text description of where/size of graphics if described.
 - After capturing, write ONE short reply: acknowledge what you got, then ask for the SINGLE most important still-missing item. If the user asks a question, answer it briefly first.
 - If nothing is missing, congratulate them and say they can send to production.

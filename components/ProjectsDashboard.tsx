@@ -58,7 +58,9 @@ export default function ProjectsDashboard({ onNewProject, onOpenProject }: Props
   useEffect(() => {
     if (!user) return
     Promise.all([listProjects(user.id), listFolders(user.id)]).then(([p, f]) => {
-      setProjects(p)
+      // Uploaded-packet orders mint a synthetic project to flow through the order
+      // pipeline; they belong in Orders, not as openable designs here.
+      setProjects(p.filter(x => !x.name?.startsWith('Uploaded · ')))
       setFolders(f)
       setLoading(false)
     })

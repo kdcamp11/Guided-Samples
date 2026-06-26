@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import { analyzeFiles } from '@/lib/prepress/analyze'
 import {
-  assess, buildTechPack, type PacketFields, type IntakeEvidence,
+  assess, buildTechPack, extractFieldsLocal, type PacketFields, type IntakeEvidence,
 } from '@/lib/intake/requirements'
 import { getDefaultSizeProfile, saveSizeProfile } from '@/lib/sizing/store'
 import { fromCsv, fromStandardFit } from '@/lib/sizing/sources'
@@ -160,16 +160,23 @@ export default function ProductionIntake({ files, report: initialReport, onBack,
     if (!clean || busy) return
     setDraft('')
     push({ id: mkId(), role: 'user', text: clean })
+    // Instant, deterministic capture (e.g. "250 gsm and screen printed" → both
+    // fabric weight + decoration), so boxes check immediately. The LLM refines below.
+    const local = extractFieldsLocal(clean)
+    const mergedFields = { ...fields, ...local }
+    if (Object.keys(local).length) setFields(mergedFields)
     setBusy(true)
     try {
+      // Assess against the locally-merged fields so the next question is accurate.
+      const localAssess = assess({ ...evidence, fields: mergedFields })
       const res = await fetch('/api/intake', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: clean,
           history: messages.slice(-8).map(m => ({ role: m.role, text: m.text })),
-          have: a.rows.filter(r => r.satisfied).map(r => r.slot.label),
-          missing: a.missingRequired.map(s => ({ id: s.id, label: s.label, ask: s.detail(evidence) })),
-          ready: a.ready,
+          have: localAssess.rows.filter(r => r.satisfied).map(r => r.slot.label),
+          missing: localAssess.missingRequired.map(s => ({ id: s.id, label: s.label, ask: s.detail({ ...evidence, fields: mergedFields }) })),
+          ready: localAssess.ready,
         }),
       })
       const j = await res.json()

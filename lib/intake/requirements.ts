@@ -36,6 +36,41 @@ export const FIELD_KEYS: (keyof PacketFields)[] = [
   'decorationMethod', 'placementNotes',
 ]
 
+// Deterministic extraction of high-confidence values from a single message, so a
+// line like "250 gsm and screen printed" instantly fills BOTH fabric weight and
+// decoration method — independent of the LLM (which still refines/extends this).
+// Conservative on purpose: only unambiguous patterns, and skipped for questions.
+const DECORATION_PATTERNS: [RegExp, string][] = [
+  [/\bscreen[\s-]?print(?:ed|ing)?\b|\bsilk[\s-]?screen/i, 'Screen print'],
+  [/\bdtg\b|direct[\s-]?to[\s-]?garment/i, 'DTG'],
+  [/\bembroider(?:y|ed|ing)?\b/i, 'Embroidery'],
+  [/\bsublimat(?:e|ed|ion)\b/i, 'Sublimation'],
+  [/\bpuff\s?print(?:ed|ing)?\b/i, 'Puff print'],
+  [/\b(?:htv|heat[\s-]?transfer|heat[\s-]?press|vinyl)\b/i, 'Heat transfer vinyl'],
+  [/\bpatch(?:es)?\b/i, 'Patch'],
+]
+
+export function extractFieldsLocal(text: string): Partial<PacketFields> {
+  const out: Partial<PacketFields> = {}
+  const t = text.trim()
+  if (!t || /\?\s*$/.test(t)) return out // don't capture from a question
+
+  // Fabric weight: "250 gsm", "240 g/m2", "7 oz"
+  const w = t.match(/(\d{1,4}(?:\.\d+)?)\s*(gsm|g\/m2?|g\/m²|oz\.?|ounces?)\b/i)
+  if (w) out.fabricWeight = `${w[1]} ${/oz|ounce/i.test(w[2]) ? 'oz' : 'gsm'}`
+
+  // Decoration method (first match wins)
+  for (const [re, label] of DECORATION_PATTERNS) {
+    if (re.test(t)) { out.decorationMethod = label; break }
+  }
+
+  // Fabric composition: "100% combed cotton", "50% cotton 50% polyester"
+  const comp = Array.from(t.matchAll(/(\d{1,3})\s*%\s*([a-z][a-z\- ]{1,20}?)(?=[,/&]|\s*\d|\s+and\b|\.|$)/gi))
+  if (comp.length) out.fabricContent = comp.map(m => `${m[1]}% ${m[2].trim()}`).join(', ')
+
+  return out
+}
+
 // ── Everything we know so far ──────────────────────────────────────────────────
 export interface IntakeEvidence {
   fields: PacketFields

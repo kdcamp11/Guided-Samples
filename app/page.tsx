@@ -329,17 +329,7 @@ function App() {
     return (
       <UploadProduction
         onBack={() => setView('landing')}
-        onContinue={(tp) => {
-          if (tp) {
-            // Packet assembled by the intake conversation → drop into production.
-            setTechPack(tp)
-            setSection('design')
-            setState(s => ({ ...s, currentPhase: 5 }))
-            setView('studio')
-          } else {
-            setSection('dashboard'); setView('studio')
-          }
-        }}
+        onContinue={() => { setSection('dashboard'); setView('studio') }}
       />
     )
   }

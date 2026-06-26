@@ -13,11 +13,14 @@ import { CATEGORY_LABEL, type CheckResult, type PrepressReport, type Severity, t
 import { useAssistant } from '@/components/assistant/AssistantProvider'
 import { downloadTextFile } from '@/lib/prepress/sizeSpec'
 import ProductionIntake from '@/components/intake/ProductionIntake'
-import type { TechPackData } from '@/components/Phase6Production'
+import Phase6Production, { type TechPackData } from '@/components/Phase6Production'
+import { mintUploadedOrder } from '@/lib/intake/persist'
+import { useAuth } from '@/lib/auth'
+import type { AppState } from '@/app/page'
 
 interface Props {
   onBack: () => void
-  onContinue: (techPack?: TechPackData) => void
+  onContinue: () => void
 }
 
 const ANALYZING_STEPS = [
@@ -44,7 +47,12 @@ function stagedIcon(name: string) {
 }
 
 export default function UploadProduction({ onBack, onContinue }: Props) {
-  const [phase, setPhase] = useState<'upload' | 'analyzing' | 'intake'>('upload')
+  const [phase, setPhase] = useState<'upload' | 'analyzing' | 'intake' | 'checkout'>('upload')
+  const { user } = useAuth()
+  const [checkout, setCheckout] = useState<{ projectId: string; tp: TechPackData; state: AppState } | null>(null)
+  const [minting, setMinting] = useState(false)
+  const [mintError, setMintError] = useState<string | null>(null)
+  const [pendingTp, setPendingTp] = useState<TechPackData | null>(null)
   const [report, setReport] = useState<PrepressReport | null>(null)
   const [dragging, setDragging] = useState(false)
   const [stepIdx, setStepIdx] = useState(0)
@@ -113,6 +121,24 @@ export default function UploadProduction({ onBack, onContinue }: Props) {
     setReport(result)
     setPhase('intake')
   }, [staged])
+
+  // The intake assembled a complete packet → persist it as a real project +
+  // tech pack, then move into the isolated production checkout (same as DIY).
+  async function mintAndCheckout(tp: TechPackData) {
+    setPendingTp(tp)
+    if (!user) { setMintError('Please sign in to send your packet to production.'); return }
+    setMinting(true); setMintError(null)
+    const projectId = await mintUploadedOrder(user.id, tp)
+    setMinting(false)
+    if (!projectId) { setMintError('Couldn’t prepare your order. Please try again.'); return }
+    const state: AppState = {
+      currentPhase: 6, logo: null,
+      garment: { svg: '', dataUrl: '', views: {}, type: tp.styleInfo.garmentType || 'T-Shirt', color: tp.styleInfo.colorway || '' },
+      design: null, preview: null,
+    }
+    setCheckout({ projectId, tp, state })
+    setPhase('checkout')
+  }
 
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault(); setDragging(false)
@@ -268,15 +294,52 @@ export default function UploadProduction({ onBack, onContinue }: Props) {
     )
   }
 
+  // ── Isolated production checkout (full DIY checkout, no design-phase nav) ───
+  if (phase === 'checkout' && checkout) {
+    return (
+      <Phase6Production
+        state={checkout.state}
+        techPack={checkout.tp}
+        projectId={checkout.projectId}
+        onEnsureProject={async () => checkout.projectId}
+        onBack={() => setPhase('intake')}
+      />
+    )
+  }
+
   // ── Intake conversation (conversational-first) ─────────────────────────────
   if (phase === 'intake' && report) {
     return (
-      <ProductionIntake
-        files={staged}
-        report={report}
-        onBack={onBack}
-        onComplete={(tp) => onContinue(tp)}
-      />
+      <>
+        <ProductionIntake
+          files={staged}
+          report={report}
+          onBack={onBack}
+          onComplete={mintAndCheckout}
+        />
+        {(minting || mintError) && (
+          <div className="fixed inset-0 z-[70] bg-black/40 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl border border-grace-border shadow-2xl p-6 max-w-sm w-full text-center">
+              {minting ? (
+                <>
+                  <Loader2 size={22} className="animate-spin text-grace-ink mx-auto mb-3" />
+                  <p className="text-sm font-bold text-grace-ink">Preparing your production order…</p>
+                  <p className="text-xs text-grace-stone mt-1">Saving your packet and tech pack.</p>
+                </>
+              ) : (
+                <>
+                  <XCircle size={22} className="text-red-500 mx-auto mb-3" />
+                  <p className="text-sm font-bold text-grace-ink">{mintError}</p>
+                  <div className="flex gap-2 mt-4">
+                    <button onClick={() => setMintError(null)} className="flex-1 py-2 rounded-xl border border-grace-border text-xs font-semibold text-grace-ink hover:bg-grace-mist">Cancel</button>
+                    {pendingTp && <button onClick={() => mintAndCheckout(pendingTp)} className="flex-1 py-2 rounded-xl bg-grace-ink text-white text-xs font-semibold hover:bg-zinc-800">Try again</button>}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+      </>
     )
   }
 
