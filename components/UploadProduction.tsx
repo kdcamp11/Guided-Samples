@@ -324,6 +324,17 @@ function CheckRow({ check, fixing, onFix }: { check: CheckResult; fixing: boolea
 
 function FileRow({ file }: { file: UploadedFile }) {
   const kindIcon = file.kind === 'raster' ? <ImageIcon size={14}/> : file.kind === 'document' ? <FileText size={14}/> : file.kind === 'vector' ? <Sparkles size={14}/> : <Box size={14}/>
+  const i = file.inspection
+  // Real, parsed facts — shown so the inspection is visibly genuine.
+  const facts = [
+    file.width ? `${file.width}×${file.height}px` : null,
+    i?.dpi ? `${i.dpi}dpi` : null,
+    i?.colorType && i.colorType !== 'unknown' ? i.colorType.toUpperCase() : null,
+    i?.pages ? `${i.pages}pg` : null,
+    i?.pageSizeIn ? `${i.pageSizeIn.w}×${i.pageSizeIn.h}in` : null,
+    i?.hasLiveText ? 'live text' : null,
+    i?.isSizeChart ? 'size chart' : null,
+  ].filter(Boolean)
   return (
     <div className="flex items-center gap-3 rounded-xl border border-grace-border bg-white px-3 py-2.5">
       <div className="w-9 h-9 rounded-lg bg-grace-mist text-grace-ink flex items-center justify-center overflow-hidden shrink-0">
@@ -332,7 +343,7 @@ function FileRow({ file }: { file: UploadedFile }) {
       <div className="min-w-0 flex-1">
         <p className="text-xs font-medium text-grace-ink truncate">{file.name}</p>
         <p className="text-[10px] text-grace-stone uppercase tracking-wider">
-          {file.kind}{file.width ? ` · ${file.width}×${file.height}` : ''} · {(file.size / 1024).toFixed(0)} KB
+          {file.kind} · {(file.size / 1024).toFixed(0)} KB{facts.length ? ` · ${facts.join(' · ')}` : ''}
         </p>
       </div>
     </div>

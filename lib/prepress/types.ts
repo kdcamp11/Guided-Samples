@@ -11,6 +11,30 @@ export type CheckCategory =
 
 export type FileKind = 'vector' | 'raster' | 'document' | 'spreadsheet' | 'other'
 
+/** Real, parsed metadata extracted from a file's actual bytes/contents. */
+export interface FileInspection {
+  inspected: boolean
+  // raster
+  width?: number
+  height?: number
+  dpi?: number
+  colorType?: 'gray' | 'rgb' | 'rgba' | 'indexed' | 'cmyk' | 'unknown'
+  hasAlpha?: boolean
+  // pdf / vector
+  pages?: number
+  pageSizeIn?: { w: number; h: number }
+  hasLiveText?: boolean
+  embeddedImages?: number
+  vectorEmbeddedRaster?: boolean
+  // shared signals
+  cmyk?: boolean
+  pantone?: boolean
+  // tabular (size charts)
+  isSizeChart?: boolean
+  table?: { headers: string[]; rows: string[][] }
+  notes?: string[]
+}
+
 export interface UploadedFile {
   id: string
   name: string
@@ -21,6 +45,7 @@ export interface UploadedFile {
   width?: number
   height?: number
   dataUrl?: string
+  inspection?: FileInspection
 }
 
 export interface FixAction {

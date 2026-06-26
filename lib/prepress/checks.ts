@@ -13,6 +13,12 @@ export interface CheckContext {
   lowRes: UploadedFile[]
   views: { front: boolean; back: boolean; side: boolean }
   garmentViews: boolean
+  /** Real content signals parsed from the files. */
+  liveTextDetected: boolean
+  inspectedText: boolean
+  embeddedImages: number
+  printSize?: { w: number; h: number }
+  sizeChartFile?: string
   flags: {
     sizeChart: boolean
     techPack: boolean
@@ -81,14 +87,16 @@ export const CHECKS: CheckDef[] = [
   {
     id: 'image-resolution', label: 'Image resolution', category: 'artwork',
     run: ({ rasterFiles, lowRes }) => {
+      const dim = (f: UploadedFile) => `${f.name} — ${f.width ?? '?'}×${f.height ?? '?'}px${f.inspection?.dpi ? ` @ ${f.inspection.dpi}dpi` : ''}`
       if (rasterFiles.length === 0) return { status: 'pass', detail: 'No raster images to evaluate.' }
       if (lowRes.length === 0) return {
         status: 'pass', detail: 'All raster artwork meets print resolution.',
-        evidence: rasterFiles.map(f => `${f.name} — ${f.width}×${f.height}px`),
+        evidence: rasterFiles.map(dim),
       }
       return {
-        status: 'warning', detail: `${lowRes.length} image(s) below ${MIN_PRINT_PX}px — may look soft when printed.`,
-        evidence: lowRes.map(f => `${f.name} — ${f.width}×${f.height}px`),
+        status: 'warning',
+        detail: `${lowRes.length} image(s) below print resolution (need ~${MIN_PRINT_PX}px / 300dpi) — may look soft when printed.`,
+        evidence: lowRes.map(dim),
         fixes: [fix('upscale', 'AI upscale to print resolution')],
       }
     },
@@ -115,17 +123,32 @@ export const CHECKS: CheckDef[] = [
   // ── Typography ─────────────────────────────────────────────────────────────
   {
     id: 'fonts-outlined', label: 'Fonts outlined', category: 'typography',
-    run: ({ hasDocument, hasVector }) => (hasDocument || hasVector)
-      ? { status: 'warning', detail: 'Live text may be present. Fonts must be outlined so they render identically at the supplier.', fixes: [fix('outline-fonts', 'Convert fonts to outlines')] }
-      : { status: 'info', detail: 'No vector/document files with text to evaluate.' },
+    run: ({ liveTextDetected, inspectedText, hasDocument, hasVector }) => {
+      if (liveTextDetected) return {
+        status: 'warning',
+        detail: 'Live text detected in your artwork. Fonts must be outlined so type renders identically at the supplier.',
+        fixes: [fix('outline-fonts', 'Convert fonts to outlines')],
+      }
+      if (inspectedText && (hasDocument || hasVector)) return { status: 'pass', detail: 'No live text found — type appears outlined.' }
+      if (hasDocument || hasVector) return {
+        status: 'warning', detail: 'Couldn’t fully verify fonts. If your files contain live text, outline it before production.',
+        fixes: [fix('outline-fonts', 'Convert fonts to outlines')],
+      }
+      return { status: 'info', detail: 'No vector/document files with text to evaluate.' }
+    },
   },
 
   // ── Dimensions & bleed ──────────────────────────────────────────────────────
   {
     id: 'print-dimensions', label: 'Print dimensions', category: 'dimensions',
-    run: ({ flags }) => flags.dimensions
-      ? { status: 'pass', detail: 'Print dimensions are specified.' }
-      : { status: 'critical', detail: 'No print dimensions found. The supplier needs exact print size per placement.', fixes: [fix('set-dimensions', 'Generate print dimensions')] },
+    run: ({ flags, printSize }) => {
+      if (printSize) return {
+        status: 'pass', detail: `Print dimensions detected from the file: ${printSize.w}″ × ${printSize.h}″.`,
+        evidence: [`${printSize.w}″ × ${printSize.h}″`],
+      }
+      if (flags.dimensions) return { status: 'pass', detail: 'Print dimensions are specified.' }
+      return { status: 'critical', detail: 'No print dimensions found. The supplier needs exact print size per placement.', fixes: [fix('set-dimensions', 'Generate print dimensions')] }
+    },
   },
   {
     id: 'bleed-safe', label: 'Bleed & safe area', category: 'dimensions',
@@ -137,8 +160,12 @@ export const CHECKS: CheckDef[] = [
   // ── Specifications ───────────────────────────────────────────────────────────
   {
     id: 'size-chart', label: 'Size chart', category: 'specs',
-    run: ({ flags }) => flags.sizeChart
-      ? { status: 'pass', detail: 'Size chart / measurement spec provided.' }
+    run: ({ flags, sizeChartFile }) => flags.sizeChart
+      ? {
+          status: 'pass',
+          detail: sizeChartFile ? `Size chart detected and parsed: ${sizeChartFile}.` : 'Size chart / measurement spec provided.',
+          evidence: sizeChartFile ? [sizeChartFile] : undefined,
+        }
       : { status: 'critical', detail: 'No size chart found. Manufacturing needs graded measurements.', fixes: [fix('generate-sizechart', 'Generate size chart')] },
   },
   {
