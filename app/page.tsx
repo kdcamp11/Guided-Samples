@@ -110,6 +110,8 @@ function App() {
   const [techPack, setTechPack] = useState<TechPackData | null>(null)
   const [authOpen, setAuthOpen] = useState(false)
   const [authInitialMode, setAuthInitialMode] = useState<'signin' | 'signup'>('signin')
+  // Where to send the user after they authenticate (the entry path they picked).
+  const [pendingDest, setPendingDest] = useState<'studio' | 'upload-production' | 'creative-direction' | null>(null)
   const projectIdRef = useRef<string | undefined>(undefined)
   const isExistingProjectRef = useRef(false)
   const [saveToast, setSaveToast] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
@@ -275,12 +277,45 @@ function App() {
     setView('studio')
   }
 
+  // Navigate to an entry path. Used after a successful sign-in.
+  const performEnter = (dest: 'studio' | 'upload-production' | 'creative-direction') => {
+    if (dest === 'creative-direction') { prevViewRef.current = 'landing'; setView('creative-direction') }
+    else if (dest === 'upload-production') { setView('upload-production') }
+    else { setSection('dashboard'); setView('studio') }
+  }
+  // Guests must authenticate first: remember where they were headed, then prompt.
+  const gate = (dest: 'studio' | 'upload-production' | 'creative-direction') => {
+    setPendingDest(dest); setAuthInitialMode('signin'); setAuthOpen(true)
+  }
+
   // Loading spinner while Supabase session resolves
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-grace-ink border-t-transparent rounded-full animate-spin"/>
       </div>
+    )
+  }
+
+  // Authentication required — no guest access. While signed out, only the public
+  // landing page is reachable, and every entry path prompts sign-in/sign-up first.
+  if (!user) {
+    return (
+      <>
+        <LandingPage
+          onSelfService={() => gate('studio')}
+          onCreativeDirection={() => gate('creative-direction')}
+          onUploadFiles={() => gate('upload-production')}
+          onSignIn={() => { setPendingDest(null); setAuthInitialMode('signin'); setAuthOpen(true) }}
+          onSignUp={() => { setPendingDest(null); setAuthInitialMode('signup'); setAuthOpen(true) }}
+        />
+        <AuthModal
+          open={authOpen}
+          onClose={() => setAuthOpen(false)}
+          onSuccess={() => { setAuthOpen(false); performEnter(pendingDest ?? 'studio') }}
+          initialMode={authInitialMode}
+        />
+      </>
     )
   }
 
@@ -299,24 +334,16 @@ function App() {
     )
   }
 
-  // Landing page
+  // Landing page (authenticated — entry paths go straight in).
   if (view === 'landing') {
     return (
-      <>
-        <LandingPage
-          onSelfService={() => setView('studio')}
-          onCreativeDirection={() => { prevViewRef.current = 'landing'; setView('creative-direction') }}
-          onUploadFiles={() => setView('upload-production')}
-          onSignIn={() => { setAuthInitialMode('signin'); setAuthOpen(true) }}
-          onSignUp={() => { setAuthInitialMode('signup'); setAuthOpen(true) }}
-        />
-        <AuthModal
-          open={authOpen}
-          onClose={() => setAuthOpen(false)}
-          onSuccess={() => { setAuthOpen(false); setSection('dashboard'); setView('studio') }}
-          initialMode={authInitialMode}
-        />
-      </>
+      <LandingPage
+        onSelfService={() => performEnter('studio')}
+        onCreativeDirection={() => performEnter('creative-direction')}
+        onUploadFiles={() => performEnter('upload-production')}
+        onSignIn={() => performEnter('studio')}
+        onSignUp={() => performEnter('studio')}
+      />
     )
   }
 
