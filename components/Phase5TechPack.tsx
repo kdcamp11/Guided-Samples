@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
   CheckCircle2, Pencil, Plus, Trash2, Download, Save, Send, ArrowLeft,
   MoreVertical, ChevronRight, X, Wand2, Loader2,
@@ -19,6 +19,11 @@ import { ALL_SIZES } from '@/lib/fitBlocks/types'
 import type { GarmentType, FitVariant, SizeKey } from '@/lib/fitBlocks/types'
 import { TechFlat, FLAT_FOR_GARMENT } from '@/components/TechFlats'
 import { downloadAssetsZip } from '@/lib/downloadAssets'
+import { getDefaultSizeProfile, onSizingChange } from '@/lib/sizing/store'
+import { profileToCsv } from '@/lib/sizing/sources'
+import { downloadTextFile } from '@/lib/prepress/sizeSpec'
+import type { SizeProfile } from '@/lib/sizing/types'
+import { Ruler } from 'lucide-react'
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -74,6 +79,15 @@ export default function Phase5TechPack({ state, onBack, onSendToProduction }: Pr
   const [garmentType, setGarmentType] = useState<GarmentType>(inferredGarmentType)
   const [fit, setFit] = useState<FitVariant | undefined>(undefined)
   const [overrides, setOverrides] = useState<SizeGuideOverrides>({})
+
+  // ── Saved sizing source of truth (reused across projects) ────────────────
+  const [savedProfile, setSavedProfile] = useState<SizeProfile | null>(null)
+  const [appliedProfileId, setAppliedProfileId] = useState<string | null>(null)
+  useEffect(() => {
+    const load = () => setSavedProfile(getDefaultSizeProfile())
+    load()
+    return onSizingChange(load)
+  }, [])
 
   const [pantones, setPantones] = useState<{ color: string; name: string }[]>([
     { color: '#0A0A0A', name: 'PANTONE Black C' },
@@ -217,6 +231,32 @@ export default function Phase5TechPack({ state, onBack, onSendToProduction }: Pr
     })
   }
 
+  // Apply the saved size profile into the measurement table by matching rows
+  // (by key/label) and writing each shared size as an override — real, not cosmetic.
+  function applySavedProfile() {
+    if (!savedProfile || !guide || !resolvedFit) return
+    const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '')
+    let applied = 0
+    setOverrides(prev => {
+      const next = JSON.parse(JSON.stringify(prev)) as SizeGuideOverrides
+      for (const grow of guide.rows) {
+        const match = savedProfile.rows.find(pr => norm(pr.key) === norm(grow.key) || norm(pr.label) === norm(grow.label))
+        if (!match) continue
+        for (const s of guide.sizes) {
+          const v = match.values[s]
+          if (typeof v !== 'number' || !Number.isFinite(v) || v <= 0) continue
+          next[garmentType] ??= {}
+          next[garmentType][resolvedFit] ??= {}
+          next[garmentType][resolvedFit][grow.key] ??= {}
+          next[garmentType][resolvedFit][grow.key][s as SizeKey] = v
+          applied++
+        }
+      }
+      return next
+    })
+    if (applied > 0) setAppliedProfileId(savedProfile.id)
+  }
+
   function resetRow(rowKey: string) {
     if (!resolvedFit) return
     setOverrides(prev => {
@@ -233,6 +273,7 @@ export default function Phase5TechPack({ state, onBack, onSendToProduction }: Pr
     setGarmentType(g)
     setFit(undefined)
     setOverrides({})
+    setAppliedProfileId(null)
   }
 
   // ── Build TechPackData for production ─────────────────────────────────────
@@ -427,6 +468,39 @@ export default function Phase5TechPack({ state, onBack, onSendToProduction }: Pr
           ))}
         </div>
       </div>}
+
+      {/* ── Saved sizing source of truth ──────────────────────────────── */}
+      {!isUniform && savedProfile && (
+        <div className="mb-6 rounded-2xl border border-grace-border bg-grace-mist/50 px-4 py-3.5 flex items-start gap-3">
+          <span className="w-8 h-8 rounded-full bg-grace-ink text-white flex items-center justify-center shrink-0 mt-0.5">
+            <Ruler size={15} />
+          </span>
+          <div className="flex-1 min-w-0">
+            <p className="text-[13px] font-bold text-grace-ink leading-tight">Use your saved size profile</p>
+            <p className="text-[11px] text-grace-stone leading-relaxed mt-0.5">
+              “{savedProfile.name}” — {savedProfile.rows.length} measurements graded {savedProfile.sizes.join('/')}.
+              {appliedProfileId === savedProfile.id
+                ? ' Applied to the table below. Edit any cell to fine-tune.'
+                : ' Apply it to fill the measurements below, or export it for your supplier.'}
+            </p>
+            <div className="flex flex-wrap gap-1.5 mt-2.5">
+              <button
+                onClick={applySavedProfile}
+                disabled={appliedProfileId === savedProfile.id}
+                className="inline-flex items-center gap-1.5 text-[11px] font-semibold rounded-full px-3 py-1.5 border transition-colors disabled:opacity-50 disabled:cursor-default bg-grace-ink text-white border-grace-ink hover:bg-zinc-800"
+              >
+                <Wand2 size={11} /> {appliedProfileId === savedProfile.id ? 'Applied' : 'Apply to measurements'}
+              </button>
+              <button
+                onClick={() => downloadTextFile('grace-size-chart.csv', profileToCsv(savedProfile), 'text/csv')}
+                className="inline-flex items-center gap-1.5 text-[11px] font-semibold rounded-full px-3 py-1.5 border border-grace-border bg-white text-grace-ink hover:bg-grace-mist transition-colors"
+              >
+                <Download size={11} /> Export size chart
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Section 2: Fit selector + Measurements (apparel only) ──────── */}
       {!isUniform && (

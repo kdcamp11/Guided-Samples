@@ -6,6 +6,8 @@
 
 import { buildSizeSpec, sizeSpecToCsv, sizeSpecSummary } from './sizeSpec'
 import { generateTechPack } from './techPack'
+import { getDefaultSizeProfile } from '@/lib/sizing/store'
+import { profileToCsv } from '@/lib/sizing/sources'
 
 export interface FixOutcome {
   /** Message shown on the now-resolved check row. */
@@ -47,6 +49,25 @@ export async function runFix(id: string, garmentHint?: string): Promise<FixOutco
         artifact: 'size-chart.csv',
         download: { filename: 'grace-size-chart.csv', content: sizeSpecToCsv(spec), mime: 'text/csv' },
       }
+    }
+  }
+  // Real implementation: attach the user's saved sizing source of truth.
+  if (id === 'attach-sizechart') {
+    await new Promise(res => setTimeout(res, 900))
+    const profile = getDefaultSizeProfile()
+    if (profile) {
+      return {
+        message: `Attached your saved size profile “${profile.name}” (${profile.rows.length} measurements, graded ${profile.sizes.join('/')}).`,
+        artifact: 'size-chart.csv',
+        download: { filename: 'grace-size-chart.csv', content: profileToCsv(profile), mime: 'text/csv' },
+      }
+    }
+    // No saved profile after all — fall through to generating one.
+    const spec = buildSizeSpec(garmentHint)
+    if (spec) return {
+      message: sizeSpecSummary(spec),
+      artifact: 'size-chart.csv',
+      download: { filename: 'grace-size-chart.csv', content: sizeSpecToCsv(spec), mime: 'text/csv' },
     }
   }
   // Real implementation: assemble a full production tech pack.

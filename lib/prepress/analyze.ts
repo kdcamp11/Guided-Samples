@@ -5,6 +5,12 @@
 import { CHECKS, STATUS_WEIGHT, type CheckContext } from './checks'
 import { inspectFile } from './inspect'
 import type { FileKind, PrepressReport, UploadedFile } from './types'
+import type { SizeProfile } from '@/lib/sizing/types'
+
+export interface AnalyzeOptions {
+  /** The user's saved default size profile (sizing source of truth), if any. */
+  sizeProfile?: SizeProfile | null
+}
 
 const VECTOR = ['svg', 'ai', 'eps']
 const RASTER = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'tif', 'tiff', 'bmp', 'heic']
@@ -64,7 +70,7 @@ async function classify(file: File): Promise<UploadedFile> {
 
 const any = (names: string[], re: RegExp) => names.some(n => re.test(n))
 
-function buildContext(files: UploadedFile[]): CheckContext {
+function buildContext(files: UploadedFile[], opts: AnalyzeOptions = {}): CheckContext {
   const names = files.map(f => f.name.toLowerCase())
   const rasterFiles = files.filter(f => f.kind === 'raster')
 
@@ -104,6 +110,7 @@ function buildContext(files: UploadedFile[]): CheckContext {
     embeddedImages,
     printSize: dimFile?.inspection?.pageSizeIn,
     sizeChartFile: sizeChartFile?.name,
+    savedSizeProfileName: opts.sizeProfile?.name,
     flags: {
       sizeChart: !!sizeChartFile || any(names, /size.?chart|sizing|measurement|grading|spec.?sheet/),
       techPack: any(names, /tech.?pack|techpack|specification|\bspec\b/),
@@ -118,9 +125,9 @@ function buildContext(files: UploadedFile[]): CheckContext {
   }
 }
 
-export async function analyzeFiles(fileList: File[]): Promise<PrepressReport> {
+export async function analyzeFiles(fileList: File[], opts: AnalyzeOptions = {}): Promise<PrepressReport> {
   const files = await Promise.all(Array.from(fileList).map(classify))
-  const ctx = buildContext(files)
+  const ctx = buildContext(files, opts)
 
   const results = CHECKS.map(def => ({ id: def.id, label: def.label, category: def.category, ...def.run(ctx) }))
 

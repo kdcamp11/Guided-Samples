@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { analyzeFiles } from '@/lib/prepress/analyze'
 import { runFix } from '@/lib/prepress/fixes'
+import { getDefaultSizeProfile } from '@/lib/sizing/store'
 import { STATUS_WEIGHT } from '@/lib/prepress/checks'
 import { CATEGORY_LABEL, type CheckResult, type PrepressReport, type Severity, type UploadedFile } from '@/lib/prepress/types'
 import { useAssistant } from '@/components/assistant/AssistantProvider'
@@ -59,7 +60,7 @@ export default function UploadProduction({ onBack, onContinue }: Props) {
     if (!files.length) return
     setPhase('analyzing')
     const [result] = await Promise.all([
-      analyzeFiles(files),
+      analyzeFiles(files, { sizeProfile: getDefaultSizeProfile() }),
       new Promise(res => setTimeout(res, ANALYZING_STEPS.length * 650 + 300)), // let the inspection read deliberately
     ])
     setReport(result)
